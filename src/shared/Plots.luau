@@ -18,6 +18,7 @@ export type View = {
 	slots: number, -- unlocked pads
 	vault: number, -- how many of them are vault pads (pads 1..vault)
 	stars: number,
+	lock: number, -- server time the Base Lock ends; 0 (or a past time) when open
 	pads: { [string]: PadView }, -- pad number as a string → the Glowling on it
 }
 
@@ -27,10 +28,11 @@ export type Patch = {
 	slots: number?,
 	vault: number?,
 	stars: number?,
+	lock: number?,
 	pads: { [string]: PadView | false }?,
 }
 
-local SCALARS = { "owner", "slots", "vault", "stars" }
+local SCALARS = { "owner", "slots", "vault", "stars", "lock" }
 
 -- The two plots next to `plotId` in the ring. `ids` is every plot id, in any order.
 function Plots.neighbors(ids: { number }, plotId: number): { number }
@@ -69,11 +71,12 @@ function Plots.pick(ids: { number }, taken: { [number]: any }, friendPlots: { nu
 end
 
 function Plots.empty(id: number): View
-	return { id = id, owner = 0, slots = 0, vault = 0, stars = 0, pads = {} }
+	return { id = id, owner = 0, slots = 0, vault = 0, stars = 0, lock = 0, pads = {} }
 end
 
--- What everyone sees of an owned plot. `layout` is Inventory's { slots, vault }.
-function Plots.view(id: number, owner: number, data: any, layout: { slots: number, vault: number }): View
+-- What everyone sees of an owned plot. `layout` is Inventory's { slots, vault }; `lock` is
+-- when its Base Lock ends (LockService).
+function Plots.view(id: number, owner: number, data: any, layout: { slots: number, vault: number }, lock: number?): View
 	local pads: { [string]: PadView } = {}
 	for _, map in { data.vault, data.display } do
 		for key, glowlingId in map do
@@ -83,7 +86,15 @@ function Plots.view(id: number, owner: number, data: any, layout: { slots: numbe
 			end
 		end
 	end
-	return { id = id, owner = owner, slots = layout.slots, vault = layout.vault, stars = data.stars, pads = pads }
+	return {
+		id = id,
+		owner = owner,
+		slots = layout.slots,
+		vault = layout.vault,
+		stars = data.stars,
+		lock = lock or 0,
+		pads = pads,
+	}
 end
 
 local function samePad(a: PadView?, b: PadView?): boolean

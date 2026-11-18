@@ -9,8 +9,10 @@
 -- there). Never by position, so the map can move. Rules for assignment and the view live in
 -- Shared.Plots.
 --
--- Not yet: the gate and the shield bubble (LockService, Phase 3), decorations and the base
--- name (Phase 4), and spawning the player at their plot.
+-- Each view carries its Base Lock's end time, set by LockService through setLock.
+--
+-- Not yet: the shield bubble (Phase 3), decorations and the base name (Phase 4), and
+-- spawning the player at their plot.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -36,6 +38,7 @@ local ids: { number } = {}
 local owners: { [number]: Player } = {}
 local plotOf: { [Player]: number } = {}
 local views: { [number]: Plots.View } = {} -- what clients were last sent; never mutated
+local locks: { [number]: number } = {} -- plotId → server time its Base Lock ends (LockService)
 local synced: { [Player]: boolean } = {} -- has the snapshot, so gets deltas
 
 function PlotService.plotOf(player: Player): number?
@@ -54,6 +57,11 @@ end
 function PlotService.pad(plotId: number, pad: number): BasePart?
 	local plot = plots[plotId]
 	return if plot then plot.pads[pad] else nil
+end
+
+function PlotService.zone(plotId: number): BasePart?
+	local plot = plots[plotId]
+	return if plot then plot.zone else nil
 end
 
 -- Is `position` inside the plot's Zone volume?
@@ -117,7 +125,7 @@ local function buildView(plotId: number): Plots.View
 	if owner == nil or data == nil then
 		return Plots.empty(plotId)
 	end
-	return Plots.view(plotId, owner.UserId, data, InventoryService.layout(owner, data))
+	return Plots.view(plotId, owner.UserId, data, InventoryService.layout(owner, data), locks[plotId])
 end
 
 -- Rebuilds one plot's view and sends what changed to every ready client.
@@ -131,6 +139,16 @@ local function publish(plotId: number)
 	for player in synced do
 		NetServer.send(player, "PlotDelta", plotId, patch)
 	end
+end
+
+-- LockService sets when a plot's Base Lock ends (0 to open it now); everyone sees it.
+function PlotService.setLock(plotId: number, untilTime: number)
+	locks[plotId] = if untilTime > 0 then untilTime else nil
+	publish(plotId)
+end
+
+function PlotService.isLocked(plotId: number): boolean
+	return (locks[plotId] or 0) > workspace:GetServerTimeNow()
 end
 
 local function sendSnapshot(player: Player)
@@ -181,6 +199,7 @@ local function release(player: Player)
 	end
 	plotOf[player] = nil
 	owners[id] = nil
+	locks[id] = nil
 	publish(id)
 	PlotService.Released:Fire(player, id)
 end

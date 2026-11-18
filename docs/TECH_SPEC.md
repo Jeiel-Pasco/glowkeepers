@@ -130,7 +130,7 @@ Client intent ──► Net (type check, rate limit) ──► Service (rules, s
 | IncomeService | Recomputes Glow/s when inventory changes; 1 Hz accrual; offline payout on join | 2 |
 | ShopService / UpgradeService | Restock windows, per-player stock, lures, Lantern, Boots, Slots, Lock Charges | 3 |
 | StealService | Grab, carry, tag, deliver, chase boost, victim cooldown, validation | 2 |
-| LockService | Base Lock timer, charges, gate state | 2 |
+| LockService | Base Lock: 60 s lock then 90 s recharge (a Lock Charge skips it), none at night, pushes outsiders out of a locked zone at 10 Hz | 2 |
 | CampfireService | Fire meter, wood and shard pickups, feeding, the dawn result | 2 |
 | ForestService | Wild spawn waves, catch validation, tutorial-only spawns | 2 |
 | StalkerService | Stalker NPC state machine and pathfinding (built by GS, runs on the server) | 2 |
@@ -256,7 +256,8 @@ export type Profile = {
 | Night modifier | Everyone | Workspace attribute `NightModifier`, set at dusk warning | Once a cycle |
 | Fire meter | Everyone | Workspace attribute `Fire` (0–1, nil by day; 0 = the night is Lost); clients lerp | 4 Hz at night |
 | Wood piles | Everyone | Each `WoodPile` model's `Available` attribute | On change |
-| Plot state (owner, slots, vault, lock, shield, decorations, base name, Stars) | Everyone | `PlotSnapshot` on join, then `PlotDelta` | On change |
+| Plot state (owner, slots, vault, lock, shield, decorations, base name, Stars) | Everyone | `PlotSnapshot` on join, then `PlotDelta`; `lock` is the server time the Base Lock ends (0 = open) | On change |
+| Lock recharge | The owner | Player attribute `LockReadyAt` (server time the recharge ends); charges are `lockCharges` in `PlayerState` | On change |
 | Wallet | Owner only | `Wallet {glow, perSec, t, embers}`; the client extrapolates the ticking counter | On change, plus every 10 s |
 | Inventory, quests, pass, pity, stock | Owner only | `PlayerState(full = true, data)` once the client sends `ClientReady`, then `PlayerState(false, patch)` with changed top-level keys (`receipts` and `flags` are never sent) | On change |
 | Wild Glowlings | Everyone (tutorial spawns: one player only) | `WildSpawned` (a list of `{ id, sp, area, x, y, z }`; every wild to a client that becomes ready mid-night) / `WildGone` (a list of ids) | Per wave, per catch, at dawn |
@@ -300,7 +301,7 @@ Every remote is declared once in `shared/Net.luau`, with its argument schema and
 | `FeedFire` | C→S | — | Carrying fuel; within 10 studs of the fire | 4/s |
 | `ReviveStart` | C→S | userId: number | Night; reviver alive; target downed (not yourself, not a wisp); one revive per reviver and per target; within 8 studs; the server times the 3 s hold, pauses the target's bleed-out during it, and cancels it if the range breaks | 2/s |
 | `ReviveCancel` | C→S | — | Lets go of the reviver's hold; the bleed-out carries on | 2/s |
-| `Lock` | C→S | — | Day; owns the plot; off cooldown or has a charge; not carrying | 1/s |
+| `Lock` | C→S | — | Day or dusk (a lock running at nightfall ends and recharges from then); owns a plot; not already locked; recharged, or spends a Lock Charge; not carrying. Grabs in progress on the plot cancel; non-owners who were inside may leave but not come back | 1/s |
 | `Place` / `Unplace` | C→S | id: string, pad: number (Place only) | Owns the id; pad unlocked (pads 1…vault are vault pads, so Place to one of them is the move to the vault; a taken pad swaps); Unplace only while storage has room; not mid-trade | 10/s |
 | `PlaceBest` | C→S | — | Best earners to the vault pads, the next best to display pads (GAME_SYSTEMS §7) | 2/s |
 | `Release` | C→S | ids: {string} (≤ 20) | Owns all of them; none in display slots, the vault or a trade; confirmed by the client UI | 2/s |
