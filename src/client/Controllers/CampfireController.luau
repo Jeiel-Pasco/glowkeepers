@@ -20,7 +20,7 @@ local InputController = require(script.Parent:WaitForChild("InputController"))
 
 local PICK_UP = "Pick up"
 local FEED = "Feed"
-local REVIVE = "Revive" -- DownedController's label
+local PRIORITY = 10 -- below Revive, Catch and Grab
 local CHECK_SECONDS = 0.15
 local MARGIN = 1 -- studs inside the server's ranges, so the button never shows where the server says no
 
@@ -140,12 +140,7 @@ local function updateContext()
 			end
 		end
 	end
-	local current = InputController.context()
-	if label ~= nil and current ~= REVIVE then -- reviving a teammate comes first
-		InputController.setContext(label)
-	elseif label == nil and (current == PICK_UP or current == FEED) then
-		InputController.setContext(nil) -- leave other controllers' labels alone
-	end
+	InputController.offer("Campfire", label, PRIORITY)
 end
 
 function CampfireController.Start()

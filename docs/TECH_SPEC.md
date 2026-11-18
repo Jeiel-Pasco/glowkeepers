@@ -259,7 +259,8 @@ export type Profile = {
 | Plot state (owner, slots, vault, lock, shield, decorations, base name, Stars) | Everyone | `PlotSnapshot` on join, then `PlotDelta` | On change |
 | Wallet | Owner only | `Wallet {glow, perSec, t, embers}`; the client extrapolates the ticking counter | On change, plus every 10 s |
 | Inventory, quests, pass, pity, stock | Owner only | `PlayerState(full = true, data)` once the client sends `ClientReady`, then `PlayerState(false, patch)` with changed top-level keys (`receipts` and `flags` are never sent) | On change |
-| Wild Glowlings | Everyone (tutorial spawns: one player only) | `WildSpawned` / `WildGone` | Per wave |
+| Wild Glowlings | Everyone (tutorial spawns: one player only) | `WildSpawned` (a list of `{ id, sp, area, x, y, z }`; every wild to a client that becomes ready mid-night) / `WildGone` (a list of ids) | Per wave, per catch, at dawn |
+| Catches left | The player | Player attribute `CatchesLeft` (nil by day) | On change |
 | Carrying | Everyone | Character attributes `CarrySp`, `CarryR`, `CarryM` and `CarryFrom` (the victim's userId) for a stolen Glowling, or `CarryFuel` (`"wood"`); `GrabUntil` (server time a grab's hold ends) while grabbing; `RunSpeed` while carrying or chase-boosted | On change |
 | Downed and revive | Everyone | Character attributes `Life` (`"downed"` or `"wisp"`; nil = alive), `BleedUntil` (server time; nil while a revive holds it), `ReviveUntil` on the reviver, `SafeUntil` after a revive | On change |
 | Stalker | Everyone | Server-owned model, replicated by the engine | Engine |
@@ -292,7 +293,7 @@ Every remote is declared once in `shared/Net.luau`, with its argument schema and
 
 | Remote | Direction | Arguments | Server checks | Limit |
 | --- | --- | --- | --- | --- |
-| `Catch` | C→S | wildId: string | Night; wild exists and is visible to this player; distance ≤ 12 studs; catches left > 0; not downed | 4/s |
+| `Catch` | C→S | wildId: string | Night; catcher alive (not downed or a wisp); wild exists and is visible to this player; catches left > 0; storage below its hard cap; distance ≤ 12 studs | 4/s |
 | `GrabStart` | C→S | plotId: number, slot: number | Day; before the dusk cutoff; target is a display slot with a Glowling; not own plot; thief has a plot and storage room; target not locked, shielded or on victim cooldown; under the per-victim daily limit; thief not shielded (a grab ends the shield); within 6 studs (flat distance, `Steal.reach`); not already grabbing or carrying | 2/s |
 | `GrabCancel` | C→S | — | Lets go of the thief's grab in progress (a carry can't be cancelled) | 2/s |
 | `PickupFuel` | C→S | pileId: string | Night; within 8 studs; hands empty | 4/s |

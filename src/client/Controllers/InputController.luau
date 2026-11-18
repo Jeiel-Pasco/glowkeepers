@@ -2,9 +2,10 @@
 -- Input for touch, keyboard/mouse and gamepad (TECH_SPEC §4).
 --
 -- One context button does whatever is relevant right now: Catch, Grab, Feed, Revive or Place.
--- Gameplay controllers call InputController.setContext("Catch") when the action becomes
--- available and setContext(nil) when it doesn't. Keyboard: E. Gamepad: X. Touch: an on-screen
--- button. Hold actions (Grab, Revive) use the began/ended pair; the server times the hold.
+-- Gameplay controllers offer a label with a priority on every check, or nil to withdraw it
+-- (InputController.offer); the highest offer shows. Keyboard: E. Gamepad: X. Touch: an
+-- on-screen button. Hold actions (Grab, Revive) use the began/ended pair; the server times
+-- the hold.
 
 local ContextActionService = game:GetService("ContextActionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,8 +18,11 @@ local CONTEXT_KEYS = { Enum.KeyCode.E, Enum.KeyCode.ButtonX }
 local InputController = {}
 InputController.Action = Signal.new() -- (label: string, began: boolean)
 
+type Offer = { label: string, priority: number }
+
 local contextLabel: string? = nil
 local bound = false
+local offers: { [string]: Offer } = {}
 
 local function onContext(_: string, state: Enum.UserInputState, _input: InputObject): Enum.ContextActionResult
 	local label = contextLabel
@@ -55,6 +59,19 @@ end
 
 function InputController.context(): string?
 	return contextLabel
+end
+
+-- `source` (a controller's name) wants the button to say `label`, or nothing with nil. The
+-- highest priority wins; give each source its own priority so two never tie.
+function InputController.offer(source: string, label: string?, priority: number)
+	offers[source] = if label ~= nil then { label = label, priority = priority } else nil
+	local best: Offer? = nil
+	for _, offer in offers do
+		if best == nil or offer.priority > best.priority then
+			best = offer
+		end
+	end
+	InputController.setContext(if best ~= nil then best.label else nil)
 end
 
 return InputController

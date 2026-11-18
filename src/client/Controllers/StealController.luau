@@ -21,6 +21,7 @@ local CycleFXController = require(script.Parent:WaitForChild("CycleFXController"
 local PlotController = require(script.Parent:WaitForChild("PlotController"))
 
 local GRAB = "Grab"
+local PRIORITY = 20 -- above Feed, below Catch and Revive (never at the same time anyway: Grab is by day)
 local CHECK_SECONDS = 0.15
 local MARGIN = 1 -- studs inside the server's range, so the button never shows where the server says no
 local MARK_COLOR = Color3.fromRGB(255, 200, 80)
@@ -79,11 +80,7 @@ local function updateContext(character: Model?, root: BasePart?)
 			end
 		end
 	end
-	if label ~= nil then
-		InputController.setContext(label)
-	elseif InputController.context() == GRAB then
-		InputController.setContext(nil) -- leave other controllers' labels alone
-	end
+	InputController.offer("Steal", label, PRIORITY)
 end
 
 local function updateMarks()

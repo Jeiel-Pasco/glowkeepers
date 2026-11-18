@@ -20,6 +20,7 @@ local InputController = require(script.Parent:WaitForChild("InputController"))
 local CycleFXController = require(script.Parent:WaitForChild("CycleFXController"))
 
 local REVIVE = "Revive"
+local PRIORITY = 40 -- a teammate's life comes before everything else
 local CHECK_SECONDS = 0.15
 local MARGIN = 1 -- studs inside the server's range, so the button never shows where the server says no
 local DOWNED_FILL = Color3.fromRGB(25, 35, 80)
@@ -70,11 +71,7 @@ local function updateContext(character: Model?)
 			end
 		end
 	end
-	if label ~= nil then
-		InputController.setContext(label)
-	elseif InputController.context() == REVIVE then
-		InputController.setContext(nil) -- leave other controllers' labels alone
-	end
+	InputController.offer("Downed", label, PRIORITY)
 end
 
 local function setFaded(character: Model, on: boolean)
