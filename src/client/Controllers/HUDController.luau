@@ -136,6 +136,7 @@ local function buildPlaceholder(playerGui: PlayerGui): ScreenGui
 	phaseLabel.Font = Enum.Font.GothamMedium
 	phaseLabel.TextSize = 12
 	phaseLabel.TextColor3 = Color3.fromRGB(210, 210, 230)
+	phaseLabel.Text = "" -- not Roblox's default "Label" before the first refresh
 	phaseLabel.Parent = ring
 
 	local countdown = Instance.new("TextLabel")
@@ -147,6 +148,7 @@ local function buildPlaceholder(playerGui: PlayerGui): ScreenGui
 	countdown.Font = Enum.Font.GothamBold
 	countdown.TextSize = 20
 	countdown.TextColor3 = Color3.new(1, 1, 1)
+	countdown.Text = ""
 	countdown.Parent = ring
 
 	local banner = makeLabel("Banner", gui, 22, Color3.new(1, 1, 1))

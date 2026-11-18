@@ -140,19 +140,20 @@ After the feature freeze (end of week 11), the only work is bug fixes, config tu
 
 ### Phase 1: Foundations + greybox (weeks 1–2)
 
-> **Status, 18 Nov 2026: the LS code scaffold is in the repo but hasn't run yet.**
+> **Status, 18 Nov 2026: the LS and GS code runs in Studio, and the greybox is built.**
 > - **Done:**
->   - Rojo project, Rokit pins, Selene and StyLua configs, CI workflow
+>   - Rojo project, Rokit pins, Selene and StyLua configs, CI workflow; toolchain installed, all specs pass
 >   - Shared pure modules: `EconomyMath`, `Economy`, `Roll`, `Cycle`, `Fire`, `Net` (with `Validate` and `TokenBucket`), `Env`, `Types`, `Signal`
->   - Server: `NetServer`; `Schema` v1 with the migration hook; `DataService` on ProfileStore, with an in-memory fallback in DEV; `CycleService`, `SettingsService`, `Telemetry`
+>   - Server: `NetServer`; `Schema` v1 with the migration hook; `DataService` on ProfileStore (copied into `Vendor/`), with an in-memory fallback in DEV; `CycleService`, `SettingsService`, `Telemetry`
 >   - Client: `StateController`, `InputController`, `MovementController` (auto-sprint), `CycleFXController`, and the HUD skeleton
 >   - Tests: a Lune spec for every pure module and the config, plus sim parity through `sim/golden_odds.json`
+>   - The three experiences exist and their ids are in `config/environments.json`
+>   - First Studio smoke test on DEV passed: boot, HUD, phase skips, auto-sprint, 2 players in sync
+>   - BL greybox from `tools/BuildGreybox.luau`: clearing, 8 plots, campfire, stations, forest ring, deepwood, trails. Metrics are in CONTENT_AND_LIVEOPS §A2 and the map contract in TECH_SPEC §6a.
 > - **Still open:**
->   - Install the toolchain and run the specs
->   - Copy ProfileStore into `src/server/Vendor/`
->   - Create the three experiences and fill in `config/environments.json`
->   - The first Studio playtest and CI's first run
->   - The DP sim extensions, and every GS, AR and BL task
+>   - CI's first run (after the first push)
+>   - The G1 mood session itself, and tuning `CycleFXController`'s LOOKS and the fire light from it
+>   - The DP sim extensions, the analytics event list and FTUE script, and the AR style test
 
 - **LS**
   - Repo, Rojo, Wally, Selene, StyLua and CI (TECH_SPEC §1)

@@ -26,7 +26,7 @@ A Roblox game: collect Glowlings by day and steal them from other players' bases
    rojo plugin install
    ```
 
-4. Put the game ids (universe ids) of the DEV, BETA and PROD experiences in `config/environments.json`. An unknown id runs as DEV.
+4. `config/environments.json` holds the DEV, BETA and PROD ids (filled in 18 Nov 2026). A place id or a game id both work. An unknown id runs as DEV.
 
 ## Working
 
@@ -36,6 +36,7 @@ rojo serve
 
 In Studio, open the Rojo plugin and connect. Code and `config/*.json` sync live. The map, UI templates and models stay in the Team Create place.
 
+- **Rebuild the greybox map:** paste `tools/BuildGreybox.luau` into Studio's command bar in Edit mode. Change the numbers in its `LAYOUT` table to try another layout. Once the map has been edited by hand, it refuses to overwrite it (TECH_SPEC §6a).
 - **Skip to the next phase** (DEV and BETA only): in Studio's server view, set the Workspace attribute `DebugSkipPhase` to true.
 - **New remote:** declare it in `src/shared/Net/init.luau` first, with its argument schema and rate limit.
 - **New service or controller:** add it to `ORDER` in `src/server/Main.server.luau` or `src/client/Main.client.luau`.
@@ -66,9 +67,9 @@ python sim/golden_odds.py
 Format, then lint:
 
 ```powershell
-stylua src tests
+stylua src tests tools
 ```
 
 ```powershell
-selene src
+selene src tools
 ```

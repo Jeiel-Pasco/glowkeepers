@@ -20,27 +20,35 @@ The rules and numbers this doc refers to are in [GAME_SYSTEMS.md](GAME_SYSTEMS.m
 ## A2. Map: the Clearing
 
 ```
-                 Deepwood (shards, rare spawns, Stalker territory)  r 150–260
+                 Deepwood (shards, rare spawns, Stalker territory)  r 160–260
           ┌───────────────────────────────────────────────┐
-          │        Forest ring (wood piles, spawns)  r 90–150
+          │        Forest ring (wood piles, spawns)  r 100–160
           │     ┌──────────────────────────────────┐      │
           │     │   P1    P2    P3    P4           │      │
           │     │            ( FIRE )   r 0–30     │      │  Lantern Shop,
           │     │   P8    P7    P6    P5           │      │  Wisp's Stash,
-          │     │   plots at r 45–85, gates face in│      │  leaderboards on the
+          │     │   plots at r 55–95, gates face in│      │  leaderboards on the
           │     └──────────────────────────────────┘      │  inner ring
           └───────────────────────────────────────────────┘
 ```
 
+**Metrics, as built in the greybox (18 Nov 2026).** These are the values in `tools/BuildGreybox.luau`, measured in Studio. They differ from the first plan in one way: eight 40-wide plots with gates 45 studs out overlap at their inner corners, which closes every gap between plots. The plots are 36 wide on a 75-stud ring instead, so the trails fit between them.
+
 | Metric | Value |
 | --- | --- |
-| Fire light radius (safe from the Stalker) | 30 studs |
-| Plot footprint | About 40 × 40 studs; gate faces the fire; decoration zone 24 × 24 |
-| Plot gate to fire | About 45 studs, roughly 2 s at run speed |
-| Plot to neighbouring plot | About 50 studs. A steal run across the ring takes 6–9 s, long enough for a chase. |
-| Forest ring | 90–150 studs, with 16 wood piles |
-| Deepwood | 150–260 studs, with glow-shards and 40% of spawns |
-| Total radius | About 260 studs; a soft boundary of fog and thickening trees |
+| Fire light radius (safe from the Stalker) | 30 studs, marked by a stone circle. The light itself reaches 40, so the circle's edge is still lit. |
+| Plot footprint | 36 wide × 40 deep; gate faces the fire; decoration zone 24 × 24 at the back; 30 slot pads |
+| Plot ring | Plot centres at 75 studs; gates at 55, backs at 95 |
+| Plot gate to fire | 55 studs (25 from the safe edge), 2.5 s at run speed |
+| Plot to neighbouring plot | 57 studs centre to centre; the narrowest gap between plots is 8.8 studs |
+| Steal run across the ring | Gate to opposite gate is 110 studs: 5.9 s carrying, plus the run from slot to gate inside the plot. 6–9 s in total, long enough for a chase. |
+| Stations (shop, stash, boards) | On the inner ring at 42 studs, in the 4 gaps without a trail; the farthest gate is 4.3 s away |
+| Trails | 4, 6 studs wide, from the stone circle out through the gaps between plots to the deepwood |
+| Clearing | 0–100 studs |
+| Forest ring | 100–160 studs, with 16 wood piles and 60% of wild spawns (24 points) |
+| Deepwood | 160–260 studs, with 12 glow-shard points and 40% of wild spawns (16 points) |
+| Total radius | 260 studs; an invisible wall, with thickening trees out to 276 |
+| Greybox size | 810 trees, 2,135 parts |
 
 The Lantern Shop, the Wisp's Stash (tutorial steal), the leaderboard boards and a "What's new" board stand on the inner ring between plots, so they're always within 10 s of any base.
 

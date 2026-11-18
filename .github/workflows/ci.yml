@@ -22,10 +22,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Format check
-        run: stylua --check src tests
+        run: stylua --check src tests tools
 
       - name: Lint
-        run: selene src
+        run: selene src tools
 
       - name: Unit tests (Lune)
         run: |

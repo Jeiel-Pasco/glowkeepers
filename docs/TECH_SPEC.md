@@ -38,7 +38,8 @@ Code finds assets by path. In Studio, an `AssetValidator` runs at startup on bot
 | BETA | Glowkeepers [BETA], private | Separate | Group role "Beta Tester" | Closed beta, and QA before each Friday release |
 | PROD | Glowkeepers | Separate | Everyone | Live |
 
-- `config/environments.json` maps `game.GameId` to an environment. An unknown id runs as DEV with purchases disabled.
+- `config/environments.json` lists each experience's id. A place id (`game.PlaceId`) or a game id (`game.GameId`) both match. An unknown id runs as DEV with purchases disabled.
+- Ids (18 Nov 2026): DEV 81788809201865, BETA 90085664037807, PROD 111315198319328.
 - Developer products and passes belong to one experience each, so `config/products.json` holds a separate set of IDs for each environment.
 - Studio play-solo uses a `MockDataStore` when API access is off, and DEV's DataStores when it's on. In Studio on the PROD experience, DataService always uses ProfileStore's mock store, so Studio never touches live saves.
 - Without `Server.Vendor.ProfileStore`, DEV runs on an in-memory store that saves nothing, with a loud warning. BETA and PROD refuse sessions and kick players with a message.
@@ -87,6 +88,7 @@ glowkeepers/
 ├─ sim/                        sim.py (original, GDD numbers), sim_v3.py (reads ../config/economy.json),
 │                              golden_odds.py → golden_odds.json (the values the Luau modules must reproduce)
 ├─ data/                       the top-98 chart dataset behind the GDD (18 Nov 2026)
+├─ tools/                      Studio command-bar scripts, not synced by Rojo: BuildGreybox.luau (§6a)
 └─ docs/
 ```
 
@@ -258,6 +260,23 @@ export type Profile = {
 | Carrying | Everyone | Character attributes `CarrySp`, `CarryR`, `CarryM` | On change |
 | Stalker | Everyone | Server-owned model, replicated by the engine | Engine |
 | Announcements and toasts | All, or one player | `Announce`, `Toast` | On event |
+
+### 6a. Map contract
+
+The map lives in the place (Team Create), not in Rojo, as `Workspace.Map`. Code finds things by CollectionService tag and attribute, never by position or path, so the level designer can move anything.
+
+| Tag | Instance | Attributes | Children code uses |
+| --- | --- | --- | --- |
+| `Plot` | Model | `PlotId` 1–8 | `Floor` (PrimaryPart), `Zone` (invisible volume over the plot), `Gate` (invisible, at the gate), `DecorZone` (24 × 24), `Slots/SlotNN` pads with `Slot` 1–30, `Trophy`, `Sign` |
+| `Campfire` | Model | `LightRadius` (30, safe from the Stalker), `FeedRadius` (10) | `Pit` (PrimaryPart), `Pit.LightPoint` (the PointLight) |
+| `WoodPile` | Model | `PileId` `"W01"`… | |
+| `WildSpawn` | Part (invisible) | `Area` `"Forest"` or `"Deepwood"` | |
+| `ShardSpawn` | Part (invisible) | | |
+| `Station` | Model | `Kind` `"LanternShop"`, `"WispStash"`, `"Leaderboards"`, `"WhatsNew"` | `Sign` |
+
+`Workspace.Map` carries the ring radii as attributes: `FireLightRadius`, `PlotRingRadius`, `ClearingRadius`, `ForestOuter`, `MapRadius`. Slots 1–6 sit in the plot's side strips (the vault pedestals come first); 7–30 sit in three rows in front of the decoration zone.
+
+The greybox comes from `tools/BuildGreybox.luau` (run it in Studio's command bar). It rebuilds only a map it made itself; once the map is edited by hand, set `Map.HandEdited = true` and it refuses to overwrite it. The art pass keeps the tags and attributes above.
 
 ---
 

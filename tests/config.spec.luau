@@ -87,14 +87,14 @@ H.test("per-rarity tables have one entry per rarity", function()
 	H.eq(#cfg.trade.feeByRarity, #cfg.rarities, "trade.feeByRarity")
 end)
 
-H.test("environments: lists of game ids, none shared", function()
+H.test("environments: lists of place or game ids, none shared", function()
 	local seen = {}
 	for _, name in { "DEV", "BETA", "PROD" } do
 		local ids = envs[name]
 		H.ok(type(ids) == "table", `{name} must be a list (it may be empty)`)
 		for _, id in ids do
-			H.ok(type(id) == "number" and id % 1 == 0 and id > 0, `{name}: game ids are positive whole numbers`)
-			H.ok(seen[id] == nil, `game id {id} is in both {seen[id]} and {name}`)
+			H.ok(type(id) == "number" and id % 1 == 0 and id > 0, `{name}: ids are positive whole numbers`)
+			H.ok(seen[id] == nil, `id {id} is in both {seen[id]} and {name}`)
 			seen[id] = name
 		end
 	end
