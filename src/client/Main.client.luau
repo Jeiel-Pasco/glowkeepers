@@ -17,6 +17,7 @@ local ORDER = {
 	"ForestController",
 	"DownedController",
 	"StealController",
+	"LockController",
 	"HUDController",
 }
 

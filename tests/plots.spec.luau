@@ -116,4 +116,18 @@ H.test("a freed plot diffs to owner 0 with every pad cleared", function()
 	H.eq(next(applied.pads), nil, "no pads left")
 end)
 
+H.test("a Base Lock starts and ends as a lock patch", function()
+	local layout = { slots = 8, vault = 3 }
+	local open = Plots.view(2, 42, data(), layout)
+	H.eq(open.lock, 0, "open by default")
+	local locked = Plots.view(2, 42, data(), layout, 1060)
+	local patch = Plots.diff(open, locked) :: any
+	H.eq(patch.lock, 1060, "lock end time")
+	H.eq(patch.pads, nil, "nothing else")
+	local applied = Plots.apply(copy(open), patch)
+	H.eq(applied.lock, 1060, "applied")
+	H.eq((Plots.diff(locked, open) :: any).lock, 0, "unlocking sends 0")
+	H.eq(Plots.empty(2).lock, 0, "a free plot is open")
+end)
+
 H.finish("plots")

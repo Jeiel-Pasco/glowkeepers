@@ -15,7 +15,10 @@
 -- for their through-walls Highlight); and RunSpeed on thief and owner (MovementController).
 -- The grab rules and the carry speed check live in Shared.Steal.
 --
--- Not yet: Base Lock (LockService fills `locked` and cancels grabs), the shield (Phase 3),
+-- A locked base (PlotService.isLocked) can't be grabbed from, and a grab in progress there is
+-- cancelled; a carry that already left keeps going.
+--
+-- Not yet: the shield (Phase 3),
 -- Boots in everyone's RunSpeed (the shop), crew-mates as taggers (Phase 4), the owner's alarm
 -- arrow (GS), the Audit store for Legendary-or-better steals (Phase 5).
 
@@ -125,6 +128,11 @@ local function carrying(player: Player): Job?
 	return if job ~= nil and job.stage == "carry" then job else nil
 end
 
+-- Carrying a stolen Glowling home (LockService: no locking your base while carrying).
+function StealService.isCarrying(player: Player): boolean
+	return carrying(player) ~= nil
+end
+
 -- Run speed from Boots, ×0.85 while carrying, ×1.2 during a chase boost.
 local function speedOf(player: Player, now: number): number
 	local data = DataService.get(player)
@@ -160,6 +168,8 @@ local function endText(job: Job, why: string, tagger: Player?): (string?, string
 			return `{if tagger then tagger.DisplayName else "They"} stopped your grab!`, "Grab stopped!"
 		elseif why == "dusk" then
 			return "Too late: grabs stop at dusk", nil
+		elseif why == "locked" then
+			return "The base locked: grab cancelled", nil
 		elseif why == "moved" then
 			return "Too far: grab cancelled", nil
 		elseif why == "owner_left" then
@@ -271,7 +281,7 @@ local function grabStart(thief: Player, plotId: number, pad: number)
 		hasGlowling = id ~= nil,
 		busy = jobs[thief] ~= nil,
 		padTaken = victim ~= nil and id ~= nil and InventoryService.isHeld(victim, id),
-		locked = false, -- LockService
+		locked = PlotService.isLocked(plotId),
 		shielded = false, -- Phase 3
 		now = now,
 		victimSafeUntil = if victim ~= nil then safeUntil[victim.UserId] or 0 else 0,
@@ -382,6 +392,8 @@ local function tick()
 			local by = tagger(job, root)
 			if not state.grabsAllowed then
 				snapHome(job, "dusk")
+			elseif PlotService.isLocked(job.plotId) then
+				snapHome(job, "locked")
 			elseif padDistance(job.plotId, job.pad, root) > economy.steal.grabRange + GRAB_SLACK then
 				snapHome(job, "moved")
 			elseif by ~= nil then

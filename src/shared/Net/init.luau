@@ -63,6 +63,7 @@ Net.remotes = {
 	-- server times the hold itself; the client's progress ring is only cosmetic.
 	GrabStart = { dir = "c2s", args = { PLOT, PAD }, rate = { perSecond = 2, burst = 4 } },
 	GrabCancel = { dir = "c2s", args = {}, rate = { perSecond = 2, burst = 4 } },
+	Lock = { dir = "c2s", args = {}, rate = { perSecond = 1, burst = 2 } }, -- Base Lock, or a Lock Charge to skip the recharge
 	Catch = { dir = "c2s", args = { { type = "string", maxLen = 16 } }, rate = { perSecond = 4, burst = 4 } }, -- wildId
 	-- Hold to revive a downed player (by userId; Studio test players have negative ids).
 	-- The server times the hold; ReviveCancel lets go.
