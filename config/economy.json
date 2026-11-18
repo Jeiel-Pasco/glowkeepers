@@ -44,7 +44,7 @@
   "fire":    { "start": 0.60, "max": 1.0, "drainBase": 0.005, "drainPerPlayer": 0.000375, "wood": 0.03, "shard": 0.06, "failGlowLoss": 0.05,
                "pileRespawnSeconds": 20, "pickupRange": 8 },
   "night":   { "baseCatches": 3, "spawnsPerPlayer": 4, "spawnWavesAt": [10, 40, 70], "catchRange": 12 },
-  "revive":  { "holdSeconds": 3, "range": 8, "bleedOutSeconds": 30 },
+  "revive":  { "holdSeconds": 3, "range": 8, "bleedOutSeconds": 30, "safeSeconds": 3 },
   "embers":  { "surviveBase": 10, "perFireTenPct": 1, "perRevive": 5, "reviveCap": 4, "perPiece": 1, "pieceCap": 6, "failConsolation": 3, "friendBonusPer": 0.10, "friendBonusCap": 0.30 },
   "trade":   { "minStars": 3, "minPlayDays": 3, "minAccountAgeDays": 7, "maxPerSide": 4, "confirmDelay": 5, "escrowSeconds": 120,
                "feeByRarity": [1, 2, 5, 10, 25, 50, 100], "tradeLockHours": 24, "maxPerDay": 10 }

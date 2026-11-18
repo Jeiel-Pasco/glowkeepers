@@ -99,6 +99,13 @@ H.test("steal", function()
 	H.ok(st.teleportStuds > cfg.movement.run, "the teleport margin covers a lag spike")
 end)
 
+H.test("revive", function()
+	local r = cfg.revive
+	H.ok(r.holdSeconds > 0 and r.range > 0 and r.safeSeconds >= 0, "hold, range, safety")
+	H.ok(r.bleedOutSeconds > r.holdSeconds, "a revive started at once can finish before bleed-out")
+	H.ok(r.bleedOutSeconds < cfg.cycle.nightSeconds, "bleed-out ends inside the night")
+end)
+
 H.test("per-rarity tables have one entry per rarity", function()
 	H.eq(#cfg.steal.grabSeconds, #cfg.rarities, "steal.grabSeconds")
 	H.eq(#cfg.trade.feeByRarity, #cfg.rarities, "trade.feeByRarity")
