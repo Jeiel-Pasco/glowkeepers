@@ -55,10 +55,10 @@ function RollService.luck(player: Player): number
 	return Economy.luck(economy, data.up.lantern, data.stars, { fireSurvived = CampfireService.survivedLastNight() })
 end
 
-local function grant(player: Player, tier: number, poolName: string, src: string): Types.Glowling?
+local function grant(player: Player, tier: number, poolName: string, src: string, species: string?): Types.Glowling?
 	local result = Roll.finish(economy, tier, rng)
 	local record = GlowlingService.create(player, {
-		sp = Roll.species(pool(poolName), rng),
+		sp = species or Roll.species(pool(poolName), rng),
 		r = result.r,
 		m = result.m,
 		s = result.s,
@@ -80,14 +80,20 @@ function RollService.lure(player: Player, floor: number): Types.Glowling?
 	return grant(player, tier, "Clearing", "lure")
 end
 
+-- Picks a species from a pool: ForestService shows a wild's species before it's caught.
+function RollService.species(poolName: string): string
+	return Roll.species(pool(poolName), rng)
+end
+
 -- A night catch from `poolName` ("Clearing" in the forest, "Deepwood" past it), with pity (§5).
-function RollService.night(player: Player, poolName: string): Types.Glowling?
+-- `species` is the wild's species, already picked; the rarity is rolled now, with luck.
+function RollService.night(player: Player, poolName: string, species: string?): Types.Glowling?
 	local data = DataService.get(player)
 	if data == nil or not GlowlingService.hasRoom(player) then
 		return nil
 	end
 	local tier, pity = Roll.nightRarity(economy, RollService.luck(player), data.pity.sinceLegendary, rng)
-	local record = grant(player, tier, poolName, "night")
+	local record = grant(player, tier, poolName, "night", species)
 	if record ~= nil then
 		data.pity.sinceLegendary = pity
 		DataService.changed(player, "pity")

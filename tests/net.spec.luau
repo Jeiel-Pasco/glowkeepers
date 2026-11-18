@@ -38,6 +38,13 @@ H.test("pad arguments allow exactly the pads a plot can unlock", function()
 	H.ok(not Validate.args(Net.remotes.Unplace.args, table.pack("id", 3)), "Unplace takes one argument")
 end)
 
+H.test("Catch takes one short wild id", function()
+	local args = Net.remotes.Catch.args
+	H.ok(Validate.args(args, table.pack("17")), "a wild id")
+	H.ok(not Validate.args(args, table.pack(string.rep("9", 17))), "too long")
+	H.ok(not Validate.args(args, table.pack(17)), "a string, not a number")
+end)
+
 H.test("ReviveStart takes one whole userId", function()
 	local args = Net.remotes.ReviveStart.args
 	H.ok(Validate.args(args, table.pack(123456)), "a user id")

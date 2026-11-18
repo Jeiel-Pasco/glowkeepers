@@ -1,8 +1,8 @@
 --!strict
 -- HUD skeleton (Phase 1): the Glow counter (extrapolated from the Wallet), Embers, the cycle
 -- ring with its countdown, the phase banner, and a loading cover until the first PlayerState.
--- Phase 2: the fire meter at night (workspace `Fire`), and banners for rolls, the dawn result
--- and server Toasts (steal alarms and results).
+-- Phase 2: the fire meter and catches left at night (workspace `Fire`, Player `CatchesLeft`),
+-- and banners for rolls, the dawn result, server Toasts and Announcements.
 --
 -- If the place has StarterGui.HUD (laid out by artists in Studio; set ResetOnSpawn off), this
 -- binds to its descendants by name: Glow, Embers, FireMeter, Ring (with Dot1..DotN children),
@@ -283,6 +283,10 @@ local function refreshFire(now: number)
 	local character = Players.LocalPlayer.Character
 	local carrying = character ~= nil and character:GetAttribute("CarryFuel") ~= nil
 	local text = if level <= 0 then "Fire out" else `Fire {math.floor(level * 100 + 0.5)}%`
+	local catches = Players.LocalPlayer:GetAttribute("CatchesLeft")
+	if type(catches) == "number" then
+		text = `{text} · {catches} {if catches == 1 then "catch" else "catches"} left`
+	end
 	meter.Text = if carrying then `{text} · carrying wood` else text
 	local low = level < FIRE_LOW_BELOW
 	meter.TextColor3 = if low then FIRE_LOW else FIRE_OK
@@ -354,6 +358,9 @@ function HUDController.Start()
 
 	NetClient.on("RollResult", function(record: any)
 		showBanner(rollText(record))
+	end)
+	NetClient.on("Announce", function(text: string)
+		showBanner(text) -- placeholder until GS gives server announcements their own style
 	end)
 	NetClient.on("Toast", function(text: string, _kind: string?)
 		showBanner(text) -- placeholder until GS styles toasts by kind ("alarm", "good", "bad")
