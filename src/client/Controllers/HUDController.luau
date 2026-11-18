@@ -13,8 +13,12 @@ local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = Shared:WaitForChild("Config")
 local Cycle = require(Shared:WaitForChild("Cycle"))
 local EconomyMath = require(Shared:WaitForChild("EconomyMath"))
+local economy = require(Config:WaitForChild("economy")) :: any
+local speciesConfig = require(Config:WaitForChild("species")) :: any
+local NetClient = require(script.Parent.Parent:WaitForChild("Net"):WaitForChild("NetClient"))
 local StateController = require(script.Parent:WaitForChild("StateController"))
 local CycleFXController = require(script.Parent:WaitForChild("CycleFXController"))
 
@@ -228,6 +232,25 @@ local function showBanner(text: string)
 	end)
 end
 
+-- Placeholder roll reveal until RollRevealController (GS): "You got a Rare Golden Mothlet!"
+local function rollText(record: any): string
+	local name = record.sp
+	for _, species in speciesConfig.species do
+		if species.id == record.sp then
+			name = species.name
+			break
+		end
+	end
+	local rarity = economy.rarities[record.r]
+	local mutation = if record.m > 0 then economy.mutations[record.m] else nil
+	local words = { if rarity then rarity.id else "?" }
+	if mutation then
+		table.insert(words, mutation.id)
+	end
+	table.insert(words, name)
+	return `You got a {table.concat(words, " ")}!`
+end
+
 local function duskText(): string
 	local id = workspace:GetAttribute("NightModifier")
 	local name = if type(id) == "string" then MODIFIER_NAMES[id] or id else nil
@@ -288,6 +311,10 @@ function HUDController.Start()
 			return
 		end
 		showBanner(if phase == "Dusk" then duskText() else BANNERS[phase])
+	end)
+
+	NetClient.on("RollResult", function(record: any)
+		showBanner(rollText(record))
 	end)
 
 	workspace:GetAttributeChangedSignal("NightModifier"):Connect(function()

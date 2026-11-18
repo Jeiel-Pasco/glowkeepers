@@ -55,7 +55,7 @@ glowkeepers/
 ├─ rokit.toml  selene.toml  stylua.toml  .luaurc
 ├─ config/                     single source of truth; the game and the sim both read it
 │  ├─ economy.json             every number in GAME_SYSTEMS §0
-│  ├─ species.json             40 species: id, pool, model path, colours
+│  ├─ species.json             40 species: id, name, pool (model path and colours come with the art)
 │  ├─ decor.json  quests.json  pass_s1.json  badges.json
 │  ├─ products.json            pass/product IDs per environment
 │  └─ environments.json
@@ -79,6 +79,8 @@ glowkeepers/
 │     ├─ Roll.luau             pure: rarity, pity, lures, mutation and size from luck and an RNG
 │     ├─ Cycle.luau            pure: phase and time left at server time t; night-modifier pick
 │     ├─ Fire.luau             pure: drain, feed and whole-night maths
+│     ├─ Inventory.luau        pure: pads, vault, storage, Place best
+│     ├─ Plots.luau            pure: plot pick (next to a friend), plot view, diff and patch
 │     ├─ Env.luau              game id → DEV / BETA / PROD
 │     ├─ Types.luau
 │     ├─ Util/Signal.luau
@@ -292,7 +294,8 @@ Every remote is declared once in `shared/Net.luau`, with its argument schema and
 | `FeedFire` | C→S | — | Carrying fuel; within 10 studs of the fire | 4/s |
 | `ReviveStart` / `ReviveCancel` | C→S | userId: number | Target downed; within 8 studs; the server times the 3 s hold and cancels it if the range breaks | 2/s |
 | `Lock` | C→S | — | Day; owns the plot; off cooldown or has a charge; not carrying | 1/s |
-| `Place` / `Unplace` / `MoveToVault` | C→S | id: string, index: number | Owns the id; index valid and unlocked; not mid-trade | 10/s |
+| `Place` / `Unplace` | C→S | id: string, pad: number (Place only) | Owns the id; pad unlocked (pads 1…vault are vault pads, so Place to one of them is the move to the vault; a taken pad swaps); Unplace only while storage has room; not mid-trade | 10/s |
+| `PlaceBest` | C→S | — | Best earners to the vault pads, the next best to display pads (GAME_SYSTEMS §7) | 2/s |
 | `Release` | C→S | ids: {string} (≤ 20) | Owns all of them; none in display slots, the vault or a trade; confirmed by the client UI | 2/s |
 | `ShopBuy` | C→S | itemId: string | In config; stock left; can afford it | 5/s |
 | `UpgradeBuy` | C→S | upgradeId: string | In config; below max; can afford it | 5/s |

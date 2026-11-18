@@ -38,6 +38,7 @@ In Studio, open the Rojo plugin and connect. Code and `config/*.json` sync live.
 
 - **Rebuild the greybox map:** paste `tools/BuildGreybox.luau` into Studio's command bar in Edit mode. Change the numbers in its `LAYOUT` table to try another layout. Once the map has been edited by hand, it refuses to overwrite it (TECH_SPEC §6a).
 - **Skip to the next phase** (DEV and BETA only): in Studio's server view, set the Workspace attribute `DebugSkipPhase` to true.
+- **Give everyone a Glowling** (DEV and BETA only): in Studio's server view, set the Workspace attribute `DebugRoll` to a lure floor (1 Common … 4 Epic). Each player gets one lure roll, then "Place best" runs for them.
 - **New remote:** declare it in `src/shared/Net/init.luau` first, with its argument schema and rate limit.
 - **New service or controller:** add it to `ORDER` in `src/server/Main.server.luau` or `src/client/Main.client.luau`.
 - **HUD:** a `StarterGui.HUD` made in Studio replaces the placeholder. Set ResetOnSpawn off, and keep the element names listed at the top of `HUDController.luau`.

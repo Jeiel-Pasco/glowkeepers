@@ -26,6 +26,18 @@ H.test("SetSetting's key enum matches Net.settings", function()
 	H.eq(#keys, count, "same number of keys")
 end)
 
+H.test("pad arguments allow exactly the pads a plot can unlock", function()
+	local cfg = H.config()
+	local pad = Net.remotes.Place.args[2]
+	H.eq(pad.type, "integer", "pad type")
+	H.eq(pad.min, 1, "first pad")
+	H.eq(pad.max, cfg.upgrades.slots.max, "last pad = upgrades.slots.max")
+	H.ok(Validate.args(Net.remotes.Place.args, table.pack("12345678-1234-1234-1234-123456789012", 30)), "valid")
+	H.ok(not Validate.args(Net.remotes.Place.args, table.pack(string.rep("x", 37), 1)), "id too long")
+	H.ok(not Validate.args(Net.remotes.Place.args, table.pack("id", 31)), "pad past 30")
+	H.ok(not Validate.args(Net.remotes.Unplace.args, table.pack("id", 3)), "Unplace takes one argument")
+end)
+
 H.test("value checks", function()
 	H.ok(Validate.value({ type = "boolean" }, true), "boolean")
 	H.ok(not Validate.value({ type = "boolean" }, 1), "1 is not a boolean")
