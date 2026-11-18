@@ -54,6 +54,30 @@ function Fire.secondsLeft(level: number, drainPerSecond: number): number
 	return math.max(0, level) / drainPerSecond
 end
 
+-- Embers at dawn (GAME_SYSTEMS §14). Survived: 10 + floor(fire% / 10) + 5 × revives (max 4)
+-- + 1 × pieces fed (max 6), times the friend bonus (+10% per friend in the server, max +30%).
+-- Lost: the consolation 3, with no bonus.
+function Fire.dawnEmbers(
+	cfg: any,
+	survived: boolean,
+	level: number,
+	revives: number,
+	piecesFed: number,
+	friends: number?
+): number
+	local e = cfg.embers
+	if not survived then
+		return e.failConsolation
+	end
+	local tenths = math.floor(math.clamp(level, 0, cfg.fire.max) * 10 + 1e-9) -- 0.7 * 10 is 7.000…01 or 6.999…
+	local base = e.surviveBase
+		+ e.perFireTenPct * tenths
+		+ e.perRevive * math.min(math.max(0, revives), e.reviveCap)
+		+ e.perPiece * math.min(math.max(0, piecesFed), e.pieceCap)
+	local bonus = math.min(e.friendBonusPer * math.max(0, friends or 0), e.friendBonusCap)
+	return math.floor(base * (1 + bonus) + 1e-9)
+end
+
 -- Plays one whole night exactly: constant drain between feeds, no time steps.
 -- Used by the tests and for balance checks; sim/golden_odds.py mirrors it line for line.
 function Fire.simulate(cfg: any, livingPlayers: number, feeds: { Feed }, modifier: any?, nightSeconds: number?): Outcome

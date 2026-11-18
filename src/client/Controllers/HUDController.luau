@@ -1,10 +1,11 @@
 --!strict
 -- HUD skeleton (Phase 1): the Glow counter (extrapolated from the Wallet), Embers, the cycle
 -- ring with its countdown, the phase banner, and a loading cover until the first PlayerState.
+-- Phase 2: the fire meter at night (workspace `Fire`), and banners for rolls and the dawn result.
 --
 -- If the place has StarterGui.HUD (laid out by artists in Studio; set ResetOnSpawn off), this
--- binds to its descendants by name: Glow, Embers, Ring (with Dot1..DotN children), Countdown,
--- PhaseLabel, Banner, Loading. Any of them may be missing. Without a StarterGui.HUD it builds
+-- binds to its descendants by name: Glow, Embers, FireMeter, Ring (with Dot1..DotN children),
+-- Countdown, PhaseLabel, Banner, Loading. Any of them may be missing. Without a StarterGui.HUD it builds
 -- a plain placeholder with the same names.
 
 local Players = game:GetService("Players")
@@ -29,6 +30,9 @@ local BANNER_SECONDS = 4
 local DAY_DOT = Color3.fromRGB(255, 205, 110)
 local NIGHT_DOT = Color3.fromRGB(120, 150, 255)
 local PANEL = Color3.fromRGB(16, 18, 32)
+local FIRE_OK = Color3.fromRGB(255, 170, 90)
+local FIRE_LOW = Color3.fromRGB(255, 70, 60)
+local FIRE_LOW_BELOW = 0.25 -- the meter pulses red below 25% (§12)
 
 local MODIFIER_NAMES = {
 	Fog = "Fog",
@@ -46,6 +50,7 @@ local BANNERS = {
 type Parts = {
 	glow: TextLabel?,
 	embers: TextLabel?,
+	fire: TextLabel?,
 	dots: { GuiObject },
 	countdown: TextLabel?,
 	phaseLabel: TextLabel?,
@@ -108,6 +113,9 @@ local function buildPlaceholder(playerGui: PlayerGui): ScreenGui
 	top.Parent = gui
 	makeLabel("Glow", top, 22, Color3.fromRGB(255, 221, 120)).LayoutOrder = 1
 	makeLabel("Embers", top, 22, Color3.fromRGB(255, 150, 90)).LayoutOrder = 2
+	local fireMeter = makeLabel("FireMeter", top, 22, FIRE_OK)
+	fireMeter.LayoutOrder = 3
+	fireMeter.Visible = false
 
 	-- Cycle ring: dots around a circle. Day dots are warm and night dots blue; passed dots dim.
 	local ring = Instance.new("Frame")
@@ -199,6 +207,7 @@ local function bind(playerGui: PlayerGui)
 
 	parts.glow = find(root, "Glow", "TextLabel")
 	parts.embers = find(root, "Embers", "TextLabel")
+	parts.fire = find(root, "FireMeter", "TextLabel")
 	parts.countdown = find(root, "Countdown", "TextLabel")
 	parts.phaseLabel = find(root, "PhaseLabel", "TextLabel")
 	parts.banner = find(root, "Banner", "TextLabel")
@@ -251,6 +260,32 @@ local function rollText(record: any): string
 	return `You got a {table.concat(words, " ")}!`
 end
 
+local function dawnText(result: any): string
+	if result.survived then
+		return `The fire survived the night! +{result.embers} Embers`
+	end
+	return `The fire went out. -{EconomyMath.formatNumber(result.glowLost)} Glow, +{result.embers} Embers`
+end
+
+local function refreshFire(now: number)
+	local meter = parts.fire
+	if meter == nil then
+		return
+	end
+	local level = workspace:GetAttribute("Fire")
+	meter.Visible = type(level) == "number"
+	if type(level) ~= "number" then
+		return
+	end
+	local character = Players.LocalPlayer.Character
+	local carrying = character ~= nil and character:GetAttribute("CarryFuel") ~= nil
+	local text = if level <= 0 then "Fire out" else `Fire {math.floor(level * 100 + 0.5)}%`
+	meter.Text = if carrying then `{text} · carrying wood` else text
+	local low = level < FIRE_LOW_BELOW
+	meter.TextColor3 = if low then FIRE_LOW else FIRE_OK
+	meter.TextTransparency = if low and level > 0 then 0.35 + 0.35 * math.sin(now * 6) else 0
+end
+
 local function duskText(): string
 	local id = workspace:GetAttribute("NightModifier")
 	local name = if type(id) == "string" then MODIFIER_NAMES[id] or id else nil
@@ -265,6 +300,7 @@ local function refresh()
 	if parts.embers ~= nil then
 		parts.embers.Text = `Embers {EconomyMath.formatNumber(StateController.wallet().embers)}`
 	end
+	refreshFire(now)
 
 	local state = CycleFXController.state()
 	if state == nil then
@@ -315,6 +351,9 @@ function HUDController.Start()
 
 	NetClient.on("RollResult", function(record: any)
 		showBanner(rollText(record))
+	end)
+	NetClient.on("DawnResult", function(result: any)
+		task.delay(BANNER_SECONDS, showBanner, dawnText(result)) -- after the "Dawn!" phase banner
 	end)
 
 	workspace:GetAttributeChangedSignal("NightModifier"):Connect(function()

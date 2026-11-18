@@ -55,6 +55,8 @@ Net.remotes = {
 	Place = { dir = "c2s", args = { GLOWLING_ID, PAD }, rate = { perSecond = 10, burst = 10 } }, -- swaps if taken
 	Unplace = { dir = "c2s", args = { GLOWLING_ID }, rate = { perSecond = 10, burst = 10 } }, -- back to storage
 	PlaceBest = { dir = "c2s", args = {}, rate = { perSecond = 2, burst = 2 } },
+	PickupFuel = { dir = "c2s", args = { { type = "string", maxLen = 16 } }, rate = { perSecond = 4, burst = 4 } }, -- PileId
+	FeedFire = { dir = "c2s", args = {}, rate = { perSecond = 4, burst = 4 } },
 
 	-- Server → client
 	PlayerState = { dir = "s2c" }, -- (full: boolean, data): a snapshot, then top-level patches
@@ -64,6 +66,7 @@ Net.remotes = {
 	PlotSnapshot = { dir = "s2c" }, -- (views: { [plotId as string]: Plots.View }), once the client is ready
 	PlotDelta = { dir = "s2c" }, -- (plotId, patch: Plots.Patch)
 	RollResult = { dir = "s2c" }, -- (record: Types.Glowling, source: "lure" | "night" | ...)
+	DawnResult = { dir = "s2c" }, -- ({ survived, fire, embers, glowLost, piecesFed })
 } :: { [string]: Remote }
 
 return Net

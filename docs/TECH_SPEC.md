@@ -254,12 +254,13 @@ export type Profile = {
 | --- | --- | --- | --- |
 | Cycle phase | Everyone | Workspace attributes `CycleEpoch`, `DayLen`, `NightLen`; clients compute the phase | Changes only on events |
 | Night modifier | Everyone | Workspace attribute `NightModifier`, set at dusk warning | Once a cycle |
-| Fire meter | Everyone | Workspace attribute `Fire`; clients lerp | 4 Hz at night |
+| Fire meter | Everyone | Workspace attribute `Fire` (0–1, nil by day; 0 = the night is Lost); clients lerp | 4 Hz at night |
+| Wood piles | Everyone | Each `WoodPile` model's `Available` attribute | On change |
 | Plot state (owner, slots, vault, lock, shield, decorations, base name, Stars) | Everyone | `PlotSnapshot` on join, then `PlotDelta` | On change |
 | Wallet | Owner only | `Wallet {glow, perSec, t, embers}`; the client extrapolates the ticking counter | On change, plus every 10 s |
 | Inventory, quests, pass, pity, stock | Owner only | `PlayerState(full = true, data)` once the client sends `ClientReady`, then `PlayerState(false, patch)` with changed top-level keys (`receipts` and `flags` are never sent) | On change |
 | Wild Glowlings | Everyone (tutorial spawns: one player only) | `WildSpawned` / `WildGone` | Per wave |
-| Carrying | Everyone | Character attributes `CarrySp`, `CarryR`, `CarryM` | On change |
+| Carrying | Everyone | Character attributes `CarrySp`, `CarryR`, `CarryM` (a Glowling) or `CarryFuel` (`"wood"`) | On change |
 | Stalker | Everyone | Server-owned model, replicated by the engine | Engine |
 | Announcements and toasts | All, or one player | `Announce`, `Toast` | On event |
 
@@ -271,10 +272,12 @@ The map lives in the place (Team Create), not in Rojo, as `Workspace.Map`. Code 
 | --- | --- | --- | --- |
 | `Plot` | Model | `PlotId` 1–8 | `Floor` (PrimaryPart), `Zone` (invisible volume over the plot), `Gate` (invisible, at the gate), `DecorZone` (24 × 24), `Slots/SlotNN` pads with `Slot` 1–30, `Trophy`, `Sign` |
 | `Campfire` | Model | `LightRadius` (30, safe from the Stalker), `FeedRadius` (10) | `Pit` (PrimaryPart), `Pit.LightPoint` (the PointLight) |
-| `WoodPile` | Model | `PileId` `"W01"`… | |
+| `WoodPile` | Model | `PileId` `"W01"`…; the server adds `Available` at runtime | |
 | `WildSpawn` | Part (invisible) | `Area` `"Forest"` or `"Deepwood"` | |
 | `ShardSpawn` | Part (invisible) | | |
 | `Station` | Model | `Kind` `"LanternShop"`, `"WispStash"`, `"Leaderboards"`, `"WhatsNew"` | `Sign` |
+
+The place has StreamingEnabled, so client code must expect tagged models whose parts haven't streamed in yet, and look parts up again when they arrive.
 
 `Workspace.Map` carries the ring radii as attributes: `FireLightRadius`, `PlotRingRadius`, `ClearingRadius`, `ForestOuter`, `MapRadius`. Slots 1–6 sit in the plot's side strips (the vault pedestals come first); 7–30 sit in three rows in front of the decoration zone.
 
