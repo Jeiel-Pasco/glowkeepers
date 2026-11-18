@@ -66,6 +66,8 @@ H.test("fire", function()
 	H.ok(f.start > 0 and f.start <= f.max, "start")
 	H.ok(f.drainBase > 0 and f.drainPerPlayer >= 0, "the fire always drains (D1)")
 	H.ok(f.wood > 0 and f.shard > f.wood, "fuel")
+	H.ok(f.pileRespawnSeconds > 0 and f.pileRespawnSeconds < cfg.cycle.nightSeconds, "a pile respawns within the night")
+	H.ok(f.pickupRange > 0, "pickup range")
 	for _, modifier in cfg.cycle.nightModifiers do
 		if modifier.fireStart ~= nil then
 			H.ok(modifier.fireStart > 0 and modifier.fireStart <= f.max, `{modifier.id} fireStart`)

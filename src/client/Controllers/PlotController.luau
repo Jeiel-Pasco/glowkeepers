@@ -2,7 +2,8 @@
 -- Every plot's replicated state (TECH_SPEC §6): PlotSnapshot once, then PlotDelta patches,
 -- applied with Shared.Plots so client and server share one shape. GlowlingRenderer (GS) will
 -- build the real models from this; until then each occupied pad gets a placeholder orb,
--- coloured by rarity, and the owner's plot sign shows their name.
+-- coloured by rarity, and the owner's plot sign shows their name. The place streams, so a
+-- plot is drawn again when its pads or sign stream in.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -29,6 +30,7 @@ PlotController.Changed = Signal.new() -- (plotId, view)
 
 local plots: { [number]: Plots.View } = {}
 local placeholders: Folder? = nil
+local renderQueued: { [number]: boolean } = {}
 
 function PlotController.get(plotId: number): Plots.View?
 	return plots[plotId]
@@ -103,6 +105,31 @@ local function render(plotId: number)
 	group.Parent = folder
 end
 
+-- Many pads stream in at once; draw the plot once after they land.
+local function renderSoon(plotId: number)
+	if renderQueued[plotId] then
+		return
+	end
+	renderQueued[plotId] = true
+	task.delay(0.2, function()
+		renderQueued[plotId] = nil
+		render(plotId)
+	end)
+end
+
+local function watchPlot(model: Instance)
+	local id = model:GetAttribute("PlotId")
+	if type(id) ~= "number" then
+		return
+	end
+	model.DescendantAdded:Connect(function(added: Instance)
+		if (added:IsA("BasePart") and added:GetAttribute("Slot") ~= nil) or added:IsA("TextLabel") then
+			renderSoon(id)
+		end
+	end)
+	renderSoon(id)
+end
+
 function PlotController.Init()
 	NetClient.on("PlotSnapshot", function(views: { [string]: Plots.View })
 		table.clear(plots)
@@ -136,12 +163,10 @@ function PlotController.Start()
 	for id in plots do
 		render(id)
 	end
-	CollectionService:GetInstanceAddedSignal("Plot"):Connect(function(model: Instance)
-		local id = model:GetAttribute("PlotId")
-		if type(id) == "number" then
-			render(id)
-		end
-	end)
+	for _, model in CollectionService:GetTagged("Plot") do
+		watchPlot(model)
+	end
+	CollectionService:GetInstanceAddedSignal("Plot"):Connect(watchPlot)
 end
 
 return PlotController

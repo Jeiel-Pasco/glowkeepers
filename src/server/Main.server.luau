@@ -11,6 +11,7 @@ local ORDER = {
 	"DataService",
 	"SettingsService",
 	"CycleService",
+	"CampfireService",
 	"InventoryService",
 	"GlowlingService",
 	"RollService",

@@ -59,4 +59,20 @@ H.test("feeds after dawn are ignored and order doesn't matter", function()
 	H.near(a.level, b.level, 1e-12, "same level")
 end)
 
+H.test("dawn Embers (§14): survived formula, caps, friend bonus, and the lost consolation", function()
+	-- 10 + floor(60% / 10) = 16
+	H.eq(Fire.dawnEmbers(cfg, true, 0.6, 0, 0), 16, "fire 60%, nothing else")
+	-- 10 + 7 + 5 × 2 + 1 × 3 = 30
+	H.eq(Fire.dawnEmbers(cfg, true, 0.7, 2, 3), 30, "0.7 must count as 7 tenths")
+	H.eq(Fire.dawnEmbers(cfg, true, 0.79, 0, 0), 17, "79% floors to 7 tenths")
+	-- Caps: revives at 4 (20), pieces at 6 (6). 10 + 10 + 20 + 6 = 46
+	H.eq(Fire.dawnEmbers(cfg, true, 1, 9, 20), 46, "caps")
+	-- Friend bonus: +10% each, max +30%. 16 × 1.2 = 19.2 → 19; 16 × 1.3 = 20.8 → 20
+	H.eq(Fire.dawnEmbers(cfg, true, 0.6, 0, 0, 2), 19, "two friends")
+	H.eq(Fire.dawnEmbers(cfg, true, 0.6, 0, 0, 5), 20, "friend bonus capped at +30%")
+	H.eq(Fire.dawnEmbers(cfg, true, 0.01, 0, 0), 10, "barely survived")
+	H.eq(Fire.dawnEmbers(cfg, false, 0, 4, 6, 3), 3, "lost: consolation only")
+	H.eq(Fire.dawnEmbers(cfg, true, 0.6, -2, -1), 16, "negative counts never take Embers away")
+end)
+
 H.finish("fire")

@@ -3,8 +3,8 @@
 -- picks the species, grants the record through GlowlingService and sends RollResult.
 --
 -- Callers: ShopService (lures, Phase 3) and ForestService (night catches). Luck here is
--- Lantern and Stars only; the fire-survived bonus, events, Server Luck and tutorial overrides
--- join as the services that own them arrive.
+-- Lantern, Stars and last night's fire; events, Server Luck and tutorial overrides join as
+-- the services that own them arrive.
 --
 -- DEV/BETA: set the server-side workspace attribute DebugRoll to a lure floor (1–4) to give
 -- every player one lure roll and run "Place best" for them.
@@ -24,6 +24,7 @@ local speciesConfig = require(Config:WaitForChild("species")) :: any
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
+local CampfireService = require(script.Parent:WaitForChild("CampfireService"))
 local InventoryService = require(script.Parent:WaitForChild("InventoryService"))
 local GlowlingService = require(script.Parent:WaitForChild("GlowlingService"))
 
@@ -51,7 +52,7 @@ function RollService.luck(player: Player): number
 	if data == nil then
 		return 1
 	end
-	return Economy.luck(economy, data.up.lantern, data.stars)
+	return Economy.luck(economy, data.up.lantern, data.stars, { fireSurvived = CampfireService.survivedLastNight() })
 end
 
 local function grant(player: Player, tier: number, poolName: string, src: string): Types.Glowling?
