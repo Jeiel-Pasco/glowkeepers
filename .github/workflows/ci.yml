@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rokit
+        run: |
+          curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | bash
+          echo "$HOME/.rokit/bin" >> "$GITHUB_PATH"
+
+      - name: Install pinned tools
+        run: rokit install --no-trust-check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Format check
+        run: stylua --check src tests
+
+      - name: Lint
+        run: selene src
+
+      - name: Unit tests (Lune)
+        run: |
+          fail=0
+          for f in tests/*.spec.luau; do
+            lune run "$f" || fail=1
+          done
+          exit $fail
+
+      - name: Golden values match config and sim
+        run: python3 sim/golden_odds.py --check
+
+      - name: Build the place
+        run: rojo build default.project.json -o build/glowkeepers.rbxl

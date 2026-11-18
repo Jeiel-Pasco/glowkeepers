@@ -1,0 +1,49 @@
+{
+  "cycle":   { "daySeconds": 240, "nightSeconds": 120, "duskWarningAt": 210, "stalkerGraceSeconds": 30, "modifierChance": 0.25,
+               "nightModifiers": [
+                 { "id": "Fog",          "spawnMult": 1.25 },
+                 { "id": "FireflyBloom", "spawnMult": 1.5, "extraCatches": 1 },
+                 { "id": "Gusty",        "fireDrainMult": 1.25, "shardSpawnMult": 2 },
+                 { "id": "Starfall",     "fireStart": 0.70 }
+               ] },
+  "server":  { "maxPlayers": 8 },
+  "rarities": [
+    { "id": "Common",    "oneIn": 2,      "glowPerSec": 1 },
+    { "id": "Uncommon",  "oneIn": 5,      "glowPerSec": 4 },
+    { "id": "Rare",      "oneIn": 20,     "glowPerSec": 20 },
+    { "id": "Epic",      "oneIn": 100,    "glowPerSec": 120 },
+    { "id": "Legendary", "oneIn": 1000,   "glowPerSec": 1000 },
+    { "id": "Mythic",    "oneIn": 10000,  "glowPerSec": 10000 },
+    { "id": "Secret",    "oneIn": 100000, "glowPerSec": 150000 }
+  ],
+  "luck":      { "perLanternLevel": 0.12, "perStar": 0.06, "fireSurvivedMult": 1.25, "tierCap": 0.5, "appliesFromRarity": 3, "serverLuckMult": 1.5 },
+  "mutations": [
+    { "id": "Golden",  "mult": 2,  "oneIn": 20 },
+    { "id": "Rainbow", "mult": 5,  "oneIn": 200 },
+    { "id": "Moonlit", "mult": 10, "oneIn": 100, "eventOnly": true }
+  ],
+  "size":    { "min": 0.8, "max": 1.3 },
+  "pity":    { "legendaryAfterNightCatches": 150 },
+  "lures":   { "baseCost": 40, "growth": 14, "maxFloor": 4, "resultCap": null, "stockPerRestock": [16, 8, 4, 2] },
+  "shop":    { "restockSeconds": 300 },
+  "upgrades": {
+    "lantern": { "baseCost": 150, "growth": 1.55, "max": 60 },
+    "boots":   { "baseCost": 150, "growth": 1.5,  "max": 25, "speedPerLevel": 0.04, "levelsPerExtraCatch": 5 },
+    "slots":   { "baseCost": 250, "growth": 1.9,  "start": 8, "max": 30 }
+  },
+  "income":  { "starBonus": 0.35, "offlineEfficiency": 0.10, "offlineCapHours": 6 },
+  "rebirth": { "baseRequirement": 250000, "growth": 3.2, "stepAfterStar": 8, "growthAfterStep": 2.0, "stepEnabled": true, "keepVault": true },
+  "vault":   { "start": 3, "perStar": 1 },
+  "storage": { "size": 60, "releaseIncomeSeconds": 60 },
+  "movement": { "walk": 16, "run": 22, "swiftBootsMult": 1.15, "autoSprintAfter": 0.5 },
+  "steal":   { "grabSeconds": [1, 1, 1, 2, 2, 3, 3], "carrySpeedMult": 0.85, "carryTimeout": 60, "tagRadius": 6,
+               "victimCooldown": 45, "chaseBoostMult": 1.2, "chaseBoostSeconds": 10, "perThiefPerVictimPerDay": 1 },
+  "lock":    { "activeSeconds": 60, "rechargeSeconds": 90, "maxCharges": 5, "chargeGlowSecondsOfIncome": 120, "chargeMinGlow": 200, "chargeEmbers": 15 },
+  "shield":  { "maxPlaySeconds": 2700 },
+  "fire":    { "start": 0.60, "max": 1.0, "drainBase": 0.005, "drainPerPlayer": 0.000375, "wood": 0.03, "shard": 0.06, "failGlowLoss": 0.05 },
+  "night":   { "baseCatches": 3, "spawnsPerPlayer": 4, "spawnWavesAt": [10, 40, 70], "catchRange": 12 },
+  "revive":  { "holdSeconds": 3, "range": 8, "bleedOutSeconds": 30 },
+  "embers":  { "surviveBase": 10, "perFireTenPct": 1, "perRevive": 5, "reviveCap": 4, "perPiece": 1, "pieceCap": 6, "failConsolation": 3, "friendBonusPer": 0.10, "friendBonusCap": 0.30 },
+  "trade":   { "minStars": 3, "minPlayDays": 3, "minAccountAgeDays": 7, "maxPerSide": 4, "confirmDelay": 5, "escrowSeconds": 120,
+               "feeByRarity": [1, 2, 5, 10, 25, 50, 100], "tradeLockHours": 24, "maxPerDay": 10 }
+}

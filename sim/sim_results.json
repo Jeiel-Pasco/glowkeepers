@@ -1,0 +1,159 @@
+{
+ "casual (3x8 min/day)": {
+  "Rare": {
+   "pct_by_d30": 100,
+   "median_day": 1.0,
+   "median_play_min": 6.0
+  },
+  "Epic": {
+   "pct_by_d30": 100,
+   "median_day": 2.0,
+   "median_play_min": 24.0
+  },
+  "Legendary": {
+   "pct_by_d30": 92,
+   "median_day": 5.0,
+   "median_play_min": 90.0
+  },
+  "Mythic": {
+   "pct_by_d30": 26,
+   "median_day": 10.0,
+   "median_play_min": 180.0
+  },
+  "Secret": {
+   "pct_by_d30": 3,
+   "median_day": 7.5,
+   "median_play_min": 132.0
+  },
+  "rebirth1": {
+   "pct_by_d30": 100,
+   "median_day": 2.0,
+   "median_play_min": 24.0
+  },
+  "rebirth3": {
+   "pct_by_d30": 100,
+   "median_day": 4.0,
+   "median_play_min": 60.0
+  },
+  "rebirth5": {
+   "pct_by_d30": 100,
+   "median_day": 7.0,
+   "median_play_min": 114.0
+  },
+  "d30_median_stars": 8.0,
+  "d30_median_income": 21537.056846784253,
+  "income_curve": [
+   190.57645782724697,
+   678.5474615925439,
+   1129.2752268207864,
+   9504.479479745984,
+   16096.505438991142,
+   21537.056846784253
+  ]
+ },
+ "engaged (4x20 min/day)": {
+  "Rare": {
+   "pct_by_d30": 100,
+   "median_day": 1.0,
+   "median_play_min": 6.0
+  },
+  "Epic": {
+   "pct_by_d30": 100,
+   "median_day": 1.0,
+   "median_play_min": 24.0
+  },
+  "Legendary": {
+   "pct_by_d30": 100,
+   "median_day": 2.0,
+   "median_play_min": 129.0
+  },
+  "Mythic": {
+   "pct_by_d30": 64,
+   "median_day": 11.5,
+   "median_play_min": 813.0
+  },
+  "Secret": {
+   "pct_by_d30": 10,
+   "median_day": 16.0,
+   "median_play_min": 1134.0
+  },
+  "rebirth1": {
+   "pct_by_d30": 100,
+   "median_day": 1.0,
+   "median_play_min": 30.0
+  },
+  "rebirth3": {
+   "pct_by_d30": 100,
+   "median_day": 2.0,
+   "median_play_min": 78.0
+  },
+  "rebirth5": {
+   "pct_by_d30": 100,
+   "median_day": 3.0,
+   "median_play_min": 150.0
+  },
+  "d30_median_stars": 9.0,
+  "d30_median_income": 69219.00014434726,
+  "income_curve": [
+   1312.2059504888257,
+   8508.957815400063,
+   12523.193877204016,
+   18788.107912020372,
+   26737.31843198823,
+   69219.00014434726
+  ]
+ },
+ "hardcore (6x45 min/day)": {
+  "Rare": {
+   "pct_by_d30": 100,
+   "median_day": 1.0,
+   "median_play_min": 6.0
+  },
+  "Epic": {
+   "pct_by_d30": 100,
+   "median_day": 1.0,
+   "median_play_min": 24.0
+  },
+  "Legendary": {
+   "pct_by_d30": 100,
+   "median_day": 1.0,
+   "median_play_min": 129.0
+  },
+  "Mythic": {
+   "pct_by_d30": 98,
+   "median_day": 6.0,
+   "median_play_min": 1608.0
+  },
+  "Secret": {
+   "pct_by_d30": 38,
+   "median_day": 16.0,
+   "median_play_min": 4362.0
+  },
+  "rebirth1": {
+   "pct_by_d30": 100,
+   "median_day": 1.0,
+   "median_play_min": 30.0
+  },
+  "rebirth3": {
+   "pct_by_d30": 100,
+   "median_day": 1.0,
+   "median_play_min": 90.0
+  },
+  "rebirth5": {
+   "pct_by_d30": 100,
+   "median_day": 1.0,
+   "median_play_min": 180.0
+  },
+  "d30_median_stars": 11.0,
+  "d30_median_income": 250276.91610244007,
+  "income_curve": [
+   13353.284754250322,
+   18278.11506599765,
+   24747.139140930707,
+   67049.96506559945,
+   98497.86869739159,
+   250276.91610244007
+  ]
+ },
+ "theft_income_ratio_engaged_d30": 1.0303981489386416
+}
