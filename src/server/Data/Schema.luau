@@ -221,7 +221,14 @@ end
 -- (the vault wins over display). Exact vault and display counts depend on passes, which
 -- PlotService checks at runtime; here an index only has to fit the total slot count.
 -- A Glowling dropped from a slot stays owned and goes back to storage.
-local function repairSlots(data: any, map: any, label: string, slotCount: number, placed: { [string]: boolean }, notes: { string })
+local function repairSlots(
+	data: any,
+	map: any,
+	label: string,
+	slotCount: number,
+	placed: { [string]: boolean },
+	notes: { string }
+)
 	local keys = {}
 	for key in map do
 		table.insert(keys, key)
@@ -312,7 +319,12 @@ function Schema.repair(data: any, cfg: any): { string }
 	repairSlots(data, data.display, "display", slotCount, placed, notes)
 
 	for species, entry in data.dex do
-		if type(species) ~= "string" or type(entry) ~= "table" or not isWhole(entry.r, 0, 2 ^ 31) or not isWhole(entry.m, 0, 2 ^ 31) then
+		if
+			type(species) ~= "string"
+			or type(entry) ~= "table"
+			or not isWhole(entry.r, 0, 2 ^ 31)
+			or not isWhole(entry.m, 0, 2 ^ 31)
+		then
 			data.dex[species] = nil
 			table.insert(notes, `dex {tostring(species)}: removed`)
 		end

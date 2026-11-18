@@ -7,8 +7,27 @@ local EconomyMath = {}
 
 -- Display suffixes, one per factor of 1000. Index 1 is 1e3 (K); index 21 is 1e63 (Vg).
 EconomyMath.SUFFIXES = {
-	"K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc",
-	"Ud", "Dd", "Td", "Qad", "Qid", "Sxd", "Spd", "Ocd", "Nod", "Vg",
+	"K",
+	"M",
+	"B",
+	"T",
+	"Qa",
+	"Qi",
+	"Sx",
+	"Sp",
+	"Oc",
+	"No",
+	"Dc",
+	"Ud",
+	"Dd",
+	"Td",
+	"Qad",
+	"Qid",
+	"Sxd",
+	"Spd",
+	"Ocd",
+	"Nod",
+	"Vg",
 }
 
 local function isFinite(value: number): boolean

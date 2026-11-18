@@ -41,7 +41,10 @@ H.test("lures and shop", function()
 	local lures = cfg.lures
 	H.ok(lures.maxFloor >= 1 and lures.maxFloor <= #cfg.rarities, "maxFloor")
 	H.eq(#lures.stockPerRestock, lures.maxFloor, "one stock number per lure")
-	H.ok(lures.resultCap == nil or (lures.resultCap >= lures.maxFloor and lures.resultCap <= #cfg.rarities), "resultCap")
+	H.ok(
+		lures.resultCap == nil or (lures.resultCap >= lures.maxFloor and lures.resultCap <= #cfg.rarities),
+		"resultCap"
+	)
 	H.ok(cfg.shop.restockSeconds > 0, "restock")
 end)
 

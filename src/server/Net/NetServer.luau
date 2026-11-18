@@ -114,8 +114,9 @@ do
 		end
 		remotes[name] = remote
 		if def.dir == "c2s" then
-			assert(def.rate ~= nil, `Net.remotes.{name}: client → server remotes need a rate`)
-			(remote :: any).OnServerEvent:Connect(onClientCall(name, def))
+			assert(def.rate ~= nil, `Net.remotes.{name}: client → server remotes need a rate`)(remote :: any).OnServerEvent:Connect(
+				onClientCall(name, def)
+			)
 		end
 	end
 end
@@ -135,14 +136,17 @@ end
 
 function NetServer.send(player: Player, name: string, ...: any)
 	local def = Net.remotes[name]
-	assert(def ~= nil and def.dir == "s2c", `{name} is not a server → client remote`)
-	(remotes[name] :: any):FireClient(player, ...)
+	assert(def ~= nil and def.dir == "s2c", `{name} is not a server → client remote`)(remotes[name] :: any):FireClient(
+		player,
+		...
+	)
 end
 
 function NetServer.sendAll(name: string, ...: any)
 	local def = Net.remotes[name]
-	assert(def ~= nil and def.dir == "s2c", `{name} is not a server → client remote`)
-	(remotes[name] :: any):FireAllClients(...)
+	assert(def ~= nil and def.dir == "s2c", `{name} is not a server → client remote`)(remotes[name] :: any):FireAllClients(
+		...
+	)
 end
 
 return NetServer
