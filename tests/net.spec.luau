@@ -38,6 +38,15 @@ H.test("pad arguments allow exactly the pads a plot can unlock", function()
 	H.ok(not Validate.args(Net.remotes.Unplace.args, table.pack("id", 3)), "Unplace takes one argument")
 end)
 
+H.test("ReviveStart takes one whole userId", function()
+	local args = Net.remotes.ReviveStart.args
+	H.ok(Validate.args(args, table.pack(123456)), "a user id")
+	H.ok(Validate.args(args, table.pack(-2)), "a Studio test player")
+	H.ok(not Validate.args(args, table.pack(1.5)), "whole numbers only")
+	H.ok(not Validate.args(args, table.pack(math.huge)), "finite")
+	H.ok(not Validate.args(args, table.pack("123")), "a number, not a string")
+end)
+
 H.test("GrabStart takes a plot and a pad", function()
 	local cfg = H.config()
 	local grab = Net.remotes.GrabStart.args

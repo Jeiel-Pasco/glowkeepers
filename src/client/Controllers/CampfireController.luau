@@ -20,6 +20,7 @@ local InputController = require(script.Parent:WaitForChild("InputController"))
 
 local PICK_UP = "Pick up"
 local FEED = "Feed"
+local REVIVE = "Revive" -- DownedController's label
 local CHECK_SECONDS = 0.15
 local MARGIN = 1 -- studs inside the server's ranges, so the button never shows where the server says no
 
@@ -125,7 +126,8 @@ local function updateContext()
 	local level = fireLevel()
 	local character = Players.LocalPlayer.Character
 	local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
-	if level ~= nil and character ~= nil and root ~= nil and root:IsA("BasePart") then
+	local living = character ~= nil and character:GetAttribute("Life") == nil -- not downed or a wisp
+	if level ~= nil and living and character ~= nil and root ~= nil and root:IsA("BasePart") then
 		if character:GetAttribute("CarryFuel") ~= nil then
 			local firePit = pit
 			if level > 0 and firePit ~= nil and (firePit.Position - root.Position).Magnitude <= feedRadius - MARGIN then
@@ -139,9 +141,9 @@ local function updateContext()
 		end
 	end
 	local current = InputController.context()
-	if label ~= nil then
+	if label ~= nil and current ~= REVIVE then -- reviving a teammate comes first
 		InputController.setContext(label)
-	elseif current == PICK_UP or current == FEED then
+	elseif label == nil and (current == PICK_UP or current == FEED) then
 		InputController.setContext(nil) -- leave other controllers' labels alone
 	end
 end

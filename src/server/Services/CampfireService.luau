@@ -8,9 +8,11 @@
 --   * each WoodPile model's `Available`: false while it respawns.
 --   * the character's `CarryFuel`: "wood" while carrying a piece (hands hold one at a time).
 --
--- Not yet: glow-shards (they need a per-night spawn count in config), downed players leaving
--- the living count (DownedService), revives and the friend bonus in the dawn Embers
--- (DownedService, SocialService), and Night Pass XP.
+-- Only living players (DownedService) drain the fire, carry and feed; a player who goes down
+-- drops their wood. The dawn Embers count each player's revives tonight.
+--
+-- Not yet: glow-shards (they need a per-night spawn count in config), the friend bonus in the
+-- dawn Embers (SocialService), and Night Pass XP.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -26,6 +28,7 @@ local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local CycleService = require(script.Parent:WaitForChild("CycleService"))
+local DownedService = require(script.Parent:WaitForChild("DownedService"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
 
 local TICK_SECONDS = 0.25 -- 4 Hz
@@ -71,17 +74,11 @@ local function rootOf(player: Player): BasePart?
 	return if root ~= nil and root:IsA("BasePart") then root else nil
 end
 
--- Living players drain the fire. DownedService will exclude downed players here.
-local function isLiving(player: Player): boolean
-	local character = player.Character
-	local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
-	return humanoid ~= nil and humanoid.Health > 0
-end
-
+-- Living players drain the fire; downed players and wisps don't.
 local function livingCount(): number
 	local n = 0
 	for _, player in Players:GetPlayers() do
-		if isLiving(player) then
+		if DownedService.isLiving(player) then
 			n += 1
 		end
 	end
@@ -165,7 +162,8 @@ local function dawn()
 			continue
 		end
 		local pieces = fed[player] or 0
-		local embers = Fire.dawnEmbers(economy, survived, finalLevel, 0, pieces)
+		local revives = DownedService.revives(player)
+		local embers = Fire.dawnEmbers(economy, survived, finalLevel, revives, pieces)
 		local glowLost = 0
 		data.embers += embers
 		if survived then
@@ -187,6 +185,7 @@ local function dawn()
 			embers = embers,
 			glowLost = glowLost,
 			piecesFed = pieces,
+			revives = revives,
 		})
 	end
 	table.clear(fed)
@@ -217,6 +216,8 @@ local function onPickup(player: Player, pileId: string)
 	local root = rootOf(player)
 	if not night or pile == nil or not pile.available or carrying[player] ~= nil or root == nil then
 		return
+	elseif not DownedService.isLiving(player) then
+		return
 	end
 	if (root.Position - pile.model:GetPivot().Position).Magnitude > economy.fire.pickupRange then
 		return
@@ -231,6 +232,8 @@ local function onFeed(player: Player)
 	local root = rootOf(player)
 	local firePit = pit
 	if not night or lost or fuel == nil or root == nil or firePit == nil then
+		return
+	elseif not DownedService.isLiving(player) then
 		return
 	end
 	if (root.Position - firePit.Position).Magnitude > feedRadius then
@@ -251,6 +254,11 @@ function CampfireService.Init()
 	discover()
 	NetServer.on("PickupFuel", onPickup)
 	NetServer.on("FeedFire", onFeed)
+	DownedService.Downed:Connect(function(player: Player)
+		if carrying[player] ~= nil then
+			setCarry(player, nil) -- dropped: the hands of the downed are empty
+		end
+	end)
 
 	CycleService.PhaseChanged:Connect(function(phase: string)
 		if phase == "Night" and not night then

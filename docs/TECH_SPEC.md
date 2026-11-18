@@ -261,6 +261,7 @@ export type Profile = {
 | Inventory, quests, pass, pity, stock | Owner only | `PlayerState(full = true, data)` once the client sends `ClientReady`, then `PlayerState(false, patch)` with changed top-level keys (`receipts` and `flags` are never sent) | On change |
 | Wild Glowlings | Everyone (tutorial spawns: one player only) | `WildSpawned` / `WildGone` | Per wave |
 | Carrying | Everyone | Character attributes `CarrySp`, `CarryR`, `CarryM` and `CarryFrom` (the victim's userId) for a stolen Glowling, or `CarryFuel` (`"wood"`); `GrabUntil` (server time a grab's hold ends) while grabbing; `RunSpeed` while carrying or chase-boosted | On change |
+| Downed and revive | Everyone | Character attributes `Life` (`"downed"` or `"wisp"`; nil = alive), `BleedUntil` (server time; nil while a revive holds it), `ReviveUntil` on the reviver, `SafeUntil` after a revive | On change |
 | Stalker | Everyone | Server-owned model, replicated by the engine | Engine |
 | Announcements and toasts | All, or one player | `Announce`, `Toast` | On event |
 
@@ -296,7 +297,8 @@ Every remote is declared once in `shared/Net.luau`, with its argument schema and
 | `GrabCancel` | C→S | — | Lets go of the thief's grab in progress (a carry can't be cancelled) | 2/s |
 | `PickupFuel` | C→S | pileId: string | Night; within 8 studs; hands empty | 4/s |
 | `FeedFire` | C→S | — | Carrying fuel; within 10 studs of the fire | 4/s |
-| `ReviveStart` / `ReviveCancel` | C→S | userId: number | Target downed; within 8 studs; the server times the 3 s hold and cancels it if the range breaks | 2/s |
+| `ReviveStart` | C→S | userId: number | Night; reviver alive; target downed (not yourself, not a wisp); one revive per reviver and per target; within 8 studs; the server times the 3 s hold, pauses the target's bleed-out during it, and cancels it if the range breaks | 2/s |
+| `ReviveCancel` | C→S | — | Lets go of the reviver's hold; the bleed-out carries on | 2/s |
 | `Lock` | C→S | — | Day; owns the plot; off cooldown or has a charge; not carrying | 1/s |
 | `Place` / `Unplace` | C→S | id: string, pad: number (Place only) | Owns the id; pad unlocked (pads 1…vault are vault pads, so Place to one of them is the move to the vault; a taken pad swaps); Unplace only while storage has room; not mid-trade | 10/s |
 | `PlaceBest` | C→S | — | Best earners to the vault pads, the next best to display pads (GAME_SYSTEMS §7) | 2/s |
@@ -312,7 +314,7 @@ Every remote is declared once in `shared/Net.luau`, with its argument schema and
 | `PromptProduct` | C→S | productKey: string | Product enabled; policy allows it; under the daily cap; not during a theft | 1/s |
 | `FtueStep` | C→S | step: number | Analytics only; grants nothing | 2/s |
 | `ClientReady` | C→S | — | Sent once the controllers have started; the server answers with `PlayerState` and `Wallet` | 1/5 s (burst 2) |
-| `PlotSnapshot`, `PlotDelta`, `PlayerState`, `Wallet`, `WildSpawned`, `WildGone`, `RollResult`, `DawnResult`, `Announce`, `Toast` | S→C | — | — | — |
+| `PlotSnapshot`, `PlotDelta`, `PlayerState`, `Wallet`, `WildSpawned`, `WildGone`, `RollResult`, `DawnResult`, `Revived`, `Announce`, `Toast` | S→C | — | — | — |
 
 **Rate limiting:** a token bucket per player per remote. Calls over the limit are dropped and counted. More than 3 times the limit within a minute raises an exploit flag (§8).
 

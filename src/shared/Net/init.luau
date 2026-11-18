@@ -63,6 +63,10 @@ Net.remotes = {
 	-- server times the hold itself; the client's progress ring is only cosmetic.
 	GrabStart = { dir = "c2s", args = { PLOT, PAD }, rate = { perSecond = 2, burst = 4 } },
 	GrabCancel = { dir = "c2s", args = {}, rate = { perSecond = 2, burst = 4 } },
+	-- Hold to revive a downed player (by userId; Studio test players have negative ids).
+	-- The server times the hold; ReviveCancel lets go.
+	ReviveStart = { dir = "c2s", args = { { type = "integer" } }, rate = { perSecond = 2, burst = 4 } },
+	ReviveCancel = { dir = "c2s", args = {}, rate = { perSecond = 2, burst = 4 } },
 
 	-- Server → client
 	PlayerState = { dir = "s2c" }, -- (full: boolean, data): a snapshot, then top-level patches
@@ -72,7 +76,8 @@ Net.remotes = {
 	PlotSnapshot = { dir = "s2c" }, -- (views: { [plotId as string]: Plots.View }), once the client is ready
 	PlotDelta = { dir = "s2c" }, -- (plotId, patch: Plots.Patch)
 	RollResult = { dir = "s2c" }, -- (record: Types.Glowling, source: "lure" | "night" | ...)
-	DawnResult = { dir = "s2c" }, -- ({ survived, fire, embers, glowLost, piecesFed })
+	DawnResult = { dir = "s2c" }, -- ({ survived, fire, embers, glowLost, piecesFed, revives })
+	Revived = { dir = "s2c" }, -- (byUserId): to the revived player, for the friend request prompt
 } :: { [string]: Remote }
 
 return Net

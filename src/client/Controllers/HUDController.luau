@@ -263,7 +263,9 @@ end
 
 local function dawnText(result: any): string
 	if result.survived then
-		return `The fire survived the night! +{result.embers} Embers`
+		local revives = tonumber(result.revives) or 0
+		local saved = if revives == 1 then " (1 revive)" elseif revives > 1 then ` ({revives} revives)` else ""
+		return `The fire survived the night! +{result.embers} Embers{saved}`
 	end
 	return `The fire went out. -{EconomyMath.formatNumber(result.glowLost)} Glow, +{result.embers} Embers`
 end
