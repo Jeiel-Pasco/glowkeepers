@@ -38,6 +38,17 @@ H.test("pad arguments allow exactly the pads a plot can unlock", function()
 	H.ok(not Validate.args(Net.remotes.Unplace.args, table.pack("id", 3)), "Unplace takes one argument")
 end)
 
+H.test("GrabStart takes a plot and a pad", function()
+	local cfg = H.config()
+	local grab = Net.remotes.GrabStart.args
+	H.eq(grab[1].max, cfg.server.maxPlayers, "one plot per player")
+	H.eq(grab[2].max, cfg.upgrades.slots.max, "last pad")
+	H.ok(Validate.args(grab, table.pack(3, 12)), "valid")
+	H.ok(not Validate.args(grab, table.pack(0, 12)), "no plot 0")
+	H.ok(not Validate.args(grab, table.pack(3, 1.5)), "whole pads only")
+	H.ok(not Validate.args(grab, table.pack(3)), "both arguments")
+end)
+
 H.test("value checks", function()
 	H.ok(Validate.value({ type = "boolean" }, true), "boolean")
 	H.ok(not Validate.value({ type = "boolean" }, 1), "1 is not a boolean")

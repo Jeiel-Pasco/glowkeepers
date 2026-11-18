@@ -193,15 +193,29 @@ end
 
 -- "Place best" (§7): the best earners fill the vault pads, the next best the display pads.
 -- A Glowling that already sits on the right kind of pad keeps its pad, so a re-run after one
--- new catch moves as little as possible. Returns true if anything moved.
-function Inventory.placeBest(data: any, layout: Layout, valueOf: ValueOf): boolean
+-- new catch moves as little as possible. `held` ids (being grabbed or carried) stay exactly
+-- where they are, pad or storage, and keep their pads. Returns true if anything moved.
+function Inventory.placeBest(data: any, layout: Layout, valueOf: ValueOf, held: { [string]: boolean }?): boolean
+	local keep = held or {}
 	local changed = Inventory.normalize(data, layout)
-	local ranked = Inventory.ranked(data, valueOf)
+	local ranked = {}
+	for _, id in Inventory.ranked(data, valueOf) do
+		if not keep[id] then
+			table.insert(ranked, id)
+		end
+	end
+	local vaultPads, displayPads = layout.vault, layout.slots - layout.vault
+	for _, id in data.vault do
+		vaultPads -= if keep[id] then 1 else 0
+	end
+	for _, id in data.display do
+		displayPads -= if keep[id] then 1 else 0
+	end
 	local wantVault, wantDisplay = {}, {}
 	for i, id in ranked do
-		if i <= layout.vault then
+		if i <= vaultPads then
 			wantVault[id] = true
-		elseif i <= layout.slots then
+		elseif i <= vaultPads + displayPads then
 			wantDisplay[id] = true
 		else
 			break
@@ -212,7 +226,9 @@ function Inventory.placeBest(data: any, layout: Layout, valueOf: ValueOf): boole
 	for _, pair in { { data.vault, wantVault }, { data.display, wantDisplay } } do
 		local map, want = pair[1], pair[2]
 		for key, id in map do
-			if want[id] then
+			if keep[id] then
+				continue
+			elseif want[id] then
 				want[id] = nil -- already in place
 			else
 				map[key] = nil

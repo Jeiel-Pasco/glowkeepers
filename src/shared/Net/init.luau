@@ -31,6 +31,8 @@ local GLOWLING_ID: ArgSchema = { type = "string", maxLen = 36 }
 -- A pad number (the map's `Slot` attribute). 30 = upgrades.slots.max; the server checks the
 -- player's unlocked pads, and tests/net.spec.luau checks this bound against the config.
 local PAD: ArgSchema = { type = "integer", min = 1, max = 30 }
+-- A plot id (the map's `PlotId` attribute): one plot per player, server.maxPlayers of them.
+local PLOT: ArgSchema = { type = "integer", min = 1, max = 8 }
 
 local Net = {}
 
@@ -57,6 +59,10 @@ Net.remotes = {
 	PlaceBest = { dir = "c2s", args = {}, rate = { perSecond = 2, burst = 2 } },
 	PickupFuel = { dir = "c2s", args = { { type = "string", maxLen = 16 } }, rate = { perSecond = 4, burst = 4 } }, -- PileId
 	FeedFire = { dir = "c2s", args = {}, rate = { perSecond = 4, burst = 4 } },
+	-- Hold to steal: GrabStart when the hold begins, GrabCancel when it is let go early. The
+	-- server times the hold itself; the client's progress ring is only cosmetic.
+	GrabStart = { dir = "c2s", args = { PLOT, PAD }, rate = { perSecond = 2, burst = 4 } },
+	GrabCancel = { dir = "c2s", args = {}, rate = { perSecond = 2, burst = 4 } },
 
 	-- Server → client
 	PlayerState = { dir = "s2c" }, -- (full: boolean, data): a snapshot, then top-level patches
