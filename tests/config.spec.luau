@@ -4,6 +4,7 @@ local Economy = require("../src/shared/Economy")
 
 local cfg = H.config()
 local envs = H.json("config/environments.json")
+local species = H.json("config/species.json")
 
 local function unique(list: { any }, key: string, label: string)
 	local seen = {}
@@ -79,6 +80,7 @@ H.test("upgrades, slots, vault, storage", function()
 	end
 	H.ok(cfg.vault.start <= cfg.upgrades.slots.start, "the starting vault fits the starting slots")
 	H.ok(cfg.storage.size > 0, "storage")
+	H.ok(cfg.storage.overflow >= 0 and cfg.storage.overflow % 1 == 0, "storage overflow")
 	H.ok(cfg.lock.maxCharges >= 1, "lock charges")
 end)
 
@@ -98,6 +100,19 @@ H.test("environments: lists of place or game ids, none shared", function()
 			seen[id] = name
 		end
 	end
+end)
+
+H.test("species: unique lowercase ids in known pools", function()
+	unique(species.species, "id", "species")
+	local pools = { Clearing = 0, Deepwood = 0 }
+	for _, entry in species.species do
+		H.ok(string.match(entry.id, "^[a-z]+$") ~= nil, `{entry.id}: ids are lowercase letters only`)
+		H.ok(type(entry.name) == "string" and #entry.name > 0, `{entry.id} needs a name`)
+		H.ok(pools[entry.pool] ~= nil, `{entry.id}: unknown pool {tostring(entry.pool)}`)
+		pools[entry.pool] += 1
+	end
+	H.eq(pools.Clearing, 16, "Clearing species (CONTENT §A3)")
+	H.eq(pools.Deepwood, 24, "Deepwood species (CONTENT §A3)")
 end)
 
 H.finish("config")

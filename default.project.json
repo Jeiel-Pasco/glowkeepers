@@ -9,7 +9,8 @@
         "Config": {
           "$className": "Folder",
           "economy": { "$path": "config/economy.json" },
-          "environments": { "$path": "config/environments.json" }
+          "environments": { "$path": "config/environments.json" },
+          "species": { "$path": "config/species.json" }
         }
       }
     },

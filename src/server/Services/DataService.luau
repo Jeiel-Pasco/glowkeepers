@@ -33,6 +33,7 @@ export type JoinInfo = { away: number, firstSession: boolean }
 local DataService = {}
 DataService.PlayerReady = Signal.new() -- (player, data, info: JoinInfo)
 DataService.PlayerLeaving = Signal.new() -- (player, data): last chance to write before the session ends
+DataService.ClientReady = Signal.new() -- (player): the client's controllers are listening (fires once)
 
 local store: any = nil
 local storeMode = "none" -- "profilestore" | "mock" | "memory" | "none"
@@ -228,8 +229,12 @@ end
 function DataService.Init()
 	openStore()
 	NetServer.on("ClientReady", function(player: Player)
+		local first = not clientReady[player]
 		clientReady[player] = true
 		sendState(player)
+		if first then
+			DataService.ClientReady:Fire(player)
+		end
 	end)
 end
 

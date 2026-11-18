@@ -151,4 +151,34 @@ H.test("finish draws mutation, then size", function()
 	H.eq(result.s, 0.8, "size")
 end)
 
+H.test("species pools come from config/species.json", function()
+	local speciesCfg = H.json("config/species.json")
+	local clearing = Roll.pool(speciesCfg, "Clearing")
+	H.eq(#clearing, 16, "Clearing species")
+	H.eq(#Roll.pool(speciesCfg, "Deepwood"), 24, "Deepwood species")
+	H.eq(#Roll.pool(speciesCfg, "Nowhere"), 0, "unknown pool")
+	H.eq(clearing[1], "glimmermouse", "config order")
+end)
+
+H.test("species pick is uniform and stays inside the pool", function()
+	local ids = { "a", "b", "c", "d" }
+	H.eq(Roll.species(ids, H.constant(0)), "a", "lowest draw")
+	H.eq(Roll.species(ids, H.constant(0.2499)), "a", "first quarter")
+	H.eq(Roll.species(ids, H.constant(0.25)), "b", "second quarter")
+	H.eq(Roll.species(ids, H.constant(0.999999)), "d", "highest draw")
+	H.eq(Roll.species(ids, H.constant(1)), "d", "a draw of exactly 1 still lands inside")
+	local counts = { a = 0, b = 0, c = 0, d = 0 }
+	local rng = H.rng(7)
+	for _ = 1, 40000 do
+		local id = Roll.species(ids, rng)
+		counts[id] += 1
+	end
+	for id, n in counts do
+		H.near(n / 40000, 0.25, 0.01, `share of {id}`)
+	end
+	H.throws(function()
+		Roll.species({}, rng)
+	end, "empty pool")
+end)
+
 H.finish("roll")

@@ -34,7 +34,7 @@
   "income":  { "starBonus": 0.35, "offlineEfficiency": 0.10, "offlineCapHours": 6 },
   "rebirth": { "baseRequirement": 250000, "growth": 3.2, "stepAfterStar": 8, "growthAfterStep": 2.0, "stepEnabled": true, "keepVault": true },
   "vault":   { "start": 3, "perStar": 1 },
-  "storage": { "size": 60, "releaseIncomeSeconds": 60 },
+  "storage": { "size": 60, "overflow": 10, "releaseIncomeSeconds": 60 },
   "movement": { "walk": 16, "run": 22, "swiftBootsMult": 1.15, "autoSprintAfter": 0.5 },
   "steal":   { "grabSeconds": [1, 1, 1, 2, 2, 3, 3], "carrySpeedMult": 0.85, "carryTimeout": 60, "tagRadius": 6,
                "victimCooldown": 45, "chaseBoostMult": 1.2, "chaseBoostSeconds": 10, "perThiefPerVictimPerDay": 1 },

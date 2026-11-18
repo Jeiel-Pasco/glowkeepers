@@ -177,6 +177,24 @@ function Roll.sizeLabel(size: number): string?
 	return nil
 end
 
+-- Species ids in `pool` ("Clearing", "Deepwood", ...), in config order. `speciesCfg` is
+-- config/species.json.
+function Roll.pool(speciesCfg: any, pool: string): { string }
+	local ids = {}
+	for _, species in speciesCfg.species do
+		if species.pool == pool then
+			table.insert(ids, species.id)
+		end
+	end
+	return ids
+end
+
+-- One species from a pool, uniformly. Rarity never depends on the species (CONTENT §A3).
+function Roll.species(ids: { string }, rng: Rng): string
+	assert(#ids > 0, "empty species pool")
+	return ids[math.min(#ids, 1 + math.floor(rng() * #ids))]
+end
+
 -- Rarity first, then mutation, then size, each from its own draws (as in the sim).
 function Roll.finish(cfg: any, tier: number, rng: Rng, events: { [string]: boolean }?): Result
 	return { r = tier, m = Roll.mutation(cfg, rng, events), s = Roll.size(cfg, rng) }
