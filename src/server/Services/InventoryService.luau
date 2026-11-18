@@ -4,9 +4,10 @@
 -- Shared.Inventory; this service applies them to the live profile and tells the others.
 --
 -- Fires Changed(player) after anything moves, so IncomeService and PlotService can update.
--- Not yet: blocking moves of a Glowling that is being stolen or traded (StealService and
--- TradeService will add that check here).
+-- A Glowling being grabbed or carried is held (StealService; TradeService will hold offers
+-- too): its owner can't move it, and Place best leaves it where it is.
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Server = script.Parent.Parent
@@ -20,6 +21,8 @@ local DataService = require(script.Parent:WaitForChild("DataService"))
 
 local InventoryService = {}
 InventoryService.Changed = Signal.new() -- (player): pads changed; Glow/s and the plot view may differ
+
+local held: { [Player]: { [string]: boolean } } = {}
 
 -- Vault pads from passes (+2 with the pass, §7). Passes arrive in Phase 5.
 local function passVaultBonus(_player: Player): number
@@ -47,10 +50,36 @@ function InventoryService.notify(player: Player, ...: string)
 	InventoryService.Changed:Fire(player)
 end
 
+-- Holds (or lets go of) a Glowling while it is grabbed or carried.
+function InventoryService.hold(player: Player, id: string, on: boolean)
+	local ids = held[player]
+	if on then
+		if ids == nil then
+			ids = {}
+			held[player] = ids
+		end
+		ids[id] = true
+	elseif ids ~= nil then
+		ids[id] = nil
+		if next(ids) == nil then
+			held[player] = nil
+		end
+	end
+end
+
+function InventoryService.isHeld(player: Player, id: string): boolean
+	local ids = held[player]
+	return ids ~= nil and ids[id] == true
+end
+
 function InventoryService.place(player: Player, id: string, pad: number): (boolean, string?)
 	local data = DataService.get(player)
 	if data == nil then
 		return false, "not loaded"
+	end
+	local occupant = data.display[tostring(pad)] or data.vault[tostring(pad)]
+	if InventoryService.isHeld(player, id) or (occupant ~= nil and InventoryService.isHeld(player, occupant)) then
+		return false, "busy" -- a swap would move the held one
 	end
 	local ok, reason = Inventory.place(data, InventoryService.layout(player, data), id, pad)
 	if ok then
@@ -64,6 +93,8 @@ function InventoryService.unplace(player: Player, id: string): (boolean, string?
 	local data = DataService.get(player)
 	if data == nil then
 		return false, "not loaded"
+	elseif InventoryService.isHeld(player, id) then
+		return false, "busy"
 	end
 	local ok, reason = Inventory.unplace(data, id, economy.storage.size)
 	if ok then
@@ -77,7 +108,8 @@ function InventoryService.placeBest(player: Player): boolean
 	if data == nil then
 		return false
 	end
-	local changed = Inventory.placeBest(data, InventoryService.layout(player, data), InventoryService.valueOf)
+	local layout = InventoryService.layout(player, data)
+	local changed = Inventory.placeBest(data, layout, InventoryService.valueOf, held[player])
 	if changed then
 		InventoryService.notify(player)
 	end
@@ -100,6 +132,9 @@ function InventoryService.Init()
 	end)
 	NetServer.on("PlaceBest", function(player: Player)
 		InventoryService.placeBest(player)
+	end)
+	Players.PlayerRemoving:Connect(function(player: Player)
+		held[player] = nil
 	end)
 end
 

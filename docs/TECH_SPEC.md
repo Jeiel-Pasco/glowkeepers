@@ -260,7 +260,7 @@ export type Profile = {
 | Wallet | Owner only | `Wallet {glow, perSec, t, embers}`; the client extrapolates the ticking counter | On change, plus every 10 s |
 | Inventory, quests, pass, pity, stock | Owner only | `PlayerState(full = true, data)` once the client sends `ClientReady`, then `PlayerState(false, patch)` with changed top-level keys (`receipts` and `flags` are never sent) | On change |
 | Wild Glowlings | Everyone (tutorial spawns: one player only) | `WildSpawned` / `WildGone` | Per wave |
-| Carrying | Everyone | Character attributes `CarrySp`, `CarryR`, `CarryM` (a Glowling) or `CarryFuel` (`"wood"`) | On change |
+| Carrying | Everyone | Character attributes `CarrySp`, `CarryR`, `CarryM` and `CarryFrom` (the victim's userId) for a stolen Glowling, or `CarryFuel` (`"wood"`); `GrabUntil` (server time a grab's hold ends) while grabbing; `RunSpeed` while carrying or chase-boosted | On change |
 | Stalker | Everyone | Server-owned model, replicated by the engine | Engine |
 | Announcements and toasts | All, or one player | `Announce`, `Toast` | On event |
 
@@ -292,7 +292,8 @@ Every remote is declared once in `shared/Net.luau`, with its argument schema and
 | Remote | Direction | Arguments | Server checks | Limit |
 | --- | --- | --- | --- | --- |
 | `Catch` | C→S | wildId: string | Night; wild exists and is visible to this player; distance ≤ 12 studs; catches left > 0; not downed | 4/s |
-| `GrabStart` / `GrabCancel` | C→S | plotId: number, slot: number | Day; before the dusk cutoff; target is a display slot with a Glowling; not own plot; target not locked, shielded or on victim cooldown; thief not shielded (a grab ends the shield); within 6 studs; not already carrying | 2/s |
+| `GrabStart` | C→S | plotId: number, slot: number | Day; before the dusk cutoff; target is a display slot with a Glowling; not own plot; thief has a plot and storage room; target not locked, shielded or on victim cooldown; under the per-victim daily limit; thief not shielded (a grab ends the shield); within 6 studs (flat distance, `Steal.reach`); not already grabbing or carrying | 2/s |
+| `GrabCancel` | C→S | — | Lets go of the thief's grab in progress (a carry can't be cancelled) | 2/s |
 | `PickupFuel` | C→S | pileId: string | Night; within 8 studs; hands empty | 4/s |
 | `FeedFire` | C→S | — | Carrying fuel; within 10 studs of the fire | 4/s |
 | `ReviveStart` / `ReviveCancel` | C→S | userId: number | Target downed; within 8 studs; the server times the 3 s hold and cancels it if the range breaks | 2/s |

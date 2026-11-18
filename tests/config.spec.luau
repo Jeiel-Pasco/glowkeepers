@@ -86,6 +86,19 @@ H.test("upgrades, slots, vault, storage", function()
 	H.ok(cfg.lock.maxCharges >= 1, "lock charges")
 end)
 
+H.test("steal", function()
+	local st = cfg.steal
+	H.ok(st.grabRange > 0 and st.tagRadius > 0, "ranges")
+	H.ok(st.carryTimeout > 0 and st.victimCooldown >= 0, "timers")
+	H.ok(st.carrySpeedMult > 0 and st.carrySpeedMult <= 1, "carrying never speeds you up")
+	H.ok(st.chaseBoostMult >= 1 and st.chaseBoostSeconds > 0, "chase boost")
+	H.ok(st.perThiefPerVictimPerDay >= 1, "at least one steal per victim per day")
+	H.ok(st.speedTolerance >= 0 and st.teleportStuds > 0, "carry checks")
+	H.ok(st.carryCheckWindow > 0 and st.carrySlackStuds >= 0, "carry check window")
+	-- The teleport check allows this many studs on top of running; more than a second of running.
+	H.ok(st.teleportStuds > cfg.movement.run, "the teleport margin covers a lag spike")
+end)
+
 H.test("per-rarity tables have one entry per rarity", function()
 	H.eq(#cfg.steal.grabSeconds, #cfg.rarities, "steal.grabSeconds")
 	H.eq(#cfg.trade.feeByRarity, #cfg.rarities, "trade.feeByRarity")

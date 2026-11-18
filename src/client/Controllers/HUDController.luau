@@ -1,7 +1,8 @@
 --!strict
 -- HUD skeleton (Phase 1): the Glow counter (extrapolated from the Wallet), Embers, the cycle
 -- ring with its countdown, the phase banner, and a loading cover until the first PlayerState.
--- Phase 2: the fire meter at night (workspace `Fire`), and banners for rolls and the dawn result.
+-- Phase 2: the fire meter at night (workspace `Fire`), and banners for rolls, the dawn result
+-- and server Toasts (steal alarms and results).
 --
 -- If the place has StarterGui.HUD (laid out by artists in Studio; set ResetOnSpawn off), this
 -- binds to its descendants by name: Glow, Embers, FireMeter, Ring (with Dot1..DotN children),
@@ -351,6 +352,9 @@ function HUDController.Start()
 
 	NetClient.on("RollResult", function(record: any)
 		showBanner(rollText(record))
+	end)
+	NetClient.on("Toast", function(text: string, _kind: string?)
+		showBanner(text) -- placeholder until GS styles toasts by kind ("alarm", "good", "bad")
 	end)
 	NetClient.on("DawnResult", function(result: any)
 		task.delay(BANNER_SECONDS, showBanner, dawnText(result)) -- after the "Dawn!" phase banner

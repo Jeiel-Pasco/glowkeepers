@@ -4,12 +4,13 @@
 -- leave, and replicates every plot: PlotSnapshot to each client once it is ready, then a
 -- PlotDelta to every ready client whenever a plot's owner, layout or pads change.
 --
--- The map is found only by tag and attribute: Models tagged `Plot` with a `PlotId`, and their
--- `Slots` pads with a `Slot` number. Never by position or name, so the map can move.
--- Rules for assignment and the view live in Shared.Plots.
+-- The map is found only by tag and attribute: Models tagged `Plot` with a `PlotId`, their
+-- `Slots` pads with a `Slot` number, and the `Zone` volume over the plot (StealService delivers
+-- there). Never by position, so the map can move. Rules for assignment and the view live in
+-- Shared.Plots.
 --
--- Not yet: gates, zones and the shield bubble (StealService, LockService), decorations and
--- the base name (Phase 4), and spawning the player at their plot.
+-- Not yet: the gate and the shield bubble (LockService, Phase 3), decorations and the base
+-- name (Phase 4), and spawning the player at their plot.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -24,7 +25,7 @@ local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local InventoryService = require(script.Parent:WaitForChild("InventoryService"))
 
-type Plot = { id: number, model: Model, pads: { [number]: BasePart } }
+type Plot = { id: number, model: Model, pads: { [number]: BasePart }, zone: BasePart? }
 
 local PlotService = {}
 PlotService.Assigned = Signal.new() -- (player, plotId)
@@ -55,6 +56,18 @@ function PlotService.pad(plotId: number, pad: number): BasePart?
 	return if plot then plot.pads[pad] else nil
 end
 
+-- Is `position` inside the plot's Zone volume?
+function PlotService.inZone(plotId: number, position: Vector3): boolean
+	local plot = plots[plotId]
+	local zone = if plot then plot.zone else nil
+	if zone == nil then
+		return false
+	end
+	local inside = zone.CFrame:PointToObjectSpace(position)
+	local half = zone.Size / 2
+	return math.abs(inside.X) <= half.X and math.abs(inside.Y) <= half.Y and math.abs(inside.Z) <= half.Z
+end
+
 local function discover()
 	for _, instance in CollectionService:GetTagged("Plot") do
 		local id = instance:GetAttribute("PlotId")
@@ -81,7 +94,12 @@ local function discover()
 		if count < economy.upgrades.slots.max then
 			warn(`[PlotService] Plot {id} has {count} slot pads; it needs {economy.upgrades.slots.max}`)
 		end
-		plots[id] = { id = id, model = instance, pads = pads }
+		local zone = instance:FindFirstChild("Zone")
+		if zone == nil or not zone:IsA("BasePart") then
+			warn(`[PlotService] Plot {id} has no Zone part; nothing can be delivered to it`)
+			zone = nil
+		end
+		plots[id] = { id = id, model = instance, pads = pads, zone = zone :: BasePart? }
 		table.insert(ids, id)
 		views[id] = Plots.empty(id)
 	end

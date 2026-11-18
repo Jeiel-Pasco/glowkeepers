@@ -17,6 +17,7 @@ local ORDER = {
 	"RollService",
 	"IncomeService",
 	"PlotService",
+	"StealService",
 }
 
 local loaded: { [string]: any } = {}

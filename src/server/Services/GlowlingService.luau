@@ -1,10 +1,8 @@
 --!strict
 -- Creates and removes Glowling records (GAME_SYSTEMS §3, TECH_SPEC §5). Every record lives in
 -- the owner's profile under `glowlings`, keyed by a GUID. New records go to storage; where a
--- record sits is InventoryService's job.
---
--- Not yet: transfer between players (StealService delivery, TradeService swaps). It will
--- forget the pad, move the record with a new `src`, and keep `by` (the original catcher).
+-- record sits is InventoryService's job. transfer moves a record between two players
+-- (StealService delivery now, TradeService swaps later).
 
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -70,6 +68,34 @@ function GlowlingService.remove(player: Player, id: string): Types.Glowling?
 	end
 	GlowlingService.Removed:Fire(player, record)
 	return record
+end
+
+-- Moves a record from one loaded profile to another's storage: same id, mutation, size and
+-- `by` (the original catcher); a new `src` and `at`. Returns the moved record, or nil when
+-- either profile isn't loaded, `from` doesn't own it, or `to` has no room.
+function GlowlingService.transfer(from: Player, to: Player, id: string, src: string): Types.Glowling?
+	local fromData, toData = DataService.get(from), DataService.get(to)
+	local record = if fromData ~= nil then fromData.glowlings[id] else nil
+	if fromData == nil or toData == nil or record == nil or toData.glowlings[id] ~= nil then
+		return nil
+	elseif not GlowlingService.hasRoom(to) then
+		return nil
+	end
+	local wasPlaced = Inventory.forget(fromData, id)
+	fromData.glowlings[id] = nil
+	local moved: Types.Glowling = table.clone(record)
+	moved.src = src
+	moved.at = os.time()
+	toData.glowlings[id] = moved
+	if wasPlaced then
+		InventoryService.notify(from, "glowlings")
+	else
+		DataService.changed(from, "glowlings")
+	end
+	DataService.changed(to, "glowlings")
+	GlowlingService.Removed:Fire(from, record)
+	GlowlingService.Added:Fire(to, moved)
+	return moved
 end
 
 return GlowlingService

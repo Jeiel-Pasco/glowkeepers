@@ -189,6 +189,24 @@ H.test("placeBest with fewer Glowlings than vault pads fills the vault only", fu
 	H.eq(count(data.display), 0, "no display")
 end)
 
+H.test("placeBest leaves held Glowlings (mid-steal) where they are", function()
+	local data = profile({ 1, 2, 3, 4, 5, 6, 1, 2, 3 })
+	Inventory.placeBest(data, LAYOUT, valueOf)
+	-- g9 (a Rare) is being grabbed off its display pad; g2 (an Uncommon) is being carried home
+	-- after it was taken off another pad, so it sits in storage.
+	local grabbedPad = select(2, Inventory.locate(data, "g9"))
+	H.eq((Inventory.locate(data, "g9")), "display", "g9 is on display")
+	Inventory.forget(data, "g2")
+	data.glowlings.g10 = { id = "g10", sp = "mothlet", r = 6, m = 0, s = 1, src = "lure", at = 10, by = 1 }
+	local held = { g9 = true, g2 = true }
+	H.ok(Inventory.placeBest(data, LAYOUT, valueOf, held), "changed")
+	H.eq(select(2, Inventory.locate(data, "g9")), grabbedPad, "the grabbed one keeps its pad")
+	H.eq((Inventory.locate(data, "g2")), "storage", "the carried one stays in storage")
+	H.eq((Inventory.locate(data, "g10")), "vault", "the new Mythic is vaulted")
+	H.eq(count(data.vault) + count(data.display), 8, "every pad is full")
+	H.ok(not Inventory.placeBest(data, LAYOUT, valueOf, held), "a second run changes nothing")
+end)
+
 H.test("placedValue sums every placed Glowling, vault and display", function()
 	local data = profile({ 1, 2, 3 })
 	Inventory.place(data, LAYOUT, "g1", 1)

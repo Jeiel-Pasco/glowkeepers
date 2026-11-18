@@ -14,6 +14,7 @@ local ORDER = {
 	"CycleFXController",
 	"PlotController",
 	"CampfireController",
+	"StealController",
 	"HUDController",
 }
 
