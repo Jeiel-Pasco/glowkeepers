@@ -332,6 +332,105 @@ do
 end
 task.wait()
 
+-- Mountains: a ring of peaks round the whole forest, so the world ends in rock and snow instead
+-- of a flat edge, and nothing beyond it can be seen from any spot or camera angle. The foot starts
+-- just past the boundary wall of trees; the ridge line wobbles and breaks into peaks with noise.
+-- Grassy foothills, grey-violet rock, snow above a wavy snow line. Heightmap columns written with
+-- WriteVoxels; the top voxel's occupancy smooths each column's height.
+do
+	local terrain = workspace.Terrain
+	terrain:SetMaterialColor(Enum.Material.Rock, Color3.fromRGB(104, 100, 118))
+	terrain:SetMaterialColor(Enum.Material.Slate, Color3.fromRGB(78, 80, 96))
+	terrain:SetMaterialColor(Enum.Material.Snow, Color3.fromRGB(232, 238, 248))
+	local RES = 4
+	local half = 620
+	local cells = math.ceil(half * 2 / RES)
+	local TOP = 420 -- highest voxel written
+	local layers = TOP // RES
+	local FOOT = LAYOUT.mapRadius + 20 -- foothills rise behind the tree wall
+	local VALLEY = FOOT + 110 -- a hazy valley behind the foothills
+	local RANGE = FOOT + 170 -- the main range starts rising here
+	local PEAKS = FOOT + 320 -- and is at full height from here outwards
+	local s = (LAYOUT.seed % 997) / 13
+
+	local function smooth(a: number, b: number, x: number): number
+		local t = math.clamp((x - a) / (b - a), 0, 1)
+		return t * t * (3 - 2 * t)
+	end
+	-- Ridged noise in 0..1: sharp crests where plain noise crosses zero.
+	local function ridged(x: number, z: number, scale: number, k: number): number
+		return 1 - math.abs(math.noise(x / scale, z / scale, s + k))
+	end
+	-- Two tiers, so the haze layers them: green foothills, a valley, then the snowy main range.
+	local function heightAt(x: number, z: number): number
+		local r = math.sqrt(x * x + z * z) + math.noise(x / 90, z / 90, s) * 30
+		local hills = smooth(FOOT, FOOT + 60, r) * (1 - 0.55 * smooth(VALLEY - 30, VALLEY + 20, r))
+		local hillHeight = 55 + 75 * ridged(x, z, 140, 6)
+		local range = smooth(RANGE, PEAKS, r)
+		local peaks = 0.55 * ridged(x, z, 260, 1) + 0.3 * ridged(x, z, 110, 2) + 0.15 * ridged(x, z, 45, 3)
+		local h = math.max(hills * hillHeight, range * (190 + 210 * peaks))
+		if h <= 0 then
+			return 0
+		end
+		return h + math.noise(x / 55, z / 55, s + 4) * 4 -- gentle bumps (more reads as chunky facets)
+	end
+	local function materialFor(y: number, h: number, x: number, z: number): Enum.Material
+		local snowLine = 270 + math.noise(x / 70, z / 70, s + 5) * 30 -- caps on the peaks only
+		if y >= snowLine then
+			return Enum.Material.Snow
+		elseif y > h - 8 and y < 140 + math.noise(x / 60, z / 60, s + 7) * 12 then
+			return Enum.Material.LeafyGrass -- green foothills and lower slopes
+		elseif math.noise(x / 35, y / 35, z / 35) > 0.25 then
+			return Enum.Material.Slate
+		end
+		return Enum.Material.Rock
+	end
+
+	local ROWS = 6
+	for x0 = 0, cells - 1, ROWS do
+		local rows = math.min(ROWS, cells - x0)
+		local materials, occupancy = {}, {}
+		local any = false
+		for ix = 1, rows do
+			local x = -half + (x0 + ix - 0.5) * RES
+			local mx, ox = {}, {}
+			for iy = 1, layers do
+				mx[iy], ox[iy] = {}, {}
+			end
+			for iz = 1, cells do
+				local z = -half + (iz - 0.5) * RES
+				local h = heightAt(x, z)
+				if h > 0 then
+					any = true
+				end
+				for iy = 1, layers do
+					local y0 = (iy - 1) * RES
+					local fill = math.clamp((h - y0) / RES, 0, 1)
+					if fill > 0.05 then
+						mx[iy][iz] = materialFor(y0, h, x, z)
+						ox[iy][iz] = fill
+					else
+						mx[iy][iz] = Enum.Material.Air
+						ox[iy][iz] = 0
+					end
+				end
+			end
+			materials[ix], occupancy[ix] = mx, ox
+		end
+		if any then
+			local corner = Vector3.new(-half + x0 * RES, 0, -half)
+			terrain:WriteVoxels(
+				Region3.new(corner, corner + Vector3.new(rows * RES, layers * RES, cells * RES)),
+				RES,
+				materials,
+				occupancy
+			)
+		end
+		task.wait()
+	end
+end
+task.wait()
+
 -- Paths: fire to every gate, and trails out through the gaps into the deepwood.
 do
 	local paths = folder("Paths")
