@@ -7,19 +7,25 @@
 -- Accrual pays for the time actually passed (server clock), not a fixed 1 per tick, so a slow
 -- frame never makes the server fall behind the client's counter.
 --
--- Not yet: offline earnings on join (Phase 3; it must read data.lastIncomePerSec before this
--- service's join recompute overwrites it), and the VIP, event and Glowdex multipliers.
+-- Offline earnings (§6): on join, floor(min(away, 6 h) × lastIncomePerSec × 10%), with `away`
+-- from the server clock (Schema.onJoin; a first join or a future lastSeen pays 0). It is read
+-- before the join recompute overwrites lastIncomePerSec, and shown in the OfflineEarnings popup
+-- once the client is ready.
+--
+-- Not yet: the VIP, event and Glowdex multipliers.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Economy = require(Shared:WaitForChild("Economy"))
+local EconomyMath = require(Shared:WaitForChild("EconomyMath"))
 local Inventory = require(Shared:WaitForChild("Inventory"))
 local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
 local InventoryService = require(script.Parent:WaitForChild("InventoryService"))
+local NetServer = require(script.Parent.Parent:WaitForChild("Net"):WaitForChild("NetServer"))
 
 local TICK_SECONDS = 1
 local WALLET_EVERY = 10 -- ticks
@@ -30,6 +36,8 @@ local IncomeService = {}
 local rates: { [Player]: number } = {}
 local paidUntil: { [Player]: number } = {} -- server time income was last paid up to
 local unlogged: { [Player]: number } = {} -- income not yet sent to Telemetry
+local offline: { [Player]: { amount: number, away: number } } = {} -- popup waiting for the client
+local clientReady: { [Player]: boolean } = {}
 
 local function now(): number
 	return workspace:GetServerTimeNow()
@@ -66,6 +74,33 @@ local function forget(player: Player)
 	rates[player] = nil
 	paidUntil[player] = nil
 	unlogged[player] = nil
+	offline[player] = nil
+	clientReady[player] = nil
+end
+
+-- Sends the offline popup once both the payout and the client are ready (either comes first).
+local function sendOffline(player: Player)
+	local pay = offline[player]
+	if pay ~= nil and clientReady[player] then
+		offline[player] = nil
+		NetServer.send(player, "OfflineEarnings", pay.amount, pay.away)
+	end
+end
+
+-- Pays the time away at the rate saved when they left. Runs before the join recompute.
+local function payOffline(player: Player, data: any, away: number)
+	local inc = economy.income
+	local amount = EconomyMath.offlineIncome(away, data.lastIncomePerSec, inc.offlineCapHours, inc.offlineEfficiency)
+	if amount <= 0 then
+		return
+	end
+	data.glow += amount
+	data.glowSinceRebirth += amount
+	data.lifetimeGlow += amount
+	local gameplay = Enum.AnalyticsEconomyTransactionType.Gameplay.Name
+	Telemetry.economy(player, "Source", "Glow", amount, math.floor(data.glow), gameplay, "offline")
+	offline[player] = { amount = amount, away = away }
+	sendOffline(player)
 end
 
 function IncomeService.perSec(player: Player): number
@@ -87,12 +122,21 @@ function IncomeService.recompute(player: Player)
 end
 
 function IncomeService.Init()
-	DataService.PlayerReady:Connect(function(player: Player)
+	DataService.PlayerReady:Connect(function(player: Player, data: any, info: any)
+		payOffline(player, data, info.away)
 		paidUntil[player] = now()
 		rates[player] = nil
 		IncomeService.recompute(player)
 	end)
 	InventoryService.Changed:Connect(IncomeService.recompute)
+	DataService.ClientReady:Connect(function(player: Player)
+		clientReady[player] = true
+		sendOffline(player)
+	end)
+	Players.PlayerRemoving:Connect(function(player: Player)
+		offline[player] = nil
+		clientReady[player] = nil
+	end)
 	DataService.PlayerLeaving:Connect(function(player: Player)
 		accrue(player, now())
 		logIncome(player)

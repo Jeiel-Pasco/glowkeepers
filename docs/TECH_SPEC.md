@@ -127,7 +127,7 @@ Client intent ──► Net (type check, rate limit) ──► Service (rules, s
 | PlotService | Assigns the 8 plots, slots, vault, plot zones, the shield bubble, plot snapshots and deltas | 2 |
 | GlowlingService / InventoryService | Create, move, release and transfer Glowling records; storage cap; auto-place | 2 |
 | RollService | Wraps `Roll` with a per-server `Random`; pity; tutorial overrides | 2 |
-| IncomeService | Recomputes Glow/s when inventory changes; 1 Hz accrual; offline payout on join | 2 |
+| IncomeService | Recomputes Glow/s when inventory changes; 1 Hz accrual; offline payout on join (at the saved `lastIncomePerSec`, before the join recompute), shown by `OfflineEarnings (amount, away)` once the client is ready | 2 |
 | ShopService / UpgradeService | Restock windows, per-player stock, lures, Lantern, Boots, Slots, Lock Charges | 3 |
 | StealService | Grab, carry, tag, deliver, chase boost, victim cooldown, validation | 2 |
 | LockService | Base Lock: 60 s lock then 90 s recharge (a Lock Charge skips it), none at night, pushes outsiders out of a locked zone at 10 Hz | 2 |
@@ -319,7 +319,7 @@ Every remote is declared once in `shared/Net.luau`, with its argument schema and
 | `PromptProduct` | C→S | productKey: string | Product enabled; policy allows it; under the daily cap; not during a theft | 1/s |
 | `FtueStep` | C→S | step: number | Analytics only; grants nothing | 2/s |
 | `ClientReady` | C→S | — | Sent once the controllers have started; the server answers with `PlayerState` and `Wallet` | 1/5 s (burst 2) |
-| `PlotSnapshot`, `PlotDelta`, `PlayerState`, `Wallet`, `WildSpawned`, `WildGone`, `RollResult`, `DawnResult`, `Revived`, `Announce`, `Toast` | S→C | — | — | — |
+| `PlotSnapshot`, `PlotDelta`, `PlayerState`, `Wallet`, `OfflineEarnings`, `WildSpawned`, `WildGone`, `RollResult`, `DawnResult`, `Revived`, `Announce`, `Toast` | S→C | — | — | — |
 
 **Rate limiting:** a token bucket per player per remote. Calls over the limit are dropped and counted. More than 3 times the limit within a minute raises an exploit flag (§8).
 
