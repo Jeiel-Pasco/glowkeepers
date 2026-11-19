@@ -19,6 +19,7 @@ export type View = {
 	vault: number, -- how many of them are vault pads (pads 1..vault)
 	stars: number,
 	lock: number, -- server time the Base Lock ends; 0 (or a past time) when open
+	shield: boolean, -- the owner has the new-player shield: nobody can steal here
 	pads: { [string]: PadView }, -- pad number as a string → the Glowling on it
 }
 
@@ -29,10 +30,11 @@ export type Patch = {
 	vault: number?,
 	stars: number?,
 	lock: number?,
+	shield: boolean?,
 	pads: { [string]: PadView | false }?,
 }
 
-local SCALARS = { "owner", "slots", "vault", "stars", "lock" }
+local SCALARS = { "owner", "slots", "vault", "stars", "lock", "shield" }
 
 -- The two plots next to `plotId` in the ring. `ids` is every plot id, in any order.
 function Plots.neighbors(ids: { number }, plotId: number): { number }
@@ -71,7 +73,7 @@ function Plots.pick(ids: { number }, taken: { [number]: any }, friendPlots: { nu
 end
 
 function Plots.empty(id: number): View
-	return { id = id, owner = 0, slots = 0, vault = 0, stars = 0, lock = 0, pads = {} }
+	return { id = id, owner = 0, slots = 0, vault = 0, stars = 0, lock = 0, shield = false, pads = {} }
 end
 
 -- What everyone sees of an owned plot. `layout` is Inventory's { slots, vault }; `lock` is
@@ -93,6 +95,7 @@ function Plots.view(id: number, owner: number, data: any, layout: { slots: numbe
 		vault = layout.vault,
 		stars = data.stars,
 		lock = lock or 0,
+		shield = data.shield ~= nil and data.shield.active == true,
 		pads = pads,
 	}
 end

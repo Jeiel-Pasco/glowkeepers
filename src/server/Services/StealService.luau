@@ -16,9 +16,10 @@
 -- The grab rules and the carry speed check live in Shared.Steal.
 --
 -- A locked base (PlotService.isLocked) can't be grabbed from, and a grab in progress there is
--- cancelled; a carry that already left keeps going.
+-- cancelled; a carry that already left keeps going. A shielded victim can't be robbed, and a
+-- shielded thief must drop their own shield first (ShieldService, after a client confirm).
 --
--- Not yet: the shield (Phase 3),
+-- Not yet:
 -- Boots in everyone's RunSpeed (the shop), crew-mates as taggers (Phase 4), the owner's alarm
 -- arrow (GS), the Audit store for Legendary-or-better steals (Phase 5).
 
@@ -255,6 +256,7 @@ local REJECT_TEXT: { [string]: string } = {
 	taken = "Someone's already grabbing that one",
 	locked = "That base is locked",
 	shielded = "That player is protected",
+	thief_shielded = "Drop your protection to steal",
 	too_far = "Get closer",
 }
 
@@ -282,7 +284,8 @@ local function grabStart(thief: Player, plotId: number, pad: number)
 		busy = jobs[thief] ~= nil,
 		padTaken = victim ~= nil and id ~= nil and InventoryService.isHeld(victim, id),
 		locked = PlotService.isLocked(plotId),
-		shielded = false, -- Phase 3
+		shielded = victimData ~= nil and victimData.shield.active == true,
+		thiefShielded = thiefData.shield.active == true,
 		now = now,
 		victimSafeUntil = if victim ~= nil then safeUntil[victim.UserId] or 0 else 0,
 		stolenToday = if victim ~= nil then stolenToday(thief, victim, state.index) else 0,

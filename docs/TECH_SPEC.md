@@ -131,6 +131,7 @@ Client intent ──► Net (type check, rate limit) ──► Service (rules, s
 | ShopService / UpgradeService | Restock windows, per-player stock, lures, Lantern, Boots, Slots, Lock Charges | 3 |
 | StealService | Grab, carry, tag, deliver, chase boost, victim cooldown, validation | 2 |
 | LockService | Base Lock: 60 s lock then 90 s recharge (a Lock Charge skips it), none at night, pushes outsiders out of a locked zone at 10 Hz | 2 |
+| ShieldService | New-player shield: 45 min of saved play time, ends early when its owner drops it to steal (or at the first rebirth, Phase 4); `Shielded` / `ShieldEndsAt` attributes; the plot view's `shield` | 3 |
 | CampfireService | Fire meter, wood and shard pickups, feeding, the dawn result | 2 |
 | ForestService | Wild spawn waves, catch validation, tutorial-only spawns | 2 |
 | StalkerService | Stalker NPC: the brain is `Shared.Stalker` (Dormant, Prowl, Stalk, Lunge, Retreat); 10 Hz sensing; kinematic, server-owned movement, straight on line of sight, else a PathfindingService path recomputed every 0.5 s; first-night near-miss | 2 |
@@ -258,6 +259,7 @@ export type Profile = {
 | Wood piles | Everyone | Each `WoodPile` model's `Available` attribute | On change |
 | Plot state (owner, slots, vault, lock, shield, decorations, base name, Stars) | Everyone | `PlotSnapshot` on join, then `PlotDelta`; `lock` is the server time the Base Lock ends (0 = open) | On change |
 | Lock recharge | The owner | Player attribute `LockReadyAt` (server time the recharge ends); charges are `lockCharges` in `PlayerState` | On change |
+| New-player shield | The player (and everyone, through the plot view's `shield`) | Player attributes `Shielded` (true or nil) and `ShieldEndsAt` (server time it ends if they stay online); `shield` in `PlayerState` | On change |
 | Wallet | Owner only | `Wallet {glow, perSec, t, embers}`; the client extrapolates the ticking counter | On change, plus every 10 s |
 | Inventory, quests, pass, pity, stock | Owner only | `PlayerState(full = true, data)` once the client sends `ClientReady`, then `PlayerState(false, patch)` with changed top-level keys (`receipts` and `flags` are never sent) | On change |
 | Wild Glowlings | Everyone (tutorial spawns: one player only) | `WildSpawned` (a list of `{ id, sp, area, x, y, z }`; every wild to a client that becomes ready mid-night) / `WildGone` (a list of ids) | Per wave, per catch, at dawn |
@@ -295,13 +297,14 @@ Every remote is declared once in `shared/Net.luau`, with its argument schema and
 | Remote | Direction | Arguments | Server checks | Limit |
 | --- | --- | --- | --- | --- |
 | `Catch` | C→S | wildId: string | Night; catcher alive (not downed or a wisp); wild exists and is visible to this player; catches left > 0; storage below its hard cap; distance ≤ 12 studs | 4/s |
-| `GrabStart` | C→S | plotId: number, slot: number | Day; before the dusk cutoff; target is a display slot with a Glowling; not own plot; thief has a plot and storage room; target not locked, shielded or on victim cooldown; under the per-victim daily limit; thief not shielded (a grab ends the shield); within 6 studs (flat distance, `Steal.reach`); not already grabbing or carrying | 2/s |
+| `GrabStart` | C→S | plotId: number, slot: number | Day; before the dusk cutoff; target is a display slot with a Glowling; not own plot; thief has a plot and storage room; target not locked, shielded or on victim cooldown; under the per-victim daily limit; thief not shielded (the client asks "This ends your protection. Steal anyway?" and sends `DropShield` first); within 6 studs (flat distance, `Steal.reach`); not already grabbing or carrying | 2/s |
 | `GrabCancel` | C→S | — | Lets go of the thief's grab in progress (a carry can't be cancelled) | 2/s |
 | `PickupFuel` | C→S | pileId: string | Night; within 8 studs; hands empty | 4/s |
 | `FeedFire` | C→S | — | Carrying fuel; within 10 studs of the fire | 4/s |
 | `ReviveStart` | C→S | userId: number | Night; reviver alive; target downed (not yourself, not a wisp); one revive per reviver and per target; within 8 studs; the server times the 3 s hold, pauses the target's bleed-out during it, and cancels it if the range breaks | 2/s |
 | `ReviveCancel` | C→S | — | Lets go of the reviver's hold; the bleed-out carries on | 2/s |
 | `Lock` | C→S | — | Day or dusk (a lock running at nightfall ends and recharges from then); owns a plot; not already locked; recharged, or spends a Lock Charge; not carrying. Grabs in progress on the plot cancel; non-owners who were inside may leave but not come back | 1/s |
+| `DropShield` | C→S | — | Ends the sender's new-player shield, after the client's confirm | 1/s |
 | `Place` / `Unplace` | C→S | id: string, pad: number (Place only) | Owns the id; pad unlocked (pads 1…vault are vault pads, so Place to one of them is the move to the vault; a taken pad swaps); Unplace only while storage has room; not mid-trade | 10/s |
 | `PlaceBest` | C→S | — | Best earners to the vault pads, the next best to display pads (GAME_SYSTEMS §7) | 2/s |
 | `Release` | C→S | ids: {string} (≤ 20) | Owns all of them; none in display slots, the vault or a trade; confirmed by the client UI | 2/s |
