@@ -99,6 +99,11 @@ function LiveConfigService.Init()
 	end
 end
 
+-- Re-reads the DataStore value now (after an admin edit) instead of at the next poll.
+function LiveConfigService.refresh()
+	task.spawn(read)
+end
+
 function LiveConfigService.Start()
 	task.spawn(function()
 		while true do
