@@ -23,6 +23,7 @@ local ORDER = {
 	"OfflineController",
 	"UpgradeController",
 	"ShopController",
+	"StorageController",
 	"HUDController",
 }
 

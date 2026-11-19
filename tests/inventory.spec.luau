@@ -220,4 +220,17 @@ H.test("placedValue sums every placed Glowling, vault and display", function()
 	H.eq(ranked[3], "g1", "ranked worst last")
 end)
 
+H.test("release: storage only, owned, not held, no repeats; pays 60 s of income", function()
+	local data = profile({ 1, 3, 4 })
+	data.vault["1"] = "g1"
+	H.ok((Inventory.canRelease(data, { "g2", "g3" })), "two from storage")
+	H.eq(select(2, Inventory.canRelease(data, {})), "empty", "nothing")
+	H.eq(select(2, Inventory.canRelease(data, { "g2", "g2" })), "duplicate", "the same id twice")
+	H.eq(select(2, Inventory.canRelease(data, { "g2", "nope" })), "not_owned", "someone else's")
+	H.eq(select(2, Inventory.canRelease(data, { "g2", "g1" })), "placed", "one in the vault")
+	H.eq(select(2, Inventory.canRelease(data, { "g3" }, { g3 = true })), "held", "mid-trade or carried")
+	-- A Rare (20/s) Golden (x2) size 1.1 at 2 Stars: 20 x 2 x 1.1 x 60 x (1 + 0.35 x 2) = 4488.
+	H.eq(Economy.releaseValue(cfg, 20 * 2 * 1.1, 2), 4488, "release value")
+end)
+
 H.finish("inventory")

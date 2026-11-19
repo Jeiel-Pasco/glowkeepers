@@ -67,6 +67,11 @@ function InventoryService.hold(player: Player, id: string, on: boolean)
 	end
 end
 
+-- The ids this player can't move right now (grabbed, carried, offered), or nil.
+function InventoryService.heldIds(player: Player): { [string]: boolean }?
+	return held[player]
+end
+
 function InventoryService.isHeld(player: Player, id: string): boolean
 	local ids = held[player]
 	return ids ~= nil and ids[id] == true

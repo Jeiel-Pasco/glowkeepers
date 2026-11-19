@@ -170,6 +170,31 @@ function Inventory.forget(data: any, id: string): boolean
 	return false
 end
 
+-- Release (§7): every id must be owned, in storage (not on a pad) and not held (being grabbed,
+-- carried or offered in a trade), with no repeats. All or nothing: returns ok, and a reason
+-- ("empty", "duplicate", "not_owned", "placed", "held") when any id fails.
+function Inventory.canRelease(data: any, ids: { string }, held: { [string]: boolean }?): (boolean, string?)
+	if #ids == 0 then
+		return false, "empty"
+	end
+	local seen = {}
+	for _, id in ids do
+		if seen[id] then
+			return false, "duplicate"
+		end
+		seen[id] = true
+		local where = Inventory.locate(data, id)
+		if where == nil then
+			return false, "not_owned"
+		elseif where ~= "storage" then
+			return false, "placed"
+		elseif held ~= nil and held[id] then
+			return false, "held"
+		end
+	end
+	return true, nil
+end
+
 -- Owned ids, best first: by value, then oldest, then id (so the order is stable).
 function Inventory.ranked(data: any, valueOf: ValueOf): { string }
 	local ids = {}

@@ -53,6 +53,29 @@ function Validate.value(schema: any, value: unknown): (boolean, string?)
 			return false, "not an allowed value"
 		end
 		return true
+	elseif kind == "list" then
+		-- An array of 1..maxCount items, each checked against `of`. No holes or extra keys.
+		if type(value) ~= "table" then
+			return false, "not a list"
+		end
+		local count = 0
+		for _ in value :: any do
+			count += 1
+		end
+		local list = value :: { unknown }
+		if count == 0 or count ~= #list then
+			return false, "not a list"
+		end
+		if count > (schema.maxCount or 1) then
+			return false, "too many items"
+		end
+		for i, item in list do
+			local ok, reason = Validate.value(schema.of, item)
+			if not ok then
+				return false, `item {i}: {reason}`
+			end
+		end
+		return true
 	end
 	return false, `unknown schema type {tostring(kind)}`
 end
