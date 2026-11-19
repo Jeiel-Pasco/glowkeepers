@@ -5,7 +5,7 @@
 --
 -- Events: "feed" (a fuel piece fed), "revive", "survive" (a night survived), "lure" (bought),
 -- "place" (a Glowling placed by hand), "glow" (Glow earned from income), "steal" (delivered),
--- "star" (a rebirth), "bronze" (a Bronze Glowdex page claimed), "lost" (a night lost). Catches come from
+-- "star" (a rebirth), "lock" (the base locked), "bronze" (a Bronze Glowdex page claimed), "lost" (a night lost). Catches come from
 -- GlowlingService.Added.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

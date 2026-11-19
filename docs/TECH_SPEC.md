@@ -133,6 +133,7 @@ Client intent ──► Net (type check, rate limit) ──► Service (rules, s
 | UpgradeService | Lantern, Boots and Slots for Glow (one level or Buy max, `Economy.upgradePurchase`), Lock Charges for Glow or Embers (5 held); applies Boots to `RunSpeed` and tonight's catches, and Slots to the layout | 3 |
 | StealService | Grab, carry, tag, deliver, chase boost, victim cooldown, validation; Guardian grab-time bonus (`Shared.Traits`) | 2 |
 | LockService | Base Lock: 60 s lock then 90 s recharge (a Lock Charge skips it), none at night, pushes outsiders out of a locked zone at 10 Hz | 2 |
+| TutorialService | The FTUE (GAME_SYSTEMS §22): path and step bitmask in `ftue`, `FtueStep` attribute (`Shared.Ftue` picks the step), Free Lure and stash grants, the first night catch at least Rare (`FtueRareCatch`), onboarding funnel events | 3 |
 | ShieldService | New-player shield: 45 min of saved play time, ends early when its owner drops it to steal (or at the first rebirth, Phase 4); `Shielded` / `ShieldEndsAt` attributes; the plot view's `shield` | 3 |
 | CampfireService | Fire meter, wood and shard pickups, feeding, the dawn result | 2 |
 | ForestService | Wild spawn waves, catch validation, tutorial-only spawns | 2 |
@@ -164,7 +165,7 @@ Client intent ──► Net (type check, rate limit) ──► Service (rules, s
 | GlowlingRenderer | Builds Glowling models from plot and wild state; rarity forms I–III from shared accessories on rig sockets; trait VFX (link beams, Overcharge, Guardian ring) and the Night Companion copy, all client-side; picks which ones get real lights by brightness and distance; LOD |
 | RollRevealController | Roll reel showing the near-miss tier, stingers, and server announcements for Mythic and above |
 | StalkerFXController | Screen-edge vignette (faint when the Stalker is near, growing through a stalk on this player, full at the lunge), halved in Calm mode; the heartbeat layer waits for its sound asset |
-| TutorialController | Both FTUE paths, arrows, guide Wisp, funnel analytics |
+| TutorialController | Draws the step from `FtueStep`: banner (pulses after 20 s), guide Wisp with a beam to the target, the Free Lure ("Open"), the Wisp's Stash grab ("Take", 1 s hold) |
 | ShopUI / InventoryUI / GlowdexUI / RebirthUI / TradeUI / DecorController / QuestUI / NightPassUI / StoreUI | One screen each, built from Studio templates |
 | GoalTrackerController | Shows the next 3 goals (GAME_SYSTEMS §19) |
 | SettingsController / AudioController / NotificationController | Settings, the audio mixer and ducking, toasts |
@@ -324,6 +325,7 @@ Every remote is declared once in `shared/Net.luau`, with its argument schema and
 | `SetSetting` | C→S | key, value | Key in an allow-list; value type and range | 10/s |
 | `PromptProduct` | C→S | productKey: string | Product enabled; policy allows it; under the daily cap; not during a theft | 1/s |
 | `FtueStep` | C→S | step: number | Analytics only; grants nothing | 2/s |
+| `FtueAction` | C→S | "lure" \| "stash" | The tutorial's Free Lure and stash grab; TutorialService checks the step, phase and distance | 2/s |
 | `ClientReady` | C→S | — | Sent once the controllers have started; the server answers with `PlayerState` and `Wallet` | 1/5 s (burst 2) |
 | `PlotSnapshot`, `PlotDelta`, `PlayerState`, `Wallet`, `OfflineEarnings`, `WildSpawned`, `WildGone`, `RollResult`, `DawnResult`, `Revived`, `Announce`, `Toast` | S→C | — | — | — |
 

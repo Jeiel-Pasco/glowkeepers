@@ -477,6 +477,8 @@ The candidates are scored by estimated time to finish, and the closest one in ea
 - **Day path** (joins with more than 60 s of day left): 1 → 6, free play, then 7 → 10.
 - **Late-day path** (60 s or less left): 1 → 4, then 7 → 10, then 5 → 6 at dawn.
 - **Night-first path** (joins at night): the Free Lure is on the Wisp, at the fire. Then 1 → 2, 8 → 10, and 3 → 6 at dawn.
+- Each step shows only in its phase, so a slow day player still gets 7 → 10 at dusk and finishes 5 → 6 the next day; dusk and dawn come first once the Free Lure is open, and a missed dusk or night step is skipped, never waited on (`Shared.Ftue`).
+- Built so far: step 9's catch is the player's first night catch, made at least Rare, not a personal spawn; the stash grab carries a Common home with nobody able to tag it. The Free Lure is a lantern next to the player on every path.
 
 **Fail-safes**
 - If a step isn't done within 20 s, the hint grows (pulsing button, bigger arrow).

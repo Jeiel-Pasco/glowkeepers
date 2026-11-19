@@ -56,7 +56,7 @@ export type Profile = {
 	playDays: number,
 	lastPlayDay: number,
 	shield: { active: boolean, playSeconds: number },
-	ftue: { step: number, path: string?, done: boolean },
+	ftue: { step: number, path: string?, done: boolean }, -- step: bitmask of finished steps (Shared.Ftue)
 	stats: {
 		catches: number,
 		steals: number,

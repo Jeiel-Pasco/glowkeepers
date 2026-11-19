@@ -22,6 +22,7 @@ local ORDER = {
 	"StealController",
 	"LockController",
 	"ShieldController",
+	"TutorialController",
 	"OfflineController",
 	"UpgradeController",
 	"ShopController",
