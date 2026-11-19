@@ -4,7 +4,9 @@
 -- Builds ReplicatedStorage.Remotes from Shared.Net when first required. Every client call goes
 -- through the rate limit, then the argument check, and only then reaches its handler. Dropped
 -- calls are counted; a flood (over 3× the per-minute limit) or repeated invalid calls fire
--- NetServer.Abuse, which ModerationService will act on (Phase 5).
+-- NetServer.Abuse, which ModerationService acts on. Handlers call NetServer.reject when a
+-- well-formed call names something that isn't the player's (another player's id, an unknown
+-- product): logged, and flagged once per remote per minute.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,7 +25,7 @@ local WINDOW_SECONDS = 60
 local INVALID_CALLS_TO_FLAG = 10
 
 local NetServer = {}
-NetServer.Abuse = Signal.new() -- (player, remoteName, reason: "flood" | "invalid")
+NetServer.Abuse = Signal.new() -- (player, remoteName, reason: "flood" | "invalid" | "rejected")
 
 local remotes: { [string]: Instance } = {}
 local handlers: { [string]: Handler } = {}
@@ -126,6 +128,17 @@ Players.PlayerRemoving:Connect(function(player)
 	buckets[player] = nil
 	windows[player] = nil
 end)
+
+-- A handler refusing a well-formed call that can't be honest (not the player's id, an
+-- unknown product). Logged; flags the player once per remote per minute.
+function NetServer.reject(player: Player, name: string, reason: string)
+	local window = windowFor(player, name, os.clock())
+	window.invalid += 1
+	if RunService:IsStudio() then
+		warn(`[Net] {name} from {player.Name} rejected: {reason}`)
+	end
+	flag(player, name, window, "rejected")
+end
 
 -- One handler per client → server remote. Arguments arrive already type-checked.
 function NetServer.on(name: string, handler: Handler)

@@ -146,12 +146,18 @@ function InventoryService.Init()
 	end)
 
 	NetServer.on("Place", function(player: Player, id: string, pad: number)
-		if InventoryService.place(player, id, pad) then
+		local ok, reason = InventoryService.place(player, id, pad)
+		if ok then
 			Progress.add(player, "place")
+		elseif reason == "not owned" then
+			NetServer.reject(player, "Place", reason)
 		end
 	end)
 	NetServer.on("Unplace", function(player: Player, id: string)
-		InventoryService.unplace(player, id)
+		local ok, reason = InventoryService.unplace(player, id)
+		if not ok and reason == "not owned" then
+			NetServer.reject(player, "Unplace", reason)
+		end
 	end)
 	NetServer.on("PlaceBest", function(player: Player)
 		InventoryService.placeBest(player)

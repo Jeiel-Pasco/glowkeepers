@@ -150,6 +150,9 @@ local function onPrompt(player: Player, key: string)
 		premium = data.pass.premium,
 	})
 	if reason ~= nil then
+		if reason == "unknown" then
+			NetServer.reject(player, "PromptProduct", `unknown {key}`)
+		end
 		toast(player, REFUSALS[reason] or "That isn't available", "bad")
 		return
 	end

@@ -332,6 +332,9 @@ local function onOffer(player: Player, ids: { string })
 	end
 	local reason = Trade.offerReason(economy, data, ids, InventoryService.heldIds(player), os.time())
 	if reason ~= nil then
+		if reason == "not_owned" or reason == "duplicate" or reason == "too_many" then
+			NetServer.reject(player, "TradeOffer", reason)
+		end
 		local text = OFFER_TEXT[reason]
 		if text then
 			toast(player, text, "bad")
