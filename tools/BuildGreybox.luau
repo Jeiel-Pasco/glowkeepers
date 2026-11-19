@@ -167,22 +167,47 @@ end
 
 -- A clone of the mesh `name`, scaled so it is `height` tall, standing on `base` (a ground-level
 -- CFrame that also carries the yaw).
-local function asset(parent, name: string, height: number, base: CFrame, props): MeshPart
-	local template = (ASSETS :: Folder):FindFirstChild(name) :: MeshPart
-	local p = template:Clone()
-	p.Size = template.Size * (height / template.Size.Y)
-	p.CFrame = base * CFrame.new(0, p.Size.Y / 2 - 0.3, 0)
-	p.Anchored = true
-	if name:sub(1, 5) == "Rock_" and name ~= "Rock_Mossy" then
-		-- The pack's rocks are blue-grey; ours match the stone of the paths and pit.
-		p.TextureID = ""
-		p.Color = COLORS.stone:Lerp(Color3.fromRGB(120, 112, 130), rng:NextNumber(0, 0.5))
+local function heightOf(name: string): number
+	local template = (ASSETS :: Folder):FindFirstChild(name) :: Instance
+	if template:IsA("Model") then
+		local _, size = template:GetBoundingBox()
+		return size.Y
 	end
-	for key, value in props or {} do
-		p[key] = value
+	return (template :: BasePart).Size.Y
+end
+
+-- Props come as one MeshPart, or as a Model of MeshParts split by material (Trunk/Leaves,
+-- Rock/Moss, Stem/Cap) with matte Wood, Grass, Rock and Fabric surfaces, pivoted at the
+-- bottom centre. Every part gets `props`; plain rock parts get a slightly varied stone colour.
+local function asset(parent, name: string, height: number, base: CFrame, props): Instance
+	local template = (ASSETS :: Folder):FindFirstChild(name) :: Instance
+	local clone = template:Clone()
+	local parts: { BasePart } = {}
+	if clone:IsA("Model") then
+		clone:ScaleTo(clone:GetScale() * height / heightOf(name))
+		clone:PivotTo(base * CFrame.new(0, -0.3, 0))
+		for _, d in clone:GetDescendants() do
+			if d:IsA("BasePart") then
+				table.insert(parts, d)
+			end
+		end
+	else
+		local p = clone :: BasePart
+		p.Size = p.Size * (height / p.Size.Y)
+		p.CFrame = base * CFrame.new(0, p.Size.Y / 2 - 0.3, 0)
+		table.insert(parts, p)
 	end
-	p.Parent = parent
-	return p
+	for _, p in parts do
+		p.Anchored = true
+		if p.Material == Enum.Material.Rock then
+			p.Color = COLORS.stone:Lerp(Color3.fromRGB(120, 112, 130), rng:NextNumber(0, 0.5))
+		end
+		for key, value in props or {} do
+			(p :: any)[key] = value
+		end
+	end
+	clone.Parent = parent
+	return clone
 end
 
 local MESH_TREES = hasAsset("Tree_Oak_Round") and hasAsset("Tree_Pine_Tall")
@@ -1051,11 +1076,21 @@ do
 				else pick({ "Tree_Oak_Round", "Tree_Oak_Small", "Tree_Oak_Tall" })
 			local mesh = asset(tree, name, total, CFrame.new(base) * turn, DECOR)
 			mesh.Name = "Crown"
-			if kind == "spirit" then
-				mesh.TextureID = "" -- the whole tree in one pale spirit colour
-				mesh.Color = if rng:NextNumber() < 0.5
-					then Color3.fromRGB(150, 225, 215)
-					else Color3.fromRGB(200, 180, 240)
+			-- Each tree's leaves get their own shade; spirit trees glow pale teal or lilac.
+			local leafColor = if kind == "spirit"
+				then (if rng:NextNumber() < 0.5 then Color3.fromRGB(150, 225, 215) else Color3.fromRGB(200, 180, 240))
+				elseif kind == "pine" then Color3.fromRGB(44, 88, 64)
+					:Lerp(Color3.fromRGB(70, 110, 70), rng:NextNumber(0, 0.5))
+				else (if deep then COLORS.deepLeaves else COLORS.leaves):Lerp(
+					Color3.fromRGB(90, 120, 60),
+					rng:NextNumber(0, 0.35)
+				)
+			for _, d in mesh:GetDescendants() do
+				if d:IsA("BasePart") and d.Name == "Leaves" then
+					d.Color = leafColor
+				elseif d:IsA("BasePart") and d.Name == "Trunk" then
+					d.Color = bark
+				end
 			end
 			part(
 				tree,
@@ -1256,11 +1291,10 @@ do
 		if pos ~= nil and hasAsset("Rock_Mossy") then
 			local name =
 				pick({ "Rock_Mossy", "Rock_Mossy", "Rock_Boulder", "Rock_Stack", "Rock_Standing", "Rock_Flat" })
-			local template = (ASSETS :: Folder):FindFirstChild(name) :: MeshPart
 			asset(
 				props,
 				name,
-				template.Size.Y * rng:NextNumber(0.8, 1.5),
+				heightOf(name) * rng:NextNumber(0.8, 1.5),
 				CFrame.new(pos) * CFrame.Angles(0, rng:NextNumber(0, TAU), 0)
 			).Name =
 				"Rock"
