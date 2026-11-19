@@ -113,6 +113,14 @@ H.test("Release: a list of 1..20 Glowling ids", function()
 	H.ok(not Validate.args(args, table.pack({ 5 })), "a number id")
 end)
 
+H.test("TradeOffer: 0..4 Glowling ids ({} clears the offer)", function()
+	local args = Net.remotes.TradeOffer.args
+	H.ok(Validate.args(args, table.pack({})), "empty")
+	H.ok(Validate.args(args, table.pack({ "a", "b", "c", "d" })), "four")
+	H.ok(not Validate.args(args, table.pack({ "a", "b", "c", "d", "e" })), "five")
+	H.ok(not Validate.args(args, table.pack({ "a", x = "b" })), "an extra key")
+end)
+
 H.test("token bucket: burst, refill, and a clock that goes backwards", function()
 	local bucket = TokenBucket.new(2, 3, 100)
 	H.ok(TokenBucket.take(bucket, 100), "1")

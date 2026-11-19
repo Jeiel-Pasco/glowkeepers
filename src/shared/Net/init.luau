@@ -16,6 +16,7 @@ export type ArgSchema = {
 	values: { string }?,
 	of: ArgSchema?, -- "list": the schema of each item
 	maxCount: number?, -- "list": at most this many items
+	minCount: number?, -- "list": at least this many (default 1)
 	optional: boolean?,
 }
 
@@ -110,6 +111,21 @@ Net.remotes = {
 		},
 		rate = { perSecond = 1, burst = 2 },
 	},
+	-- Trading (§17): request a player by userId, answer a request, set your offer (storage ids),
+	-- confirm (after the 5 s delay), cancel. The server runs the session (TradeService).
+	TradeRequest = { dir = "c2s", args = { { type = "integer" } }, rate = { perSecond = 5, burst = 5 } },
+	TradeRespond = {
+		dir = "c2s",
+		args = { { type = "integer" }, { type = "boolean" } },
+		rate = { perSecond = 5, burst = 5 },
+	},
+	TradeOffer = {
+		dir = "c2s",
+		args = { { type = "list", of = GLOWLING_ID, minCount = 0, maxCount = 4 } }, -- {} clears it
+		rate = { perSecond = 5, burst = 5 },
+	},
+	TradeConfirm = { dir = "c2s", args = {}, rate = { perSecond = 5, burst = 5 } },
+	TradeCancel = { dir = "c2s", args = {}, rate = { perSecond = 5, burst = 5 } },
 	PassPremium = { dir = "c2s", args = {}, rate = { perSecond = 0.2, burst = 1 } }, -- this season's premium for Embers
 	Lock = { dir = "c2s", args = {}, rate = { perSecond = 1, burst = 2 } }, -- Base Lock, or a Lock Charge to skip the recharge
 	ShopBuy = {
@@ -172,6 +188,8 @@ Net.remotes = {
 	DawnResult = { dir = "s2c" }, -- ({ survived, fire, embers, glowLost, piecesFed, revives })
 	WildSpawned = { dir = "s2c" }, -- ({ { id, sp, area, x, y, z } }): a wave, or every wild for a new client
 	WildGone = { dir = "s2c" }, -- ({ wildId }): caught, or dawn
+	TradeRequested = { dir = "s2c" }, -- (fromUserId, fromName): someone asked to trade
+	TradeState = { dir = "s2c" }, -- (view | nil): the trade session from this side, nil = ended
 	Leaderboards = { dir = "s2c" }, -- ({ week, stars, dex, revives, nights = { { name, value } } }): top N each
 	Revived = { dir = "s2c" }, -- (byUserId): to the revived player, for the friend request prompt
 } :: { [string]: Remote }

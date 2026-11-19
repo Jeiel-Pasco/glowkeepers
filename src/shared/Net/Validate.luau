@@ -54,7 +54,8 @@ function Validate.value(schema: any, value: unknown): (boolean, string?)
 		end
 		return true
 	elseif kind == "list" then
-		-- An array of 1..maxCount items, each checked against `of`. No holes or extra keys.
+		-- An array of minCount (default 1)..maxCount items, each checked against `of`. No holes
+		-- or extra keys. An empty table counts as an empty list.
 		if type(value) ~= "table" then
 			return false, "not a list"
 		end
@@ -63,8 +64,11 @@ function Validate.value(schema: any, value: unknown): (boolean, string?)
 			count += 1
 		end
 		local list = value :: { unknown }
-		if count == 0 or count ~= #list then
+		if count ~= #list then
 			return false, "not a list"
+		end
+		if count < (schema.minCount or 1) then
+			return false, "too few items"
 		end
 		if count > (schema.maxCount or 1) then
 			return false, "too many items"
