@@ -222,5 +222,6 @@
   "trade":   { "minStars": 3, "minPlayDays": 3, "minAccountAgeDays": 7, "maxPerSide": 4, "confirmDelay": 5, "escrowSeconds": 120,
                "feeByRarity": [1, 2, 5, 10, 25, 50, 100], "tradeLockHours": 24, "maxPerDay": 10 },
   "moderation": { "windowSeconds": 600, "kickAt": 10, "logKeep": 50,
-                  "points": { "flood": 3, "invalid": 2, "rejected": 1, "Carry": 4 } }
+                  "points": { "flood": 3, "invalid": 2, "rejected": 1, "Carry": 4 } },
+  "admin": { "groupId": 0, "minRank": 200, "maxEmbers": 100000, "banLadderDays": [1, 7, -1] }
 }

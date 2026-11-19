@@ -195,6 +195,29 @@ function DataService.isReady(player: Player): boolean
 	return profiles[player] ~= nil
 end
 
+-- A read-only copy of a saved profile (any player, loaded here or not), or nil. Yields.
+-- Not available on the in-memory DEV store.
+function DataService.peek(userId: number): any?
+	if store == nil or store.GetAsync == nil then
+		return nil
+	end
+	local ok, profile = pcall(function()
+		return store:GetAsync(`Player_{userId}`)
+	end)
+	return if ok and profile ~= nil then profile.Data else nil
+end
+
+-- Right to Erasure: deletes a saved profile. The player must not be in this server. Yields.
+function DataService.erase(userId: number): (boolean, string?)
+	if store == nil or store.RemoveAsync == nil then
+		return false, `no store to erase from ({storeMode})`
+	end
+	local ok, err = pcall(function()
+		return store:RemoveAsync(`Player_{userId}`)
+	end)
+	return ok, if ok then nil else tostring(err)
+end
+
 function DataService.storeMode(): string
 	return storeMode
 end
