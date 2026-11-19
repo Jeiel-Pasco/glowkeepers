@@ -18,6 +18,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local Cycle = require(Shared:WaitForChild("Cycle"))
 local EconomyMath = require(Shared:WaitForChild("EconomyMath"))
+local Roll = require(Shared:WaitForChild("Roll"))
 local economy = require(Config:WaitForChild("economy")) :: any
 local speciesConfig = require(Config:WaitForChild("species")) :: any
 local NetClient = require(script.Parent.Parent:WaitForChild("Net"):WaitForChild("NetClient"))
@@ -52,6 +53,7 @@ type Parts = {
 	glow: TextLabel?,
 	embers: TextLabel?,
 	fire: TextLabel?,
+	pity: TextLabel?,
 	dots: { GuiObject },
 	countdown: TextLabel?,
 	phaseLabel: TextLabel?,
@@ -117,6 +119,7 @@ local function buildPlaceholder(playerGui: PlayerGui): ScreenGui
 	local fireMeter = makeLabel("FireMeter", top, 22, FIRE_OK)
 	fireMeter.LayoutOrder = 3
 	fireMeter.Visible = false
+	makeLabel("Pity", top, 16, Color3.fromRGB(200, 170, 255)).LayoutOrder = 4
 
 	-- Cycle ring: dots around a circle. Day dots are warm and night dots blue; passed dots dim.
 	local ring = Instance.new("Frame")
@@ -209,6 +212,7 @@ local function bind(playerGui: PlayerGui)
 	parts.glow = find(root, "Glow", "TextLabel")
 	parts.embers = find(root, "Embers", "TextLabel")
 	parts.fire = find(root, "FireMeter", "TextLabel")
+	parts.pity = find(root, "Pity", "TextLabel")
 	parts.countdown = find(root, "Countdown", "TextLabel")
 	parts.phaseLabel = find(root, "PhaseLabel", "TextLabel")
 	parts.banner = find(root, "Banner", "TextLabel")
@@ -308,6 +312,13 @@ local function refresh()
 		parts.embers.Text = `Embers {EconomyMath.formatNumber(StateController.wallet().embers)}`
 	end
 	refreshFire(now)
+	local data = StateController.get()
+	if parts.pity ~= nil and data ~= nil and data.pity ~= nil then
+		local left = Roll.pityLeft(economy, data.pity.sinceLegendary or 0)
+		parts.pity.Text = if left == 1
+			then "Next catch: Legendary guaranteed"
+			else `Legendary guaranteed within {left} catches`
+	end
 
 	local state = CycleFXController.state()
 	if state == nil then

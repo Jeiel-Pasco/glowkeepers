@@ -88,6 +88,10 @@ H.test("pity: 150 night catches below Legendary guarantee the next one (§5)", f
 	tier, pity = Roll.nightRarity(cfg, 1, 10, H.constant(0))
 	H.eq(tier, 7, "natural Secret")
 	H.eq(pity, 0, "a natural Legendary+ resets too")
+	H.eq(Roll.pityLeft(cfg, 0), 151, "HUD: a fresh counter")
+	H.eq(Roll.pityLeft(cfg, 149), 2, "HUD: one miss left")
+	H.eq(Roll.pityLeft(cfg, 150), 1, "HUD: the next one is guaranteed")
+	H.eq(Roll.pityLeft(cfg, 400), 1, "HUD: a damaged counter never shows 0 or less")
 	H.eq(Roll.nightOdds(cfg, 1, 150)[1], 0, "odds tab shows no Common at 150")
 end)
 

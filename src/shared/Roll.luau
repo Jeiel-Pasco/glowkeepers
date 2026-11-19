@@ -72,6 +72,12 @@ function Roll.nightRarity(cfg: any, luck: number, pity: number, rng: Rng): (numb
 	return tier, if tier >= legendary then 0 else pity + 1
 end
 
+-- Night catches until Legendary is guaranteed, counting the guaranteed one (§5, D5): the HUD's
+-- "Legendary guaranteed within N catches". 151 from a fresh counter, 1 when the next one is.
+function Roll.pityLeft(cfg: any, pity: number): number
+	return math.max(1, cfg.pity.legendaryAfterNightCatches + 1 - pity)
+end
+
 function Roll.nightOdds(cfg: any, luck: number, pity: number): { number }
 	local legendary = Roll.rarityIndex(cfg, "Legendary")
 	local floor = if pity >= cfg.pity.legendaryAfterNightCatches then legendary else 1
