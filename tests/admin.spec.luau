@@ -41,6 +41,18 @@ H.test("ban: days, permanent, ladder", function()
 	H.eq(Commands.ladderDays(cfg, 9), -1)
 end)
 
+H.test("versions and rollback: unix time, rollback needs a reason", function()
+	H.eq((Commands.parse(cfg, species, "versions", 5, "") :: any).at, nil, "default now")
+	H.eq((Commands.parse(cfg, species, "versions", 5, "1795000000") :: any).at, 1795000000)
+	H.eq(why("versions", 5, "yesterday"), "time must be a unix timestamp in seconds")
+	H.eq(why("rollback", 5, "1795000000"), "needs a reason")
+	H.eq(why("rollback", 5, ""), "time must be a unix timestamp in seconds")
+	local r = Commands.parse(cfg, species, "rollback", 5, "1795000000 dupe cleanup") :: any
+	H.eq(r.at, 1795000000)
+	H.eq(r.reason, "dupe cleanup")
+	H.eq(why("rollback", 0, "1 x"), "needs a target user id")
+end)
+
 H.test("diff lists changed, added and removed leaves", function()
 	local lines = Commands.diff(
 		{ killSwitches = { trading = false, stealing = false }, codes = { A = { embers = 5 } } },

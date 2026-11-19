@@ -10,6 +10,8 @@
 --   ban      "<days|next> <reason>"  next = the ladder (1 d, 7 d, permanent) by past bans
 --   unban
 --   erase    "<requestId>"       Right to Erasure: profile key + leaderboard entries
+--   versions "[unix]"            saved versions at or before that time (default now)
+--   rollback "<unix> <reason>"   restore the newest version at or before that time (offline)
 --   live_get / live_set "<json>" (shows a diff) / live_confirm (writes it)
 -- Every grant, kick and ban needs a reason.
 
@@ -24,17 +26,30 @@ Commands.LIST = {
 	"ban",
 	"unban",
 	"erase",
+	"versions",
+	"rollback",
 	"live_get",
 	"live_set",
 	"live_confirm",
 }
 
-local NEEDS_TARGET =
-	{ lookup = true, flags = true, embers = true, glowling = true, kick = true, ban = true, unban = true, erase = true }
+local NEEDS_TARGET = {
+	lookup = true,
+	flags = true,
+	embers = true,
+	glowling = true,
+	kick = true,
+	ban = true,
+	unban = true,
+	erase = true,
+	versions = true,
+	rollback = true,
+}
 
 export type Parsed = {
 	cmd: string,
 	target: number,
+	at: number?,
 	amount: number?,
 	species: string?,
 	rarity: number?,
@@ -108,10 +123,20 @@ function Commands.parse(
 			return nil, "needs the erasure request id"
 		end
 		out.requestId = id
+	elseif cmd == "versions" or cmd == "rollback" then
+		local at, reason = head(arg)
+		local n = tonumber(at)
+		if cmd == "versions" and at == "" then
+			n = nil
+		elseif n == nil or n % 1 ~= 0 or n <= 0 then
+			return nil, "time must be a unix timestamp in seconds"
+		end
+		out.at, out.reason = n, if cmd == "rollback" then reason else nil
 	elseif cmd == "live_set" then
 		out.json = trim(arg)
 	end
-	if (cmd == "embers" or cmd == "glowling" or cmd == "kick" or cmd == "ban") and (out.reason or "") == "" then
+	local needsReason = { embers = true, glowling = true, kick = true, ban = true, rollback = true }
+	if needsReason[cmd] and (out.reason or "") == "" then
 		return nil, "needs a reason"
 	end
 	return out, nil

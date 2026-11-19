@@ -139,6 +139,8 @@ Net.remotes = {
 					"ban",
 					"unban",
 					"erase",
+					"versions",
+					"rollback",
 					"live_get",
 					"live_set",
 					"live_confirm",

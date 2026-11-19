@@ -8,7 +8,9 @@
 -- Every action goes to telemetry (admin_action) and, on the live stores, the DataStore `Audit`
 -- (key <yyyy-mm-dd>_<JobId>, a list of { t, admin, cmd, target, detail }). Erasure logs only
 -- the request id, never data.
--- Not yet: profile rollback (ProfileStore VersionQuery), offline grants, crew membership erasure.
+-- Rollback (versions / rollback) uses ProfileStore's VersionQuery; the player must be offline
+-- everywhere, or their live session saves over it.
+-- Not yet: offline grants, crew membership erasure.
 
 local DataStoreService = game:GetService("DataStoreService")
 local HttpService = game:GetService("HttpService")
@@ -248,6 +250,35 @@ local function run(admin: Player, c: Commands.Parsed): string
 		local boards = eraseBoards(c.target)
 		AdminService.audit(admin, cmd, c.target, `request {c.requestId}`) -- the id only, never data
 		return `erased the profile and {boards} leaderboard entries`
+	elseif cmd == "versions" then
+		local list = DataService.versions(c.target, c.at or os.time(), 8)
+		if #list == 0 then
+			return `no saved versions ({DataService.storeMode()})`
+		end
+		local lines = {}
+		for _, v in list do
+			local d = v.data
+			local count = 0
+			for _ in d.glowlings or {} do
+				count += 1
+			end
+			table.insert(
+				lines,
+				`{v.at} {os.date("!%Y-%m-%d %H:%M", v.at)} · Stars {d.stars or 0} · Embers {d.embers or 0} · Glowlings {count}`
+			)
+		end
+		AdminService.audit(admin, cmd, c.target, "")
+		return table.concat(lines, "\n")
+	elseif cmd == "rollback" then
+		if target ~= nil then
+			return "the player is in this server: kick them first"
+		end
+		local at, err = DataService.rollback(c.target, c.at :: number)
+		if at == nil then
+			return `rollback failed: {err}`
+		end
+		AdminService.audit(admin, cmd, c.target, `to {at} · {c.reason}`)
+		return `restored the version saved at {at} ({os.date("!%Y-%m-%d %H:%M", at)} UTC)`
 	elseif cmd == "live_get" then
 		local value = readLive()
 		return if value == nil then "LiveConfig/current is empty" else HttpService:JSONEncode(value)
