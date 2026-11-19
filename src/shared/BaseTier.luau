@@ -15,9 +15,9 @@ local BaseTier = {}
 export type Look = {
 	tier: number,
 	name: string,
-	home: string?, -- template in WorldAssets.Tiers
+	home: string?, -- a Shared.Props model
 	homeHeight: number, -- studs
-	fence: string, -- template in WorldAssets.Tiers
+	fence: string, -- a Shared.Props model
 	floor: string, -- Enum.Material name
 	floorColor: { number },
 	lamps: string?, -- template for the four corner lamps

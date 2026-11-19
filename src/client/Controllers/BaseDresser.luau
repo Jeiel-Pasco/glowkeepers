@@ -1,10 +1,8 @@
 --!strict
 -- Dresses a plot for its tier (Shared.BaseTier) and draws its placed decorations, from the
--- models in ReplicatedStorage.WorldAssets (kept in the place file):
---   Tiers/   Tent, Cabin, Cottage, Treehouse, Sanctuary, FenceRope, FenceWood, FenceStone, LampPost
---   Decor/   one model per decoration id (config decor.items)
--- Every model is pivoted at its bottom centre with its front facing -Z. Without WorldAssets the
--- plot keeps its plain floor and decorations fall back to blocks.
+-- low-poly models in Shared.Props (homes, fences, lamps, one model per decoration id). Every
+-- model is pivoted at its bottom centre with its front facing -Z; unknown decorations fall back
+-- to blocks.
 --
 -- Everything here is local and cosmetic: no collision, no queries, nothing the server reads.
 -- (Not a controller: PlotController calls it while it draws a plot.)
@@ -14,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local BaseTier = require(Shared:WaitForChild("BaseTier"))
 local Decor = require(Shared:WaitForChild("Decor"))
+local Props = require(Shared:WaitForChild("Props"))
 local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
 
 local BaseDresser = {}
@@ -53,15 +52,8 @@ local GLOWING: { [string]: Color3 } = {
 	string_lights = Color3.fromRGB(255, 210, 140),
 }
 
-local function assets(group: string): Folder?
-	local root = ReplicatedStorage:FindFirstChild("WorldAssets")
-	return if root ~= nil then root:FindFirstChild(group) :: Folder? else nil
-end
-
-local function template(group: string, name: string): Model?
-	local folder = assets(group)
-	local found = if folder ~= nil then folder:FindFirstChild(name) else nil
-	return if found ~= nil and found:IsA("Model") then found else nil
+local function template(_group: string, name: string): Model?
+	return Props.get(name)
 end
 
 local function cosmetic(model: Model)
@@ -120,7 +112,7 @@ end
 -- Dresses one plot. `plot` is the Plot model, `owned` whether anyone has it.
 function BaseDresser.dress(plot: Instance, slots: number, owned: boolean, parent: Instance)
 	local floor = plot:FindFirstChild("Floor")
-	if floor == nil or not floor:IsA("BasePart") or assets("Tiers") == nil then
+	if floor == nil or not floor:IsA("BasePart") then
 		return
 	end
 	local look = BaseTier.look(slots, owned)

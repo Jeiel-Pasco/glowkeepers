@@ -214,17 +214,46 @@ end
 
 local MESH_TREES = hasAsset("Tree_Oak_Round") and hasAsset("Tree_Pine_Tall")
 
--- Generated hand-painted models (stations, campfire, lamp posts, homes, decorations), kept in
--- ReplicatedStorage.WorldAssets in the place file, pivoted at their bottom centre, front -Z.
-local WORLD = game:GetService("ReplicatedStorage"):FindFirstChild("WorldAssets")
+-- Low-poly props (stations, campfire, lamp posts) from Shared.Props, pivoted at their bottom
+-- centre, front -Z. The forest meshes they borrow are copied to ReplicatedStorage.WorldAssets.Forest
+-- so the client (BaseDresser) can build the same props.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+do
+	local root = ReplicatedStorage:FindFirstChild("WorldAssets")
+	if root == nil then
+		root = Instance.new("Folder")
+		root.Name = "WorldAssets"
+		root.Parent = ReplicatedStorage
+	end
+	for _, name in { "Stations", "Tiers", "Decor", "Forest" } do -- the old generated models go
+		local old = root:FindFirstChild(name)
+		if old ~= nil then
+			old:Destroy()
+		end
+	end
+	if ASSETS ~= nil then
+		local forest = (ASSETS :: Folder):Clone()
+		forest.Name = "Forest"
+		forest.Parent = root
+	end
+end
+-- A fresh copy of the module, so a rebuild in Studio never reuses a stale require.
+local Props = (function()
+	local shared = ReplicatedStorage:WaitForChild("Shared")
+	local copy = shared:WaitForChild("Props"):Clone()
+	copy.Name = "PropsBuild"
+	copy.Parent = shared
+	local ok, result = pcall(require, copy)
+	copy:Destroy()
+	assert(ok, result)
+	return result
+end)()
 
-local function world(group: string, name: string): Model?
-	local folder = if WORLD ~= nil then WORLD:FindFirstChild(group) else nil
-	local found = if folder ~= nil then folder:FindFirstChild(name) else nil
-	return if found ~= nil and found:IsA("Model") then found else nil
+local function world(_group: string, name: string): Model?
+	return Props.get(name)
 end
 
--- A clone of a WorldAssets model, `height` tall, standing on `at`.
+-- A clone of a prop model, `height` tall, standing on `at`.
 local function placeWorld(source: Model, height: number, at: CFrame, parent: Instance, collide: boolean): Model
 	local m = source:Clone()
 	local _, size = m:GetBoundingBox()
@@ -242,7 +271,7 @@ local function placeWorld(source: Model, height: number, at: CFrame, parent: Ins
 	return m
 end
 
--- A lamp post with a warm light (none without the model).
+-- A lamp post with a warm light.
 local function lampPost(parent: Instance, at: CFrame)
 	local source = world("Tiers", "LampPost")
 	if source == nil then
@@ -605,9 +634,9 @@ do
 	)
 	local pitModel = world("Stations", "Campfire")
 	if pitModel ~= nil then
-		-- The hand-painted pit (rune stones and stacked logs); the Pit part stays as the base.
+		-- The low-poly pit (a stone ring and leaning logs); the Pit part stays as the base.
 		pit.Transparency = 1
-		placeWorld(pitModel, 6.5, CFrame.new(0, 0, 0), fire, false).Name = "PitModel"
+		placeWorld(pitModel, 3, CFrame.new(0, 0, 0), fire, false).Name = "PitModel"
 	end
 	for k = 0, 2 do
 		local cf = CFrame.new(0, 1.4, 0) * CFrame.Angles(0, k * math.pi / 3, 0.25)
@@ -857,7 +886,7 @@ do
 		)
 		local signHeight = 7.4
 		if look ~= nil then
-			-- A hand-painted building; the sign hangs above its front.
+			-- A low-poly building; the sign hangs above its front.
 			local height = STATION_HEIGHT[info.kind] or 12
 			placeWorld(look, height, cf, station, true).Name = "Building"
 			signHeight = height + 1.6
