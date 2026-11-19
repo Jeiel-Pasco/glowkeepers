@@ -47,11 +47,14 @@ function Glowdex.hasMutation(entry: any, m: number): boolean
 	return type(entry) == "table" and has(tonumber(entry.m) or 0, m)
 end
 
--- The highest page tier this entry has reached (0 = none).
-function Glowdex.tier(cfg: any, entry: any): number
+-- The highest page tier this entry has reached (0 = none). Rarities below the species' floor
+-- (`floor`, a rarity index, default 1) can't be caught, so they aren't needed; a tier below the
+-- floor needs just the floor rarity (D18).
+function Glowdex.tier(cfg: any, entry: any, floor: number?): number
+	local from = floor or 1
 	local reached = 0
 	for t, tier in cfg.glowdex.tiers do
-		for r = 1, tier.needs do
+		for r = from, math.max(tier.needs, from) do
 			if not Glowdex.hasRarity(entry, r) then
 				return reached
 			end
@@ -59,6 +62,16 @@ function Glowdex.tier(cfg: any, entry: any): number
 		reached = t
 	end
 	return reached
+end
+
+-- Entries a full Glowdex has: each species from its floor up to the top rarity (254 at launch).
+-- `floorOf(species)` returns the floor as a rarity index.
+function Glowdex.reachable(cfg: any, speciesCfg: any, floorOf: (any) -> number): number
+	local n = 0
+	for _, species in speciesCfg.species do
+		n += #cfg.rarities - floorOf(species) + 1
+	end
+	return n
 end
 
 -- Total entries: rarity bits across every species.
@@ -73,9 +86,9 @@ function Glowdex.entries(dex: any): number
 end
 
 -- The next page tier of `species` this player may claim, or nil and "nothing_new".
-function Glowdex.canClaimPage(cfg: any, dex: any, claimed: any, species: string): (number?, string?)
+function Glowdex.canClaimPage(cfg: any, dex: any, claimed: any, species: string, floor: number?): (number?, string?)
 	local done = tonumber(claimed[species]) or 0
-	if Glowdex.tier(cfg, dex[species]) <= done then
+	if Glowdex.tier(cfg, dex[species], floor) <= done then
 		return nil, "nothing_new"
 	end
 	return done + 1, nil

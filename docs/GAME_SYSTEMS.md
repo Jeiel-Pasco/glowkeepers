@@ -597,6 +597,8 @@ Every species has a **family** and one **trait** (CONTENT_AND_LIVEOPS §A3). Tra
 
 **Neighbours:** the pads that share an edge on the plot's pad grid (vault and display pads alike).
 
+**Shipped in traits v1:** family link, Harmonizer (and the whole-plot Skywhale Calf and Lunadrake), Guardian (and Elder Sapling), the cap, species floors (with D25 for wilds), and Glowdex reachable entries. **Next:** Infuser Overcharge, Forager pouches, Aurora Lynx, then the Night Companion. With today's numbers the best stack is ×1.581 (two links, a Harmonizer, Lunadrake), so the ×1.6 cap is a guard for tuning.
+
 **Family link (everyone):** +5% Glow/s for each neighbour of the same family, up to +10%.
 
 **Day traits (on the plot)**

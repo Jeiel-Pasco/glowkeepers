@@ -13,6 +13,7 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local Glowdex = require(Shared:WaitForChild("Glowdex"))
+local Roll = require(Shared:WaitForChild("Roll"))
 local economy = require(Config:WaitForChild("economy")) :: any
 local species = require(Config:WaitForChild("species")) :: any
 local NetClient = require(script.Parent.Parent:WaitForChild("Net"):WaitForChild("NetClient"))
@@ -76,7 +77,9 @@ local function refresh()
 	end
 	dirty = false
 	local dex, claimed = data.dex or {}, data.dexClaimed or {}
-	local total = #economy.rarities * #species.species
+	local total = Glowdex.reachable(economy, species, function(entry)
+		return Roll.speciesFloor(economy, entry)
+	end)
 	title.Text = `Glowdex {Glowdex.entries(dex)}/{total}`
 	local index = nextMilestone(claimed)
 	if index == nil then
@@ -93,15 +96,17 @@ local function refresh()
 		local row = rows[entry.id]
 		local page = dex[entry.id]
 		local dots = {}
+		local floor = Roll.speciesFloor(economy, entry)
 		for r = 1, #economy.rarities do
-			dots[r] = if Glowdex.hasRarity(page, r) then "●" else "○"
+			-- rarities under the species' floor can't be caught (D18)
+			dots[r] = if Glowdex.hasRarity(page, r) then "●" elseif r < floor then "·" else "○"
 		end
 		local stamps = (if Glowdex.hasMutation(page, 1) then " G" else "")
 			.. (if Glowdex.hasMutation(page, 2) then " R" else "")
 		local done = tonumber(claimed[entry.id]) or 0
 		local tierName = if done > 0 then ` · {economy.glowdex.tiers[done].id}` else ""
 		row.label.Text = `{entry.name}{tierName}\n{table.concat(dots)}{stamps}`
-		local nextTier = Glowdex.canClaimPage(economy, dex, claimed, entry.id)
+		local nextTier = Glowdex.canClaimPage(economy, dex, claimed, entry.id, floor)
 		if nextTier ~= nil then
 			setButton(row.claim, economy.glowdex.tiers[nextTier].id, true)
 		else

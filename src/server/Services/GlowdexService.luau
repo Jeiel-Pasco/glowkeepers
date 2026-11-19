@@ -19,6 +19,7 @@ local Server = script.Parent.Parent
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local Glowdex = require(Shared:WaitForChild("Glowdex"))
+local Roll = require(Shared:WaitForChild("Roll"))
 local economy = require(Config:WaitForChild("economy")) :: any
 local species = require(Config:WaitForChild("species")) :: any
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
@@ -32,8 +33,10 @@ local IncomeService = require(script.Parent:WaitForChild("IncomeService"))
 local GAMEPLAY = Enum.AnalyticsEconomyTransactionType.Gameplay.Name
 
 local names: { [string]: string } = {}
+local floors: { [string]: number } = {} -- species id → floor rarity (D18)
 for _, entry in species.species do
 	names[entry.id] = entry.name
+	floors[entry.id] = Roll.speciesFloor(economy, entry)
 end
 
 local GlowdexService = {}
@@ -60,7 +63,7 @@ local function claimPage(player: Player, data: any, speciesId: string)
 	if names[speciesId] == nil then
 		return
 	end
-	local tier = Glowdex.canClaimPage(economy, data.dex, data.dexClaimed, speciesId)
+	local tier = Glowdex.canClaimPage(economy, data.dex, data.dexClaimed, speciesId, floors[speciesId])
 	if tier == nil then
 		toast(player, "Nothing new to claim on that page yet", "bad")
 		return

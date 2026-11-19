@@ -195,6 +195,25 @@ function Roll.pool(speciesCfg: any, pool: string): { string }
 	return ids
 end
 
+-- Species ids in `pool` that can appear at rarity `r`: their minRarity is at most r (D18).
+function Roll.eligible(cfg: any, speciesCfg: any, pool: string, r: number): { string }
+	local ids = {}
+	for _, species in speciesCfg.species do
+		if species.pool == pool and Roll.speciesFloor(cfg, species) <= r then
+			table.insert(ids, species.id)
+		end
+	end
+	return ids
+end
+
+-- A species' floor as a rarity index (1 when it has no minRarity).
+function Roll.speciesFloor(cfg: any, species: any): number
+	if species ~= nil and type(species.minRarity) == "string" then
+		return Roll.rarityIndex(cfg, species.minRarity)
+	end
+	return 1
+end
+
 -- One species from a pool, uniformly. Rarity never depends on the species (CONTENT §A3).
 function Roll.species(ids: { string }, rng: Rng): string
 	assert(#ids > 0, "empty species pool")
