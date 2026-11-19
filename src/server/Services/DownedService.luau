@@ -31,6 +31,7 @@ local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
+local Progress = require(script.Parent:WaitForChild("Progress"))
 local CycleService = require(script.Parent:WaitForChild("CycleService"))
 
 local TICK_SECONDS = 0.1
@@ -184,6 +185,7 @@ local function revive(hold: Hold)
 	local data = DataService.get(reviver)
 	if data ~= nil then
 		data.stats.revives += 1
+		Progress.add(reviver, "revive")
 		DataService.changed(reviver, "stats")
 	end
 	Telemetry.custom(reviver, "revive")

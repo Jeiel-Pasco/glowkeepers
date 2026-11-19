@@ -18,6 +18,7 @@ local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
 local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
+local Progress = require(script.Parent:WaitForChild("Progress"))
 
 local InventoryService = {}
 InventoryService.Changed = Signal.new() -- (player): pads changed; Glow/s and the plot view may differ
@@ -130,7 +131,9 @@ function InventoryService.Init()
 	end)
 
 	NetServer.on("Place", function(player: Player, id: string, pad: number)
-		InventoryService.place(player, id, pad)
+		if InventoryService.place(player, id, pad) then
+			Progress.add(player, "place")
+		end
 	end)
 	NetServer.on("Unplace", function(player: Player, id: string)
 		InventoryService.unplace(player, id)

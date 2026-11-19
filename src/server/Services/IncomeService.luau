@@ -26,6 +26,7 @@ local Glowdex = require(Shared:WaitForChild("Glowdex"))
 local Inventory = require(Shared:WaitForChild("Inventory"))
 local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
 local DataService = require(script.Parent:WaitForChild("DataService"))
+local Progress = require(script.Parent:WaitForChild("Progress"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
 local InventoryService = require(script.Parent:WaitForChild("InventoryService"))
 local NetServer = require(script.Parent.Parent:WaitForChild("Net"):WaitForChild("NetServer"))
@@ -59,6 +60,7 @@ local function accrue(player: Player, at: number)
 		data.glowSinceRebirth += amount
 		data.lifetimeGlow += amount
 		unlogged[player] = (unlogged[player] or 0) + amount
+		Progress.add(player, "glow", amount)
 	end
 end
 

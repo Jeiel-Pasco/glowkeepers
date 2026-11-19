@@ -27,6 +27,7 @@ local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
+local Progress = require(script.Parent:WaitForChild("Progress"))
 local InventoryService = require(script.Parent:WaitForChild("InventoryService"))
 local IncomeService = require(script.Parent:WaitForChild("IncomeService"))
 local StealService = require(script.Parent:WaitForChild("StealService"))
@@ -84,6 +85,7 @@ local function onRebirth(player: Player)
 	end
 	PlotService.refresh(player)
 	DataService.save(player)
+	Progress.add(player, "star")
 
 	toast(player, `Star {data.stars}! +35% income, +6% luck and +1 vault slot, for good`, "good")
 	if lost > 0 then

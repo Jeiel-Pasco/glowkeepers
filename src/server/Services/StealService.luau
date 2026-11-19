@@ -38,6 +38,7 @@ local speciesConfig = require(Config:WaitForChild("species")) :: any
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
+local Progress = require(script.Parent:WaitForChild("Progress"))
 local CycleService = require(script.Parent:WaitForChild("CycleService"))
 local InventoryService = require(script.Parent:WaitForChild("InventoryService"))
 local GlowlingService = require(script.Parent:WaitForChild("GlowlingService"))
@@ -368,6 +369,7 @@ local function deliver(job: Job, now: number)
 	local thiefData, victimData = DataService.get(thief), DataService.get(victim)
 	if thiefData ~= nil then
 		thiefData.stats.steals += 1
+		Progress.add(thief, "steal")
 		DataService.changed(thief, "stats")
 	end
 	if victimData ~= nil then

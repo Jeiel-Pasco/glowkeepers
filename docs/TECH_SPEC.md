@@ -142,7 +142,7 @@ Client intent ──► Net (type check, rate limit) ──► Service (rules, s
 | GlowdexService | Credits new Glowlings from night, lure, event and tutorial (`Shared.Glowdex`); page tier and milestone claims, each once; claimed pages add income (IncomeService); odds tab data later | 4 |
 | TradeService | Unlock checks, sessions, escrow, atomic swap, fees, trade lock | 5 |
 | DecorService | Owned and placed decorations, placement validation, base name | 4 |
-| QuestService / DailyGiftService | Daily and weekly quests (UTC); the cumulative daily gift (`Shared.Gift`: one step per UTC day claimed, never reset, loops after 28) | 4 |
+| QuestService / DailyGiftService | Daily and weekly quests (`Shared.Quest`: 3 a day at 00:00 UTC, 3 a week at Monday 00:00 UTC, one free reroll a day; progress from `Progress` events and night catches); the cumulative daily gift (`Shared.Gift`: one step per UTC day claimed, never reset, loops after 28) | 4 |
 | ClaimService | Owns the `Claim` remote and hands each kind to the service that registered it | 4 |
 | NightPassService | Season XP, tiers, claims | 4 |
 | EventService | Weekend events, weekly limited species, community goals | 4 |
@@ -213,7 +213,7 @@ export type Profile = {
 	dexClaimed: { [string]: number },          -- page tier claimed per species
 	decor: { owned: { [string]: number }, placed: { { id: string, x: number, z: number, rot: number } } },
 	baseName: { a: number, n: number },        -- indices into preset word lists
-	quests: { day: number, daily: { any }, week: number, weekly: { any } },
+	quests: { day: number, daily: { any }, week: number, weekly: { any }, rerollDay: number },
 	gift: { claimed: number, lastDay: number },
 	pass: { season: number, xp: number, premium: boolean, free: { [string]: boolean }, prem: { [string]: boolean } },
 	firstJoin: number, lastSeen: number, lastIncomePerSec: number,
@@ -316,7 +316,8 @@ Every remote is declared once in `shared/Net.luau`, with its argument schema and
 | `UpgradeBuy` | C→S | upgradeId: `"lantern"` \| `"boots"` \| `"slots"`, all: boolean? (Buy max) | Below max; can afford the next level (Buy max buys as many as the balance covers, up to max) | 5/s |
 | `LockChargeBuy` | C→S | currency: `"glow"` \| `"embers"` | Fewer than 5 held; can afford `max(200, 120 × Glow/s)` Glow or 15 Embers | 2/s |
 | `Rebirth` | C→S | — | `glowSinceRebirth` ≥ threshold; not carrying; none of the player's Glowlings held (grabbed or in a trade); the client confirms with a 2 s hold | 1/10 s |
-| `Claim` | C→S | kind: enum (`dex_page`, `dex_milestone`, `gift` for now; quests and pass tiers join later), id: string ≤ 32 | Quest, gift, pass tier or Glowdex page/milestone is complete and unclaimed | 5/s |
+| `Claim` | C→S | kind: enum (`dex_page`, `dex_milestone`, `gift`, `quest` with id `d1`..`d3` / `w1`..`w3`; pass tiers join later), id: string ≤ 32 | Quest, gift, pass tier or Glowdex page/milestone is complete and unclaimed | 5/s |
+| `QuestReroll` | C→S | index: integer 1–3 | The day's free reroll is unused; that daily quest is unclaimed | 1/s |
 | `TradeRequest` / `TradeRespond` / `TradeOffer` / `TradeConfirm` / `TradeCancel` | C→S | Various | GAME_SYSTEMS §17 | 5/s |
 | `DecorPlace` / `DecorRemove` | C→S | itemId, x, z, rot | Owned; inside own plot bounds; on the grid; no overlap; item count under the cap | 10/s |
 | `SetBaseName` | C→S | a: number, n: number | Valid indices into the preset lists | 1/5 s |

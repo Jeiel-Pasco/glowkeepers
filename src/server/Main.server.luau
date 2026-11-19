@@ -8,6 +8,7 @@ local Services = script.Parent:WaitForChild("Services")
 -- Explicit order: a service may use the services listed before it during Init.
 local ORDER = {
 	"Telemetry",
+	"Progress",
 	"DataService",
 	"SettingsService",
 	"CycleService",
@@ -30,6 +31,7 @@ local ORDER = {
 	"ClaimService",
 	"GlowdexService",
 	"DailyGiftService",
+	"QuestService",
 }
 
 local loaded: { [string]: any } = {}

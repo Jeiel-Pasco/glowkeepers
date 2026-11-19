@@ -25,6 +25,7 @@ local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local ClaimService = require(script.Parent:WaitForChild("ClaimService"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
+local Progress = require(script.Parent:WaitForChild("Progress"))
 local GlowlingService = require(script.Parent:WaitForChild("GlowlingService"))
 local IncomeService = require(script.Parent:WaitForChild("IncomeService"))
 
@@ -67,6 +68,9 @@ local function claimPage(player: Player, data: any, speciesId: string)
 	data.dexClaimed[speciesId] = tier
 	DataService.changed(player, "dexClaimed")
 	IncomeService.recompute(player) -- the page's income bonus starts now
+	if tier == 1 then
+		Progress.add(player, "bronze")
+	end
 	local tierId = economy.glowdex.tiers[tier].id
 	toast(player, `{names[speciesId]}: {tierId} page claimed`, "good")
 	Telemetry.custom(player, "dex_page", tier, { tierId })
