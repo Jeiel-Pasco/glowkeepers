@@ -279,7 +279,7 @@ The map lives in the place (Team Create), not in Rojo, as `Workspace.Map`. Code 
 
 | Tag | Instance | Attributes | Children code uses |
 | --- | --- | --- | --- |
-| `Plot` | Model | `PlotId` 1–8 | `Floor` (PrimaryPart), `Zone` (invisible volume over the plot), `Gate` (invisible, at the gate), `DecorZone` (24 × 24), `Slots/SlotNN` pads with `Slot` 1–30, `Trophy`, `Sign` |
+| `Plot` | Model | `PlotId` 1–8 | `Floor` (PrimaryPart), `Zone` (invisible volume over the plot), `Gate` (invisible, at the gate), `DecorZone` (24 × 24), `Slots/SlotNN` pads with `Slot` 1–30, `Sign` (the home, fence and lamps are drawn client-side by `BaseDresser` from the tier) |
 | `Campfire` | Model | `LightRadius` (30, safe from the Stalker), `FeedRadius` (10) | `Pit` (PrimaryPart), `Pit.LightPoint` (the PointLight) |
 | `WoodPile` | Model | `PileId` `"W01"`…; the server adds `Available` at runtime | |
 | `WildSpawn` | Part (invisible) | `Area` `"Forest"` or `"Deepwood"` | |

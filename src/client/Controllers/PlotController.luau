@@ -3,7 +3,8 @@
 -- applied with Shared.Plots so client and server share one shape. Each occupied pad gets a
 -- GlowlingRenderer model (rebuilt only when the pad changes; the rarest 8 get a light), the
 -- owner's plot sign shows the base name and their name, a shielded plot
--- gets a bubble, and each placed decoration is a placeholder block on the DecorZone. The place streams, so a
+-- gets a bubble, BaseDresser dresses the plot for its size (home, fence, lamps) and draws
+-- each placed decoration on the DecorZone. The place streams, so a
 -- plot is drawn again when its pads or sign stream in.
 
 local CollectionService = game:GetService("CollectionService")
@@ -11,18 +12,16 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Decor = require(Shared:WaitForChild("Decor"))
 local Plots = require(Shared:WaitForChild("Plots"))
-local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
 local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
 local RarityLook = require(Shared:WaitForChild("RarityLook"))
 local NetClient = require(script.Parent.Parent:WaitForChild("Net"):WaitForChild("NetClient"))
 local GlowlingRenderer = require(script.Parent:WaitForChild("GlowlingRenderer"))
+local BaseDresser = require(script.Parent:WaitForChild("BaseDresser"))
 
 local LIGHT_CAP = 8 -- PointLights per plot (Design & Asset Bible §8)
 
 local SHIELD_COLOR = Color3.fromRGB(150, 220, 255)
-local DECOR_COLOR = Color3.fromRGB(170, 140, 100)
 
 local PlotController = {}
 PlotController.Changed = Signal.new() -- (plotId, view)
@@ -158,24 +157,10 @@ local function render(plotId: number)
 		bubble.CastShadow = false
 		bubble.Parent = group
 	end
+	BaseDresser.dress(model, view.slots, view.owner ~= 0, group)
 	local zone = model:FindFirstChild("DecorZone")
 	if zone ~= nil and zone:IsA("BasePart") then
-		for i, d in view.decor do
-			local item = Decor.item(economy, d.id)
-			if item ~= nil then
-				local block = Instance.new("Part")
-				block.Name = `Decor{i}`
-				block.Size = Vector3.new(item.w - 0.2, 1, item.d - 0.2)
-				block.CFrame = zone.CFrame * CFrame.new(d.x, 0.5, d.z) * CFrame.Angles(0, d.rot * math.pi / 2, 0)
-				block.Color = DECOR_COLOR
-				block.Material = Enum.Material.SmoothPlastic
-				block.Anchored = true
-				block.CanCollide = false
-				block.CanTouch = false
-				block.CanQuery = false
-				block.Parent = group
-			end
-		end
+		BaseDresser.decor(zone, view.decor, group)
 	end
 	renderPads(plotId, view, slots)
 	group.Parent = folder

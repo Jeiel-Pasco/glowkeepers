@@ -10,7 +10,7 @@
 -- ServerStorage.ReplacedByGreybox; nothing is deleted.
 --
 -- Code finds the map by tag and attribute, never by position (TECH_SPEC §6a):
---   Plot        Model, PlotId 1–8. Children: Floor, Zone, Gate, DecorZone, Slots (pads with Slot 1–30), Trophy, Sign
+--   Plot        Model, PlotId 1–8. Children: Floor, Zone, Gate, DecorZone, Slots (pads with Slot 1–30), Sign
 --   Campfire    Model, LightRadius, FeedRadius
 --   WoodPile    Model, PileId "W01"…
 --   WildSpawn   Part, Area "Forest" | "Deepwood"
@@ -72,6 +72,8 @@ local STATIONS = {
 	{ kind = "Leaderboards", label = "Leaderboards" },
 	{ kind = "WhatsNew", label = "What's New" },
 }
+
+local STATION_HEIGHT = { LanternShop = 12, WispStash = 14, WhatsNew = 10, Leaderboards = 17 }
 
 local COLORS = {
 	outer = Color3.fromRGB(34, 40, 32),
@@ -211,6 +213,49 @@ local function asset(parent, name: string, height: number, base: CFrame, props):
 end
 
 local MESH_TREES = hasAsset("Tree_Oak_Round") and hasAsset("Tree_Pine_Tall")
+
+-- Generated hand-painted models (stations, campfire, lamp posts, homes, decorations), kept in
+-- ReplicatedStorage.WorldAssets in the place file, pivoted at their bottom centre, front -Z.
+local WORLD = game:GetService("ReplicatedStorage"):FindFirstChild("WorldAssets")
+
+local function world(group: string, name: string): Model?
+	local folder = if WORLD ~= nil then WORLD:FindFirstChild(group) else nil
+	local found = if folder ~= nil then folder:FindFirstChild(name) else nil
+	return if found ~= nil and found:IsA("Model") then found else nil
+end
+
+-- A clone of a WorldAssets model, `height` tall, standing on `at`.
+local function placeWorld(source: Model, height: number, at: CFrame, parent: Instance, collide: boolean): Model
+	local m = source:Clone()
+	local _, size = m:GetBoundingBox()
+	m:ScaleTo(m:GetScale() * height / size.Y)
+	m:PivotTo(at)
+	for _, d in m:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = collide
+			d.CanTouch = false
+			d.CanQuery = collide
+		end
+	end
+	m.Parent = parent
+	return m
+end
+
+-- A lamp post with a warm light (none without the model).
+local function lampPost(parent: Instance, at: CFrame)
+	local source = world("Tiers", "LampPost")
+	if source == nil then
+		return
+	end
+	local lamp = placeWorld(source, 9, at, parent, false)
+	lamp.Name = "LampPost"
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 196, 120)
+	light.Range = 18
+	light.Brightness = 1.2
+	light.Parent = lamp:FindFirstChildWhichIsA("BasePart", true)
+end
 
 local function pick(list: { string }): string
 	return list[rng:NextInteger(1, #list)]
@@ -496,26 +541,50 @@ task.wait()
 -- Paths: fire to every gate, and trails out through the gaps into the deepwood.
 do
 	local paths = folder("Paths")
-	local function strip(name: string, from: number, to: number, a: number, width: number)
+	-- Cobbled lanes to the plots and a cobbled plaza round the fire; packed-earth trails into
+	-- the forest, with lamp posts along them while they're still near the camp.
+	local COBBLE = Color3.fromRGB(150, 136, 118)
+	local function strip(name: string, from: number, to: number, a: number, width: number, cobbled: boolean)
 		local cf = CFrame.lookAt(polar((from + to) / 2, a, 0.05), Vector3.new(0, 0.05, 0))
-		part(paths, name, nil, Vector3.new(width, 0.1, to - from), cf, COLORS.path, Enum.Material.Ground)
-		for _, side in { -1, 1 } do -- soft darker edges
+		local color = if cobbled then COBBLE else COLORS.path
+		local material = if cobbled then Enum.Material.Cobblestone else Enum.Material.Ground
+		part(paths, name, nil, Vector3.new(width, 0.1, to - from), cf, color, material)
+		for _, side in { -1, 1 } do -- curbs: darker edges
 			part(
 				paths,
 				`{name}Edge`,
 				nil,
-				Vector3.new(1, 0.08, to - from),
-				cf * CFrame.new(side * (width / 2 + 0.5), -0.01, 0),
-				COLORS.path:Lerp(COLORS.clearing, 0.5),
-				Enum.Material.Ground
+				Vector3.new(1, if cobbled then 0.3 else 0.08, to - from),
+				cf * CFrame.new(side * (width / 2 + 0.5), if cobbled then 0.05 else -0.01, 0),
+				if cobbled then Color3.fromRGB(112, 104, 96) else COLORS.path:Lerp(COLORS.clearing, 0.5),
+				if cobbled then Enum.Material.Slate else Enum.Material.Ground
 			)
 		end
 	end
+	part(
+		paths,
+		"Plaza",
+		Enum.PartType.Cylinder,
+		Vector3.new(0.1, 34, 34),
+		CFrame.new(0, 0.06, 0) * UPRIGHT,
+		COBBLE,
+		Enum.Material.Cobblestone
+	)
 	for i, a in pathAngles do
-		strip(`PathToPlot{i}`, 5, gateRadius, a, LAYOUT.pathWidth)
+		strip(`PathToPlot{i}`, 16, gateRadius, a, LAYOUT.pathWidth, true)
+		for _, side in { -1, 1 } do -- a lamp either side of the gate
+			lampPost(
+				paths,
+				CFrame.lookAt(polar(gateRadius - 3, a), ORIGIN) * CFrame.new(side * (LAYOUT.pathWidth / 2 + 1.5), 0, 0)
+			)
+		end
 	end
 	for k, a in trailAngles do
-		strip(`Trail{k}`, LAYOUT.fireLightRadius, LAYOUT.mapRadius - 30, a, LAYOUT.trailWidth)
+		strip(`Trail{k}`, LAYOUT.fireLightRadius, LAYOUT.mapRadius - 30, a, LAYOUT.trailWidth, false)
+		for n, r in { 50, 90, 130, 170 } do
+			local side = if n % 2 == 0 then 1 else -1
+			lampPost(paths, CFrame.lookAt(polar(r, a), ORIGIN) * CFrame.new(side * (LAYOUT.trailWidth / 2 + 1.5), 0, 0))
+		end
 	end
 	paths.Parent = map
 end
@@ -534,9 +603,17 @@ do
 		Enum.Material.Slate,
 		{ CastShadow = false }
 	)
+	local pitModel = world("Stations", "Campfire")
+	if pitModel ~= nil then
+		-- The hand-painted pit (rune stones and stacked logs); the Pit part stays as the base.
+		pit.Transparency = 1
+		placeWorld(pitModel, 6.5, CFrame.new(0, 0, 0), fire, false).Name = "PitModel"
+	end
 	for k = 0, 2 do
 		local cf = CFrame.new(0, 1.4, 0) * CFrame.Angles(0, k * math.pi / 3, 0.25)
-		if hasAsset("Log_Fallen") then
+		if pitModel ~= nil then
+			break
+		elseif hasAsset("Log_Fallen") then
 			asset(fire, "Log_Fallen", 1.8, CFrame.new(0, 0.9, 0) * CFrame.Angles(0, k * math.pi / 3, 0.25), {
 				CanCollide = false,
 				CanTouch = false,
@@ -630,7 +707,7 @@ do
 end
 task.wait()
 
--- Plots: floor, zone, gate facing the fire, 30 slot pads, decoration zone, trophy.
+-- Plots: floor, zone, gate facing the fire, 30 slot pads, decoration zone.
 -- Slot order: 1–6 in the side strips from the back (the vault pedestals are the first ones),
 -- then 7–30 in three rows in front of the decoration zone, back row first.
 local gatePositions = {}
@@ -654,7 +731,7 @@ do
 			decorCF,
 			COLORS.decor,
 			nil,
-			{ Transparency = 0.6, CanCollide = false, CanTouch = false, CanQuery = false }
+			{ Transparency = 0.9, CanCollide = false, CanTouch = false, CanQuery = false }
 		)
 
 		local gateZ = -D / 2
@@ -721,55 +798,9 @@ do
 		do
 			part(dressing, "Trim", nil, beam[1], cf * beam[2], trim, Enum.Material.Wood, DECOR)
 		end
-		local function fence(from: Vector3, to: Vector3)
-			local span = to - from
-			local length = span.Magnitude
-			local posts = math.max(1, math.floor(length / 4))
-			for k = 0, posts do
-				local at = from + span * (k / posts)
-				part(
-					dressing,
-					"FencePost",
-					nil,
-					Vector3.new(0.5, 2.6, 0.5),
-					cf * CFrame.new(at + Vector3.new(0, 1.6, 0)),
-					COLORS.wood,
-					Enum.Material.Wood,
-					DECOR
-				)
-			end
-			local mid = (from + to) / 2
-			for _, y in { 1.1, 2.1 } do
-				part(
-					dressing,
-					"FenceRail",
-					nil,
-					Vector3.new(0.25, 0.3, length),
-					cf * CFrame.lookAt(mid + Vector3.new(0, y, 0), to + Vector3.new(0, y, 0)),
-					COLORS.wood:Lerp(COLORS.sign, 0.15),
-					Enum.Material.Wood,
-					DECOR
-				)
-			end
-		end
+		-- The fence, the home behind the plot and its lamps grow with the base: the client
+		-- dresses them (BaseDresser) from the owner's pads.
 		local hw, hd = W / 2 - 0.3, D / 2 - 0.3
-		fence(Vector3.new(-hw, 0, -hd), Vector3.new(-hw, 0, hd))
-		fence(Vector3.new(hw, 0, -hd), Vector3.new(hw, 0, hd))
-		fence(Vector3.new(-hw, 0, hd), Vector3.new(hw, 0, hd))
-		fence(Vector3.new(-hw, 0, -hd), Vector3.new(-6.6, 0, -hd))
-		fence(Vector3.new(6.6, 0, -hd), Vector3.new(hw, 0, -hd))
-		for _, x in { -6, 6 } do
-			part(
-				dressing,
-				"GateLantern",
-				nil,
-				Vector3.new(1, 1.2, 1),
-				cf * CFrame.new(x, 9.2, gateZ - 0.9), -- hanging under the sign
-				COLORS.fire:Lerp(COLORS.gold, 0.5),
-				Enum.Material.Neon,
-				DECOR
-			)
-		end
 		for _, corner in { { -1, 1 }, { 1, 1 } } do
 			for m = 1, 3 do
 				local size = Vector3.new(rng:NextNumber(2.5, 5), 0.12, rng:NextNumber(2, 4))
@@ -791,29 +822,10 @@ do
 			end
 		end
 
-		local trophy = model("Trophy", plot)
-		part(
-			trophy,
-			"Pedestal",
-			nil,
-			Vector3.new(3, 2, 3),
-			cf * CFrame.new(15, 1.3, 15),
-			COLORS.stone,
-			Enum.Material.Marble
-		)
-		part(
-			trophy,
-			"Cup",
-			Enum.PartType.Ball,
-			Vector3.new(1.6, 1.6, 1.6),
-			cf * CFrame.new(15, 3.1, 15),
-			COLORS.gold,
-			Enum.Material.Metal
-		)
-
 		CollectionService:AddTag(plot, "Plot")
 		gatePositions[i] = (cf * CFrame.new(0, 0, gateZ)).Position
 		reserve(cf.Position, math.sqrt((W / 2) ^ 2 + (D / 2) ^ 2) + 2)
+		reserve((cf * CFrame.new(0, 0, D / 2 + 14)).Position, 17) -- room for the home
 	end
 	plots.Parent = map
 end
@@ -832,6 +844,7 @@ do
 		local cf = CFrame.lookAt(pos, ORIGIN)
 		local station = model(info.kind, stations)
 		station:SetAttribute("Kind", info.kind)
+		local look = world("Stations", info.kind)
 		local base = part(
 			station,
 			"Base",
@@ -839,43 +852,66 @@ do
 			Vector3.new(12, 0.6, 9),
 			cf * CFrame.new(0, 0.3, 0),
 			COLORS.wood,
-			Enum.Material.WoodPlanks
+			Enum.Material.WoodPlanks,
+			if look ~= nil then { Transparency = 1 } else nil
 		)
-		part(
-			station,
-			"Counter",
-			nil,
-			Vector3.new(10, 3, 1.5),
-			cf * CFrame.new(0, 2.1, -2.5),
-			COLORS.wood,
-			Enum.Material.Wood
-		)
-		for _, x in { -5.5, 5.5 } do
+		local signHeight = 7.4
+		if look ~= nil then
+			-- A hand-painted building; the sign hangs above its front.
+			local height = STATION_HEIGHT[info.kind] or 12
+			placeWorld(look, height, cf, station, true).Name = "Building"
+			signHeight = height + 1.6
+			if info.kind == "Leaderboards" then
+				-- The flat face the board's SurfaceGui draws on (LeaderboardController).
+				part(
+					station,
+					"BoardFace",
+					nil,
+					Vector3.new(height * 0.72, height * 0.5, 0.2),
+					cf * CFrame.new(0, height * 0.46, -1.7),
+					Color3.fromRGB(46, 36, 30),
+					Enum.Material.Wood,
+					DECOR
+				)
+				signHeight = height + 1
+			end
+		else
 			part(
 				station,
-				"Post",
+				"Counter",
 				nil,
-				Vector3.new(0.8, 8, 0.8),
-				cf * CFrame.new(x, 4.6, 3.8),
+				Vector3.new(10, 3, 1.5),
+				cf * CFrame.new(0, 2.1, -2.5),
 				COLORS.wood,
 				Enum.Material.Wood
 			)
+			for _, x in { -5.5, 5.5 } do
+				part(
+					station,
+					"Post",
+					nil,
+					Vector3.new(0.8, 8, 0.8),
+					cf * CFrame.new(x, 4.6, 3.8),
+					COLORS.wood,
+					Enum.Material.Wood
+				)
+			end
+			part(
+				station,
+				"Roof",
+				nil,
+				Vector3.new(13, 0.6, 10),
+				cf * CFrame.new(0, 8.9, 0),
+				COLORS.wood,
+				Enum.Material.WoodPlanks
+			)
 		end
-		part(
-			station,
-			"Roof",
-			nil,
-			Vector3.new(13, 0.6, 10),
-			cf * CFrame.new(0, 8.9, 0),
-			COLORS.wood,
-			Enum.Material.WoodPlanks
-		)
 		local board = part(
 			station,
 			"Sign",
 			nil,
 			Vector3.new(10, 2, 0.4),
-			cf * CFrame.new(0, 7.4, -4.6),
+			cf * CFrame.new(0, signHeight, -4.6),
 			COLORS.wood,
 			Enum.Material.Wood
 		)
@@ -1382,48 +1418,51 @@ do
 	end
 end
 
--- Clearing dressing: lantern posts along the plot paths and wildflowers in the grass.
+-- Clearing dressing: wildflowers in the grass (and plain lantern posts by the paths when the
+-- generated lamp posts are missing).
 do
 	local dressing = folder("Dressing")
-	for i, a in pathAngles do
-		local side = if i % 2 == 0 then 1 else -1
-		local cf = CFrame.lookAt(polar(gateRadius - 6, a, 0), ORIGIN)
-			* CFrame.new(side * (LAYOUT.pathWidth / 2 + 1.5), 0, 0)
-		local post = model(`LanternPost{i}`, dressing)
-		part(
-			post,
-			"Post",
-			Enum.PartType.Cylinder,
-			Vector3.new(8, 0.6, 0.6),
-			cf * CFrame.new(0, 4, 0) * UPRIGHT,
-			COLORS.wood,
-			Enum.Material.Wood
-		)
-		part(
-			post,
-			"Arm",
-			nil,
-			Vector3.new(0.4, 0.4, 2),
-			cf * CFrame.new(0, 7.8, -0.8),
-			COLORS.wood,
-			Enum.Material.Wood,
-			DECOR
-		)
-		local lantern = part(
-			post,
-			"Lantern",
-			nil,
-			Vector3.new(1, 1.3, 1),
-			cf * CFrame.new(0, 6.9, -1.6),
-			COLORS.gold,
-			Enum.Material.Neon,
-			DECOR
-		)
-		local light = Instance.new("PointLight")
-		light.Color = Color3.fromRGB(255, 190, 110)
-		light.Range = 14
-		light.Brightness = 1.2
-		light.Parent = lantern
+	if world("Tiers", "LampPost") == nil then -- the paths have generated lamp posts otherwise
+		for i, a in pathAngles do
+			local side = if i % 2 == 0 then 1 else -1
+			local cf = CFrame.lookAt(polar(gateRadius - 6, a, 0), ORIGIN)
+				* CFrame.new(side * (LAYOUT.pathWidth / 2 + 1.5), 0, 0)
+			local post = model(`LanternPost{i}`, dressing)
+			part(
+				post,
+				"Post",
+				Enum.PartType.Cylinder,
+				Vector3.new(8, 0.6, 0.6),
+				cf * CFrame.new(0, 4, 0) * UPRIGHT,
+				COLORS.wood,
+				Enum.Material.Wood
+			)
+			part(
+				post,
+				"Arm",
+				nil,
+				Vector3.new(0.4, 0.4, 2),
+				cf * CFrame.new(0, 7.8, -0.8),
+				COLORS.wood,
+				Enum.Material.Wood,
+				DECOR
+			)
+			local lantern = part(
+				post,
+				"Lantern",
+				nil,
+				Vector3.new(1, 1.3, 1),
+				cf * CFrame.new(0, 6.9, -1.6),
+				COLORS.gold,
+				Enum.Material.Neon,
+				DECOR
+			)
+			local light = Instance.new("PointLight")
+			light.Color = Color3.fromRGB(255, 190, 110)
+			light.Range = 14
+			light.Brightness = 1.2
+			light.Parent = lantern
+		end
 	end
 	local petals = {
 		Color3.fromRGB(250, 235, 150),
