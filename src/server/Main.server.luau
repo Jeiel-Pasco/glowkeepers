@@ -27,7 +27,9 @@ local ORDER = {
 	"ShopService",
 	"ReleaseService",
 	"RebirthService",
+	"ClaimService",
 	"GlowdexService",
+	"DailyGiftService",
 }
 
 local loaded: { [string]: any } = {}
