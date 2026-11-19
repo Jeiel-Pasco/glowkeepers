@@ -631,6 +631,91 @@ do
 			end
 		end
 
+		-- Homestead dressing (decor only: no collision, so stealing and the gate rules are
+		-- unchanged): darker edge beams, a low picket fence with a gap at the gate, lanterns on
+		-- the gate posts, and moss creeping in at the back corners.
+		local dressing = folder("Dressing", plot)
+		local trim = COLORS.wood:Lerp(Color3.new(0, 0, 0), 0.25)
+		for _, beam in
+			{
+				{ Vector3.new(W + 0.6, 0.8, 1), CFrame.new(0, 0.1, -D / 2) },
+				{ Vector3.new(W + 0.6, 0.8, 1), CFrame.new(0, 0.1, D / 2) },
+				{ Vector3.new(1, 0.8, D), CFrame.new(-W / 2, 0.1, 0) },
+				{ Vector3.new(1, 0.8, D), CFrame.new(W / 2, 0.1, 0) },
+			}
+		do
+			part(dressing, "Trim", nil, beam[1], cf * beam[2], trim, Enum.Material.Wood, DECOR)
+		end
+		local function fence(from: Vector3, to: Vector3)
+			local span = to - from
+			local length = span.Magnitude
+			local posts = math.max(1, math.floor(length / 4))
+			for k = 0, posts do
+				local at = from + span * (k / posts)
+				part(
+					dressing,
+					"FencePost",
+					nil,
+					Vector3.new(0.5, 2.6, 0.5),
+					cf * CFrame.new(at + Vector3.new(0, 1.6, 0)),
+					COLORS.wood,
+					Enum.Material.Wood,
+					DECOR
+				)
+			end
+			local mid = (from + to) / 2
+			for _, y in { 1.1, 2.1 } do
+				part(
+					dressing,
+					"FenceRail",
+					nil,
+					Vector3.new(0.25, 0.3, length),
+					cf * CFrame.lookAt(mid + Vector3.new(0, y, 0), to + Vector3.new(0, y, 0)),
+					COLORS.wood:Lerp(COLORS.sign, 0.15),
+					Enum.Material.Wood,
+					DECOR
+				)
+			end
+		end
+		local hw, hd = W / 2 - 0.3, D / 2 - 0.3
+		fence(Vector3.new(-hw, 0, -hd), Vector3.new(-hw, 0, hd))
+		fence(Vector3.new(hw, 0, -hd), Vector3.new(hw, 0, hd))
+		fence(Vector3.new(-hw, 0, hd), Vector3.new(hw, 0, hd))
+		fence(Vector3.new(-hw, 0, -hd), Vector3.new(-6.6, 0, -hd))
+		fence(Vector3.new(6.6, 0, -hd), Vector3.new(hw, 0, -hd))
+		for _, x in { -6, 6 } do
+			part(
+				dressing,
+				"GateLantern",
+				nil,
+				Vector3.new(1, 1.2, 1),
+				cf * CFrame.new(x, 9.2, gateZ - 0.9), -- hanging under the sign
+				COLORS.fire:Lerp(COLORS.gold, 0.5),
+				Enum.Material.Neon,
+				DECOR
+			)
+		end
+		for _, corner in { { -1, 1 }, { 1, 1 } } do
+			for m = 1, 3 do
+				local size = Vector3.new(rng:NextNumber(2.5, 5), 0.12, rng:NextNumber(2, 4))
+				local at = Vector3.new(
+					corner[1] * (hw - size.X / 2 - rng:NextNumber(0, 3)),
+					0.33,
+					hd - size.Z / 2 - rng:NextNumber(0, 4 * m)
+				)
+				part(
+					dressing,
+					"Moss",
+					nil,
+					size,
+					cf * CFrame.new(at) * CFrame.Angles(0, rng:NextNumber(-0.4, 0.4), 0),
+					Color3.fromRGB(86, 120, 58):Lerp(Color3.fromRGB(110, 140, 70), rng:NextNumber()),
+					Enum.Material.Grass,
+					DECOR
+				)
+			end
+		end
+
 		local trophy = model("Trophy", plot)
 		part(
 			trophy,
@@ -877,19 +962,34 @@ do
 	local glowLights = 0
 	for _, spot in spots do
 		local deep = spot.deep
+		-- Three kinds (Bible §4: a storybook forest, not a lollipop grid): broad oaks with 3–5
+		-- lobes, layered pines (most of the deepwood and the boundary wall), and a rare pale
+		-- "spirit tree" with a teal or lilac canopy.
+		local edge = spot.pos.Magnitude > LAYOUT.mapRadius - 16
+		local roll = rng:NextNumber()
+		local kind = if roll < 0.06
+			then "spirit"
+			elseif roll < (if edge then 0.75 elseif deep then 0.45 else 0.15) then "pine"
+			else "oak"
 		local height = if deep then rng:NextNumber(28, 42) else rng:NextNumber(20, 30)
 		local width = if deep then rng:NextNumber(4, 6) else rng:NextNumber(3, 4.5)
 		local crown = if deep then rng:NextNumber(18, 26) else rng:NextNumber(13, 19)
+		if kind == "pine" then
+			height *= 0.55
+			width *= 0.7
+		end
 		local tree = model("Tree")
+		tree:SetAttribute("Kind", kind)
 		local base = spot.pos
 		local turn = CFrame.Angles(0, rng:NextNumber(0, TAU), 0)
+		local bark = if kind == "spirit" then Color3.fromRGB(205, 200, 215) else COLORS.trunk
 		part(
 			tree,
 			"Trunk",
 			Enum.PartType.Cylinder,
 			Vector3.new(height, width, width),
 			CFrame.new(base + Vector3.new(0, height / 2, 0)) * UPRIGHT,
-			COLORS.trunk,
+			bark,
 			Enum.Material.Wood
 		)
 		part(
@@ -898,26 +998,59 @@ do
 			Enum.PartType.Cylinder,
 			Vector3.new(2, width * 1.6, width * 1.6),
 			CFrame.new(base + Vector3.new(0, 0.6, 0)) * UPRIGHT,
-			COLORS.trunk,
+			bark,
 			Enum.Material.Wood,
 			DECOR
 		)
 		local leaves = if deep then COLORS.deepLeaves else COLORS.leaves
 		local shade = leaves:Lerp(Color3.fromRGB(90, 120, 60), rng:NextNumber(0, 0.35))
-		-- A main crown and two lower lobes, so the canopy reads as a cloud, not a ball.
-		for k, lobe in { { 0, 0, 0, 1 }, { 0.32, -0.28, 0.1, 0.72 }, { -0.3, -0.22, -0.18, 0.66 } } do
-			local size = crown * lobe[4]
-			local offset = (turn * Vector3.new(lobe[1], 0, lobe[3])) * crown
-			part(
-				tree,
-				if k == 1 then "Crown" else "Lobe",
-				Enum.PartType.Ball,
-				Vector3.one * size,
-				CFrame.new(base + Vector3.new(offset.X, height + lobe[2] * crown, offset.Z)),
-				if k == 1 then shade else shade:Lerp(Color3.new(0, 0, 0), 0.12),
-				Enum.Material.LeafyGrass,
-				DECOR
-			)
+		if kind == "pine" then
+			-- Stacked tiers that narrow to a tip: a stylised fir.
+			local tiers = rng:NextInteger(4, 5)
+			local spread = crown * rng:NextNumber(0.75, 0.95)
+			local tierH = crown * 0.32
+			local pineColor = Color3.fromRGB(38, 70, 58):Lerp(shade, 0.3)
+			for t = 1, tiers do
+				local f = 1 - (t - 1) / tiers
+				part(
+					tree,
+					if t == 1 then "Crown" else "Tier",
+					Enum.PartType.Cylinder,
+					Vector3.new(tierH, spread * f, spread * f),
+					CFrame.new(base + Vector3.new(0, height + (t - 1) * tierH * 0.72, 0)) * turn * UPRIGHT,
+					pineColor:Lerp(Color3.new(0, 0, 0), 0.08 * (tiers - t)),
+					Enum.Material.LeafyGrass,
+					DECOR
+				)
+			end
+		else
+			if kind == "spirit" then
+				shade = if rng:NextNumber() < 0.5 then Color3.fromRGB(96, 170, 160) else Color3.fromRGB(150, 128, 190)
+			end
+			-- A main crown and 2–4 lower lobes, so the canopy reads as a cloud, not a ball.
+			local lobes = {
+				{ 0, 0, 0, 1 },
+				{ 0.32, -0.28, 0.1, 0.72 },
+				{ -0.3, -0.22, -0.18, 0.66 },
+				{ 0.05, 0.22, -0.3, 0.6 },
+				{ -0.12, -0.32, 0.34, 0.58 },
+			}
+			local count = rng:NextInteger(3, 5)
+			for k = 1, count do
+				local lobe = lobes[k]
+				local size = crown * lobe[4] * rng:NextNumber(0.9, 1.1)
+				local offset = (turn * Vector3.new(lobe[1], 0, lobe[3])) * crown
+				part(
+					tree,
+					if k == 1 then "Crown" else "Lobe",
+					Enum.PartType.Ball,
+					Vector3.one * size,
+					CFrame.new(base + Vector3.new(offset.X, height + lobe[2] * crown, offset.Z)),
+					if k == 1 then shade else shade:Lerp(Color3.new(0, 0, 0), 0.08 + 0.04 * k),
+					Enum.Material.LeafyGrass,
+					DECOR
+				)
+			end
 		end
 		-- Deepwood trees sometimes grow a ring of glow mushrooms at the roots.
 		if deep and rng:NextNumber() < 0.18 then
