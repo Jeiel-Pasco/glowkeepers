@@ -175,6 +175,7 @@ local function dawn()
 			glowLost = Economy.nightLostPenalty(economy, data.glow)
 			data.glow -= glowLost
 			data.stats.firesLost += 1
+			Progress.add(player, "lost")
 			Telemetry.custom(player, "fire_lost")
 			Telemetry.economy(player, "Sink", "Glow", glowLost, math.floor(data.glow), gameplay, "night_lost")
 		end

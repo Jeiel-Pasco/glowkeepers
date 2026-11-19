@@ -103,6 +103,7 @@ function Schema.template(): any
 		settings = { calm = false, reducedFlash = false, music = 0.8, sfx = 1, breakReminder = true },
 		notifyOptIn = false,
 		flags = {},
+		cosmetics = {}, -- cosmetic id → 1 (Night Pass premium rewards; equipped later)
 		badges = {}, -- badge key → true once awarded (BadgeService)
 		lb = { week = "", revives = 0, nights = 0 }, -- this ISO week's board counts
 	}

@@ -73,11 +73,11 @@ Net.remotes = {
 	Rebirth = { dir = "c2s", args = {}, rate = { perSecond = 0.1, burst = 1 } }, -- +1 Star (§15); the client confirms with a hold
 	-- Claim a reward: a Glowdex page tier (id = species id), milestone (id = its index), or
 	-- today's daily gift (id unused), or a quest (id "d1".."d3" daily, "w1".."w3" weekly).
-	-- Pass tiers join the enum in their phase.
+	-- Night Pass tiers: "pass_free" / "pass_prem" with id = the tier ("1".."50").
 	Claim = {
 		dir = "c2s",
 		args = {
-			{ type = "enum", values = { "dex_page", "dex_milestone", "gift", "quest" } },
+			{ type = "enum", values = { "dex_page", "dex_milestone", "gift", "quest", "pass_free", "pass_prem" } },
 			{ type = "string", maxLen = 32 },
 		},
 		rate = { perSecond = 5, burst = 8 },
@@ -87,6 +87,7 @@ Net.remotes = {
 		args = { { type = "integer", min = 1, max = 3 } },
 		rate = { perSecond = 1, burst = 2 },
 	}, -- the day's free reroll of daily quest N
+	PassPremium = { dir = "c2s", args = {}, rate = { perSecond = 0.2, burst = 1 } }, -- this season's premium for Embers
 	Lock = { dir = "c2s", args = {}, rate = { perSecond = 1, burst = 2 } }, -- Base Lock, or a Lock Charge to skip the recharge
 	ShopBuy = {
 		dir = "c2s",

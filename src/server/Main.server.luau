@@ -31,6 +31,7 @@ local ORDER = {
 	"ClaimService",
 	"GlowdexService",
 	"DailyGiftService",
+	"NightPassService",
 	"QuestService",
 	"DecorService",
 	"LeaderboardService",
