@@ -82,9 +82,9 @@ Every other number is the GDD's.
 
 ## 3. Glowlings
 
-A Glowling is a **species + rarity + mutation + size** record (TECH_SPEC §5).
+A Glowling is a **species + rarity + mutation + size** record (TECH_SPEC §5). Its species gives it a **family**, a **trait** and a **minimum rarity** (CONTENT_AND_LIVEOPS §A3, D18).
 
-- **Income/s** = `glowPerSec[rarity] × size × mutationMult × (1 + 0.35 × Stars) × (1.5 if VIP) × eventMult × (1 + Glowdex bonus)`
+- **Income/s** = `glowPerSec[rarity] × size × mutationMult × traitMult × (1 + 0.35 × Stars) × (1.5 if VIP) × eventMult × (1 + Glowdex bonus)`. `traitMult` comes from §31 and is at most 1.6. `glowPerSec` depends on rarity only (D19).
 - **Species pools** (CONTENT_AND_LIVEOPS.md §A3):
   - **Clearing** (16 species): from lures and nights
   - **Deepwood** (24): nights only
@@ -130,6 +130,8 @@ This is the algorithm `sim.py` uses, and `sim_v3.py` keeps it. The CI parity tes
 An Epic lure gives Legendary or better 0.11% of the time at luck 1 (0.56% at luck 5). In the sim, about half of players' first Legendaries come from lures and half from nights.
 
 **Mutation roll** (independent of rarity; luck doesn't apply): one random draw. Under 0.5% is Rainbow; under 5% is Golden (so Golden is 4.5%); otherwise none. This matches the sim. On Moonlit event nights, Moonlit (1 in 100) is checked first.
+
+**Species:** after the rarity is rolled, the species is picked uniformly from the pool's species whose `minRarity` ≤ that rarity (D18). The odds above don't change; only which species can appear at each rarity does.
 
 **Size:** uniform from 0.80 to 1.30, rounded to 2 decimal places. Labels: Tiny (under 0.90), Big (1.20 and up), Huge (1.28 and up).
 
@@ -231,7 +233,7 @@ Every upgrade has a "Buy max" button, which walks the real price list and stops 
 
 **Flow**
 1. **Grab.** The thief stands within 6 studs of a display slot on another plot and holds the button.
-   - Hold time: 1 s for Common to Rare, 2 s for Epic and Legendary, 3 s for Mythic and Secret (†).
+   - Hold time: 1 s for Common to Rare, 2 s for Epic and Legendary, 3 s for Mythic and Secret (†), plus any Guardian bonus on that pad (§31).
    - The owner gets an alarm and a toast at once: "Sam is stealing your Rare Mothlet!", with an arrow.
 2. **Carry.** The thief moves at ×0.85 and glows (**Marked**). The owner sees them through walls (a Highlight).
    - The owner gets the **chase boost**: ×1.2 speed for 10 s (D11, **sim**).
@@ -357,7 +359,7 @@ Every upgrade has a "Buy max" button, which walks the real price list and stops 
 
 ## 16. Glowdex
 
-**Entries:** 40 species × 7 rarities = 280, plus a Golden and a Rainbow stamp per species. Limited species add their own pages.
+**Entries:** each species counts only the rarities it can be caught at (from its `minRarity` up to Secret, D18): 30 species × 7 + 5 × 5 (Rare floor) + 4 × 4 (Epic floor) + 1 × 3 (Legendary floor) = **254**, plus a Golden and a Rainbow stamp per species. Limited species add their own pages.
 
 **Credit:** night catches, lure rolls, event catches and the tutorial. Not steals, trades or Fuse (D10).
 
@@ -365,12 +367,12 @@ Every upgrade has a "Buy max" button, which walks the real price list and stops 
 
 | Tier | Needs | Reward |
 | --- | --- | --- |
-| Bronze | Common, Uncommon, Rare, Epic | +0.5% income, plus a decoration of that species |
+| Bronze | Every reachable rarity up to Epic (just the floor rarity if the floor is above Epic) | +0.5% income, plus a decoration of that species |
 | Silver | + Legendary | +0.5% income, plus a nameplate frame |
 | Gold | + Mythic | +1% income, plus a trophy statue variant |
 | Radiant | + Secret | An aura for your Glowlings of that species, plus a title |
 
-**Milestones** on total entries: 10 / 25 / 50 / 100 / 150 / 200 / 280 give 25 / 50 / 100 / 200 / 300 / 500 / 1,000 Embers and titles.
+**Milestones** on total entries: 10 / 25 / 50 / 100 / 150 / 200 / 254 (all) give 25 / 50 / 100 / 200 / 300 / 500 / 1,000 Embers and titles.
 
 **Acceptance:** a catch updates the entry within 1 s. A page reward can be claimed only once (server-checked).
 
@@ -586,3 +588,50 @@ The candidates are scored by estimated time to finish, and the closest one in ea
 ## 30. Wisps (low priority)
 
 The GDD added night-only bots because small servers struggled. D1's drain formula already scales the fire to the player count, so Wisps **don't feed the fire**: that would make a solo night free again. Instead, in a server with fewer than 4 players, friendly Wisps drift ahead of players toward the nearest wood and shards, and make the clearing feel alive. They can be turned off in config.
+
+---
+
+## 31. Pet traits (D20–D23, sim pending)
+
+Every species has a **family** and one **trait** (CONTENT_AND_LIVEOPS §A3). Traits are rules on placed Glowlings, not physics: the server applies them when placements change (and at Overcharge start and end), with no new per-second loop. The rules live in `Shared.Traits`; numbers live in `config/species.json` (per species) and `economy.traits` (shared). All numbers are † and **sim**.
+
+**Neighbours:** the pads that share an edge on the plot's pad grid (vault and display pads alike).
+
+**Family link (everyone):** +5% Glow/s for each neighbour of the same family, up to +10%.
+
+**Day traits (on the plot)**
+
+| Trait | Effect | Notes |
+| --- | --- | --- |
+| Harmonizer | Its same-family neighbours get +15% Glow/s | Doesn't boost itself; several Harmonizers next to one Glowling don't stack (the highest counts) |
+| Guardian | Its own pad and its neighbours get +0.5 s grab time (+1.0 s if the species' floor is Rare or higher) | Highest bonus per pad counts; at most +1.5 s on any pad |
+| Infuser | Every 60 s, one random neighbour gets **Overcharge**: ×1.5 Glow/s for 30 s | Overcharge never stacks, isn't saved, isn't a mutation, and ends if the Glowling moves or is stolen |
+| Forager | Every 90 s, adds a Glow pouch worth 30 × its own Glow/s | Auto-collected at launch (a basket later); never Embers (D21) |
+
+**Apex species** (floors of Epic or Legendary) use the whole-plot version of their trait. Whole-plot effects don't stack with each other: the highest applies.
+
+| Species | Whole-plot effect |
+| --- | --- |
+| Aurora Lynx | Infuser: every 45 s, Overcharge on up to 6 pads for 30 s |
+| Skywhale Calf | Harmonizer: +15% Glow/s to every Glowling on the plot, any family |
+| Elder Sapling | Guardian: +1.0 s grab time on every display pad |
+| Emberwing | Firebinder as companion: fuel value +50% |
+| Lunadrake | Harmonizer: +25% Glow/s to every Glowling on the plot, any family |
+
+**Cap:** family link × Harmonizer × Overcharge × whole-plot bonus is at most **×1.6** per Glowling (`traitMult`). Forager pouches are outside the cap but count as income for the sim.
+
+**Night Companion (D23, ships after traits v1)**
+- One companion slot, chosen from your vault Glowlings. It stays on its pad (still earning, still safe); a client-only copy floats beside you at night. It changes only at day.
+- Firebinder: wood and shards you feed count +15% (Rare floor or lower) or +30% (higher floors); Emberwing +50%. Fire maths in §12 use the boosted value.
+- Wayfinder: every 10 s, points to the nearest Rare-or-better wild Glowling or Glow-Shard within 60 studs.
+- Savior: your revive hold is 0.6 s shorter (never under 1.8 s).
+- Day traits of the companion keep working on its pad.
+
+**Not doing (D21, D22):** Embers from traits, knockback, protection from the night-lost penalty, server-wide luck from a player's Glowling, guaranteed mutations, permanent mutations from Infusers, longer Base Lock. A rare **Dawn Jackpot** (a permanent upgrade of one unmutated Glowling) and **Sanctuary Blooms** are post-launch ideas, each only after a sim run.
+
+**Acceptance**
+- Placing two same-family Glowlings side by side raises both by 5% within 1 s; moving one away removes it.
+- A thief grabbing a pad next to a Guardian sees the longer hold, and the server times it.
+- Overcharge shows on the boosted Glowling, ends after 30 s, and the income returns to normal.
+- No Glowling's trait multiplier ever exceeds 1.6 (a Lune test over random plots).
+- A Common roll never gives a species whose floor is above Common.

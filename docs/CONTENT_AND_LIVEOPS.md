@@ -17,6 +17,20 @@ The rules and numbers this doc refers to are in [GAME_SYSTEMS.md](GAME_SYSTEMS.m
 - **Day:** warm, saturated and playful (a golden-hour meadow). **Dusk:** red sky, long shadows. **Night:** deep blue-black with cyan and gold light pools. The fire is the warmest light in the scene.
 - **No outside IP.** Every creature is original. No meme characters.
 
+**Rarity look ladder** (D24). One model per species; rarity changes everything around it. Forms are shared accessories on standard rig sockets, not new meshes.
+
+| Rarity | Icon | Form | Material and light | Presence |
+| --- | --- | --- | --- | --- |
+| Common | Cream circle | I: base | Matte body, one warm Neon feature | Grounded hop; no particles |
+| Uncommon | Mint diamond | I | Two-tone gradient, rim Neon | Faint spores or pawprints when moving |
+| Rare | Cyan hexagon | I | Pulsing Neon inlays, Glass accents | Slow light motes; soft pulsing light |
+| Epic | Violet star | II: awakened (crest, wing membranes, tail ribbons) | Glass over a Neon core, iridescent edge | Halo ring; Beam trail |
+| Legendary | Gold crown | II, ×1.08 scale | Gold Metal trim, blazing Neon | Floating crown; sky beam from the plot |
+| Mythic | Rose crest | III: ascended (halo crown, extra wings or tails, levitating idle), ×1.15 | Scrolling aurora texture, runes | Orbiting rune ring; ground sigil |
+| Secret | Void octagram | III, ×1.25 | Starfield shader, prismatic edges | Server-wide sky flash and chime on catch; orbiting pearls |
+
+The 8-brightest-lights rule per plot still applies (TECH_SPEC §11).
+
 ## A2. Map: the Clearing
 
 ```
@@ -54,59 +68,66 @@ The Lantern Shop, the Wisp's Stash (tutorial steal), the leaderboard boards and 
 
 ## A3. Species roster (40 at launch)
 
-Any species can come in any rarity. Rarity changes the glow, particles and scale, not the model.
+Rarity is rolled per catch, with the same odds for every species (GAME_SYSTEMS §4). Each species has a **minimum rarity**, so apex creatures never appear as Common: the species is picked among those whose floor is at or below the rolled rarity (D18). Glow/s depends on rarity only, never on species (D19). What makes species differ is their **family** and **trait** (GAME_SYSTEMS §31, D20).
+
+- **Families (6):** Lantern, Ember, Crystal, Grove (moss and fungi), Celestial, Shadow. Same-family neighbours link up.
+- **Day traits** act on your plot: Harmonizer, Guardian, Infuser, Forager. **Night traits** act only as your Night Companion (D23): Firebinder, Wayfinder, Savior.
+- **Apex** species (Mythic-tier looks: floors of Epic or Legendary) have a whole-plot version of their trait.
+- **Look by rarity:** see §A1 "Rarity look ladder". The species keeps one model; rarity adds shared accessories (D24).
 
 **Clearing pool (16): from lures and nights**
 
-| # | Species | Look |
-| --- | --- | --- |
-| 1 | Glimmermouse | Round mouse, glowing tail tip |
-| 2 | Puffwick | Dandelion puff with a candle-flame top |
-| 3 | Mothlet | Fat little moth with lantern wings |
-| 4 | Dewdrop Slime | Clear jelly drop with a light inside |
-| 5 | Lanternbug | Beetle with a paper-lantern shell |
-| 6 | Sparkhop | Frog that sparks when it lands |
-| 7 | Pebblepup | Puppy made of glowing river stones |
-| 8 | Fuzzlight | Caterpillar with light-bulb segments |
-| 9 | Bloomkit | Fox kit with a flower for a tail |
-| 10 | Snailspark | Snail with a crystal shell |
-| 11 | Cinderchick | Chick with ember feathers |
-| 12 | Moonbun | Bunny with crescent ears |
-| 13 | Acorn Imp | Acorn-capped sprite |
-| 14 | Firefly Pip | Firefly the size of a fist |
-| 15 | Sproutling | Seedling with a light-bulb bud |
-| 16 | Mushpup | Puppy with a mushroom cap |
+| # | Species | Look | Family | Trait | Min rarity |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Glimmermouse | Round mouse, glowing tail tip | Lantern | Forager | Any |
+| 2 | Puffwick | Dandelion puff with a candle-flame top | Ember | Firebinder | Any |
+| 3 | Mothlet | Fat little moth with lantern wings | Lantern | Infuser | Any |
+| 4 | Dewdrop Slime | Clear jelly drop with a light inside | Crystal | Harmonizer | Any |
+| 5 | Lanternbug | Beetle with a paper-lantern shell | Lantern | Harmonizer | Any |
+| 6 | Sparkhop | Frog that sparks when it lands | Ember | Guardian | Any |
+| 7 | Pebblepup | Puppy made of glowing river stones | Crystal | Forager | Any |
+| 8 | Fuzzlight | Caterpillar with light-bulb segments | Lantern | Harmonizer | Any |
+| 9 | Bloomkit | Fox kit with a flower for a tail | Grove | Infuser | Any |
+| 10 | Snailspark | Snail with a crystal shell | Crystal | Guardian | Any |
+| 11 | Cinderchick | Chick with ember feathers | Ember | Firebinder | Any |
+| 12 | Moonbun | Bunny with crescent ears | Celestial | Savior | Any |
+| 13 | Acorn Imp | Acorn-capped sprite | Grove | Forager | Any |
+| 14 | Firefly Pip | Firefly the size of a fist | Lantern | Wayfinder | Any |
+| 15 | Sproutling | Seedling with a light-bulb bud | Grove | Forager | Any |
+| 16 | Mushpup | Puppy with a mushroom cap | Grove | Forager | Any |
 
 **Deepwood pool (24): nights only**
 
-| # | Species | Look |
-| --- | --- | --- |
-| 17 | Wispfox | Fox made of smoke and light |
-| 18 | Owlumen | Owl whose eyes are lamps |
-| 19 | Lumoth | Giant moth with patterned wings |
-| 20 | Fawnfire | Fawn with ember spots |
-| 21 | Mossbear | Bear cub with glowing moss |
-| 22 | Otterglow | Otter that carries a glowing pebble |
-| 23 | Embercat | Cat whose tail is a flame |
-| 24 | Shadebat | Bat with stained-glass wings |
-| 25 | Prismbeetle | Crystal beetle that splits light |
-| 26 | Thornhog | Hedgehog with light-tipped spines |
-| 27 | Bramblepup | Wolf pup wrapped in glowing vines |
-| 28 | Spore Toad | Toad that puffs glowing spores |
-| 29 | Lightjelly | Floating jellyfish of the forest |
-| 30 | Rootling | Walking root bundle with a core light |
-| 31 | Lumingale | Songbird that glows when it sings |
-| 32 | Antlerlight | Stag with lantern antlers |
-| 33 | Comet Ferret | Ferret trailing a comet tail |
-| 34 | Gloom Raven | Raven with starfield feathers |
-| 35 | Glowworm Wyrm | Long, serpent-like glowworm |
-| 36 | Aurora Lynx | Lynx with an aurora mane |
-| 37 | Skywhale Calf | Tiny floating whale |
-| 38 | Elder Sapling | Ancient treant sprout |
-| 39 | Emberwing | Phoenix chick |
-| 40 | Lunadrake | Moon-dragon hatchling |
+| # | Species | Look | Family | Trait | Min rarity |
+| --- | --- | --- | --- | --- | --- |
+| 17 | Wispfox | Fox made of smoke and light | Shadow | Wayfinder | Any |
+| 18 | Owlumen | Owl whose eyes are lamps | Lantern | Wayfinder | Any |
+| 19 | Lumoth | Giant moth with patterned wings | Celestial | Infuser | Any |
+| 20 | Fawnfire | Fawn with ember spots | Ember | Firebinder | Any |
+| 21 | Mossbear | Bear cub with glowing moss | Grove | Guardian | Any |
+| 22 | Otterglow | Otter that carries a glowing pebble | Crystal | Forager | Any |
+| 23 | Embercat | Cat whose tail is a flame | Ember | Firebinder | Any |
+| 24 | Shadebat | Bat with stained-glass wings | Shadow | Wayfinder | Any |
+| 25 | Prismbeetle | Crystal beetle that splits light | Crystal | Infuser | Any |
+| 26 | Thornhog | Hedgehog with light-tipped spines | Grove | Guardian | Any |
+| 27 | Bramblepup | Wolf pup wrapped in glowing vines | Grove | Guardian | Any |
+| 28 | Spore Toad | Toad that puffs glowing spores | Grove | Infuser | Any |
+| 29 | Lightjelly | Floating jellyfish of the forest | Celestial | Infuser | Rare |
+| 30 | Rootling | Walking root bundle with a core light | Grove | Guardian | Any |
+| 31 | Lumingale | Songbird that glows when it sings | Celestial | Savior | Any |
+| 32 | Antlerlight | Stag with lantern antlers | Lantern | Harmonizer | Rare |
+| 33 | Comet Ferret | Ferret trailing a comet tail | Celestial | Forager | Rare |
+| 34 | Gloom Raven | Raven with starfield feathers | Shadow | Guardian | Rare |
+| 35 | Glowworm Wyrm | Long, serpent-like glowworm | Crystal | Harmonizer | Rare |
+| 36 | Aurora Lynx | Lynx with an aurora mane | Celestial | Infuser (apex) | Epic |
+| 37 | Skywhale Calf | Tiny floating whale | Celestial | Harmonizer (apex) | Epic |
+| 38 | Elder Sapling | Ancient treant sprout | Grove | Guardian (apex) | Epic |
+| 39 | Emberwing | Phoenix chick | Ember | Firebinder (apex) | Epic |
+| 40 | Lunadrake | Moon-dragon hatchling | Celestial | Harmonizer (apex) | Legendary |
 
-**Limited species, weeks L0–L12:** Koilight (paper-lantern koi), Crimson Mothlet, Frostwhisker, Bloom Bunny, Starfall Kit, Tidepup, Auroraowl, Ember Koi, Mossling Twins, Glasswing, Comet Pup, Lantern Drake, Swamp preview species.
+Counts: Lantern 7, Ember 6, Crystal 6, Grove 10, Celestial 8, Shadow 3. Day traits: Harmonizer 7, Guardian 8, Infuser 7, Forager 7; night traits: Firebinder 5, Wayfinder 4, Savior 2.
+
+**Limited species, weeks L0–L12** (each gets a family, a day or night trait, and a floor in its week's config; no Embers from traits, D21): Koilight (paper-lantern koi), Crimson Mothlet, Frostwhisker, Bloom Bunny, Starfall Kit, Tidepup, Auroraowl, Ember Koi, Mossling Twins, Glasswing, Comet Pup, Lantern Drake, Swamp preview species.
 
 ## A4. The Stalker, kept to a Mild rating (D16)
 
@@ -157,7 +178,7 @@ Any species can come in any rarity. Rarity changes the glow, particles and scale
 
 ## A6. Budgets
 
-These are summarized from TECH_SPEC §11. Glowling models are at most 1,500 tris (3,000 for Legendary and above), with one atlas per species. The rarity VFX are shared emitter templates, so a new species needs no new VFX.
+These are summarized from TECH_SPEC §11. A species' base model is at most 1,500 tris (3,000 for species with a Rare or higher floor), with one atlas per species. Form II and III accessories are shared across species and at most 400 tris each. The rarity VFX and trait VFX are shared templates, so a new species needs no new VFX.
 
 ## A7. Weekly species pipeline
 
