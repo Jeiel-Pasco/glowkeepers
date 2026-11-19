@@ -72,13 +72,20 @@ end
 
 -- Moves a record from one loaded profile to another's storage: same id, mutation, size and
 -- `by` (the original catcher); a new `src` and `at`. Returns the moved record, or nil when
--- either profile isn't loaded, `from` doesn't own it, or `to` has no room.
-function GlowlingService.transfer(from: Player, to: Player, id: string, src: string): Types.Glowling?
+-- either profile isn't loaded, `from` doesn't own it, or `to` has no room (unless `ignoreRoom`:
+-- a trade checks the net room for the whole swap first).
+function GlowlingService.transfer(
+	from: Player,
+	to: Player,
+	id: string,
+	src: string,
+	ignoreRoom: boolean?
+): Types.Glowling?
 	local fromData, toData = DataService.get(from), DataService.get(to)
 	local record = if fromData ~= nil then fromData.glowlings[id] else nil
 	if fromData == nil or toData == nil or record == nil or toData.glowlings[id] ~= nil then
 		return nil
-	elseif not GlowlingService.hasRoom(to) then
+	elseif not ignoreRoom and not GlowlingService.hasRoom(to) then
 		return nil
 	end
 	local wasPlaced = Inventory.forget(fromData, id)
