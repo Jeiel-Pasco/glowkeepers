@@ -597,7 +597,7 @@ Every species has a **family** and one **trait** (CONTENT_AND_LIVEOPS §A3). Tra
 
 **Neighbours:** the pads that share an edge on the plot's pad grid (vault and display pads alike).
 
-**Shipped in traits v1:** family link, Harmonizer (and the whole-plot Skywhale Calf and Lunadrake), Guardian (and Elder Sapling), the cap, species floors (with D25 for wilds), and Glowdex reachable entries. **Traits v1b:** Infuser Overcharge, Aurora Lynx and Forager pouches (TraitService, a 2 s tick; Overcharge shows as a gold aura). **Next:** the Night Companion. With today's numbers the best stack is ×1.581 (two links, a Harmonizer, Lunadrake), so the ×1.6 cap is a guard for tuning.
+**Shipped in traits v1:** family link, Harmonizer (and the whole-plot Skywhale Calf and Lunadrake), Guardian (and Elder Sapling), the cap, species floors (with D25 for wilds), and Glowdex reachable entries. **Traits v1b:** Infuser Overcharge, Aurora Lynx and Forager pouches (TraitService, a 2 s tick; Overcharge shows as a gold aura). **Night Companion** shipped (CompanionService; save field `companion`, attribute `Companion` = "sp|r|m"). Wayfinder points at wilds only, and judges them by **species floor** (Rare or higher), since a wild's rarity stays hidden until caught; Glow-Shards aren't targeted yet. With today's numbers the best stack is ×1.581 (two links, a Harmonizer, Lunadrake), so the ×1.6 cap is a guard for tuning.
 
 **Family link (everyone):** +5% Glow/s for each neighbour of the same family, up to +10%.
 
@@ -625,7 +625,7 @@ Every species has a **family** and one **trait** (CONTENT_AND_LIVEOPS §A3). Tra
 **Night Companion (D23, ships after traits v1)**
 - One companion slot, chosen from your vault Glowlings. It stays on its pad (still earning, still safe); a client-only copy floats beside you at night. It changes only at day.
 - Firebinder: wood and shards you feed count +15% (Rare floor or lower) or +30% (higher floors); Emberwing +50%. Fire maths in §12 use the boosted value.
-- Wayfinder: every 10 s, points to the nearest Rare-or-better wild Glowling or Glow-Shard within 60 studs.
+- Wayfinder: every 10 s, points to the nearest wild Glowling whose species floor is Rare or higher, within 60 studs (shards: later).
 - Savior: your revive hold is 0.6 s shorter (never under 1.8 s).
 - Day traits of the companion keep working on its pad.
 
