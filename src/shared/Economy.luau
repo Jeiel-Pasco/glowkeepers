@@ -138,6 +138,30 @@ function Economy.releaseValue(cfg: any, value: number, stars: number, extra: num
 	return math.floor(value * cfg.storage.releaseIncomeSeconds * Economy.incomeMultiplier(cfg, stars, extra))
 end
 
+-- Levels of an upgrade that `money` Glow buys from `level` owned: one level, or with `all` as
+-- many as it affords ("Buy max", walking the real price list up to the max). Returns the count
+-- and the total price; (0, 0) when it's maxed or the next level is unaffordable.
+function Economy.upgradePurchase(cfg: any, id: string, level: number, money: number, all: boolean): (number, number)
+	local count, total = 0, 0
+	while true do
+		local price = Economy.upgradeCost(cfg, id, level + count)
+		if price == nil or total + price > money then
+			break
+		end
+		total += price
+		count += 1
+		if not all then
+			break
+		end
+	end
+	return count, total
+end
+
+-- A Lock Charge costs Glow (lockChargeGlow) or a flat number of Embers.
+function Economy.lockChargePrice(cfg: any, currency: string, perSec: number): number
+	return if currency == "embers" then cfg.lock.chargeEmbers else Economy.lockChargeGlow(cfg, perSec)
+end
+
 -- Lock Charge price in Glow: max(200, 120 s of income).
 function Economy.lockChargeGlow(cfg: any, perSec: number): number
 	return math.floor(math.max(cfg.lock.chargeMinGlow, cfg.lock.chargeGlowSecondsOfIncome * perSec))

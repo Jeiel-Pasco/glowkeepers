@@ -128,7 +128,8 @@ Client intent ──► Net (type check, rate limit) ──► Service (rules, s
 | GlowlingService / InventoryService | Create, move, release and transfer Glowling records; storage cap; auto-place | 2 |
 | RollService | Wraps `Roll` with a per-server `Random`; pity; tutorial overrides | 2 |
 | IncomeService | Recomputes Glow/s when inventory changes; 1 Hz accrual; offline payout on join (at the saved `lastIncomePerSec`, before the join recompute), shown by `OfflineEarnings (amount, away)` once the client is ready | 2 |
-| ShopService / UpgradeService | Restock windows, per-player stock, lures, Lantern, Boots, Slots, Lock Charges | 3 |
+| ShopService | Restock windows, per-player stock, lures | 3 |
+| UpgradeService | Lantern, Boots and Slots for Glow (one level or Buy max, `Economy.upgradePurchase`), Lock Charges for Glow or Embers (5 held); applies Boots to `RunSpeed` and tonight's catches, and Slots to the layout | 3 |
 | StealService | Grab, carry, tag, deliver, chase boost, victim cooldown, validation | 2 |
 | LockService | Base Lock: 60 s lock then 90 s recharge (a Lock Charge skips it), none at night, pushes outsiders out of a locked zone at 10 Hz | 2 |
 | ShieldService | New-player shield: 45 min of saved play time, ends early when its owner drops it to steal (or at the first rebirth, Phase 4); `Shielded` / `ShieldEndsAt` attributes; the plot view's `shield` | 3 |
@@ -309,7 +310,8 @@ Every remote is declared once in `shared/Net.luau`, with its argument schema and
 | `PlaceBest` | C→S | — | Best earners to the vault pads, the next best to display pads (GAME_SYSTEMS §7) | 2/s |
 | `Release` | C→S | ids: {string} (≤ 20) | Owns all of them; none in display slots, the vault or a trade; confirmed by the client UI | 2/s |
 | `ShopBuy` | C→S | itemId: string | In config; stock left; can afford it | 5/s |
-| `UpgradeBuy` | C→S | upgradeId: string | In config; below max; can afford it | 5/s |
+| `UpgradeBuy` | C→S | upgradeId: `"lantern"` \| `"boots"` \| `"slots"`, all: boolean? (Buy max) | Below max; can afford the next level (Buy max buys as many as the balance covers, up to max) | 5/s |
+| `LockChargeBuy` | C→S | currency: `"glow"` \| `"embers"` | Fewer than 5 held; can afford `max(200, 120 × Glow/s)` Glow or 15 Embers | 2/s |
 | `Rebirth` | C→S | — | `glowSinceRebirth` ≥ threshold; not carrying; not mid-trade | 1/10 s |
 | `Claim` | C→S | kind: string, id: string | Quest, gift, pass tier or Glowdex page is complete and unclaimed | 5/s |
 | `TradeRequest` / `TradeRespond` / `TradeOffer` / `TradeConfirm` / `TradeCancel` | C→S | Various | GAME_SYSTEMS §17 | 5/s |

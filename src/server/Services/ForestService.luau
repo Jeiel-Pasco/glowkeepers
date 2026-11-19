@@ -86,6 +86,9 @@ local function publishCatches(player: Player)
 	player:SetAttribute("CatchesLeft", if night then catchesLeft(player) else nil)
 end
 
+-- UpgradeService calls this after Boots are bought (every 5 levels add a catch).
+ForestService.refresh = publishCatches
+
 local function view(wild: Wild): any
 	return { id = wild.id, sp = wild.sp, area = wild.area, x = wild.x, y = wild.y, z = wild.z }
 end
