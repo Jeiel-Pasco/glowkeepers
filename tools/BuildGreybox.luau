@@ -157,6 +157,40 @@ end
 local GHOST = { Transparency = 1, CanCollide = false, CanTouch = false, CanQuery = false, CastShadow = false }
 local DECOR = { CanCollide = false, CanTouch = false, CanQuery = false }
 
+-- Mesh props (the "Stylized Forest Pack - 25 Props" from the Creator Store, kept in
+-- ServerStorage.MapAssets in the place file). Without them the map falls back to primitives.
+local ASSETS = ServerStorage:FindFirstChild("MapAssets")
+
+local function hasAsset(name: string): boolean
+	return ASSETS ~= nil and ASSETS:FindFirstChild(name) ~= nil
+end
+
+-- A clone of the mesh `name`, scaled so it is `height` tall, standing on `base` (a ground-level
+-- CFrame that also carries the yaw).
+local function asset(parent, name: string, height: number, base: CFrame, props): MeshPart
+	local template = (ASSETS :: Folder):FindFirstChild(name) :: MeshPart
+	local p = template:Clone()
+	p.Size = template.Size * (height / template.Size.Y)
+	p.CFrame = base * CFrame.new(0, p.Size.Y / 2 - 0.3, 0)
+	p.Anchored = true
+	if name:sub(1, 5) == "Rock_" and name ~= "Rock_Mossy" then
+		-- The pack's rocks are blue-grey; ours match the stone of the paths and pit.
+		p.TextureID = ""
+		p.Color = COLORS.stone:Lerp(Color3.fromRGB(120, 112, 130), rng:NextNumber(0, 0.5))
+	end
+	for key, value in props or {} do
+		p[key] = value
+	end
+	p.Parent = parent
+	return p
+end
+
+local MESH_TREES = hasAsset("Tree_Oak_Round") and hasAsset("Tree_Pine_Tall")
+
+local function pick(list: { string }): string
+	return list[rng:NextInteger(1, #list)]
+end
+
 local function marker(parent, name, size, cframe)
 	return part(parent, name, nil, size, cframe, Color3.new(1, 0, 1), nil, GHOST)
 end
@@ -339,8 +373,9 @@ task.wait()
 -- WriteVoxels; the top voxel's occupancy smooths each column's height.
 do
 	local terrain = workspace.Terrain
-	terrain:SetMaterialColor(Enum.Material.Rock, Color3.fromRGB(104, 100, 118))
+	terrain:SetMaterialColor(Enum.Material.Rock, Color3.fromRGB(112, 108, 130)) -- one calm rock, no slate patches
 	terrain:SetMaterialColor(Enum.Material.Slate, Color3.fromRGB(78, 80, 96))
+	terrain:SetMaterialColor(Enum.Material.Limestone, Color3.fromRGB(78, 104, 64)) -- steep foothill moss
 	terrain:SetMaterialColor(Enum.Material.Snow, Color3.fromRGB(232, 238, 248))
 	local RES = 4
 	local half = 620
@@ -378,10 +413,12 @@ do
 		local snowLine = 270 + math.noise(x / 70, z / 70, s + 5) * 30 -- caps on the peaks only
 		if y >= snowLine then
 			return Enum.Material.Snow
-		elseif y > h - 8 and y < 140 + math.noise(x / 60, z / 60, s + 7) * 12 then
-			return Enum.Material.LeafyGrass -- green foothills and lower slopes
-		elseif math.noise(x / 35, y / 35, z / 35) > 0.25 then
-			return Enum.Material.Slate
+		elseif h < 150 + math.noise(x / 60, z / 60, s + 7) * 12 then
+			-- Green foothills, by the column's height. Grass shows a dirt side on every voxel
+			-- step, which stripes steep slopes, so those take a moss-green Limestone instead.
+			local steep = math.abs(heightAt(x + 4, z) - heightAt(x - 4, z))
+				+ math.abs(heightAt(x, z + 4) - heightAt(x, z - 4))
+			return if steep > 6 then Enum.Material.Limestone else Enum.Material.LeafyGrass
 		end
 		return Enum.Material.Rock
 	end
@@ -474,6 +511,15 @@ do
 	)
 	for k = 0, 2 do
 		local cf = CFrame.new(0, 1.4, 0) * CFrame.Angles(0, k * math.pi / 3, 0.25)
+		if hasAsset("Log_Fallen") then
+			asset(fire, "Log_Fallen", 1.8, CFrame.new(0, 0.9, 0) * CFrame.Angles(0, k * math.pi / 3, 0.25), {
+				CanCollide = false,
+				CanTouch = false,
+				CanQuery = false,
+				CastShadow = false,
+			})
+			continue
+		end
 		part(fire, "Log", Enum.PartType.Cylinder, Vector3.new(6, 1.2, 1.2), cf, COLORS.wood, Enum.Material.Wood, {
 			CanCollide = false,
 			CanTouch = false,
@@ -531,7 +577,11 @@ do
 		if not onRadial(a, r, allPathAngles, LAYOUT.pathWidth / 2 + 1.5) then
 			local cf = CFrame.lookAt(polar(r, a, 0.4), Vector3.new(0, 0.4, 0))
 				* CFrame.Angles(0, rng:NextNumber(-0.3, 0.3), 0)
-			part(stones, "Stone", nil, Vector3.new(2.2, 1, 1.6), cf, COLORS.stone, Enum.Material.Slate, DECOR)
+			if hasAsset("Rock_Pebble") then
+				asset(stones, "Rock_Pebble", 1.3, cf * CFrame.new(0, -0.4, 0), DECOR).Name = "Stone"
+			else
+				part(stones, "Stone", nil, Vector3.new(2.2, 1, 1.6), cf, COLORS.stone, Enum.Material.Slate, DECOR)
+			end
 			-- A thin Neon rune on top; CampfireController lights it by the fire's state.
 			local rune = part(
 				stones,
@@ -825,15 +875,22 @@ do
 		local pile = model(string.format("WoodPile%02d", i), piles)
 		pile:SetAttribute("PileId", string.format("W%02d", i))
 		for k, offset in { Vector3.new(-0.8, 0.7, 0), Vector3.new(0.8, 0.7, 0), Vector3.new(0, 1.9, 0) } do
-			local log = part(
-				pile,
-				"Log",
-				Enum.PartType.Cylinder,
-				Vector3.new(6, 1.4, 1.4),
-				cf * CFrame.new(offset) * CFrame.Angles(0, math.pi / 2, 0),
-				COLORS.wood,
-				Enum.Material.Wood
-			)
+			local log = if hasAsset("Log_Fallen")
+				then asset(
+					pile,
+					"Log_Fallen",
+					2.4,
+					cf * CFrame.new(offset - Vector3.new(0, 0.7, 0)) * CFrame.Angles(0, math.pi / 2 + k * 0.3, 0)
+				)
+				else part(
+					pile,
+					"Log",
+					Enum.PartType.Cylinder,
+					Vector3.new(6, 1.4, 1.4),
+					cf * CFrame.new(offset) * CFrame.Angles(0, math.pi / 2, 0),
+					COLORS.wood,
+					Enum.Material.Wood
+				)
 			if k == 1 then
 				pile.PrimaryPart = log
 			end
@@ -983,73 +1040,104 @@ do
 		local base = spot.pos
 		local turn = CFrame.Angles(0, rng:NextNumber(0, TAU), 0)
 		local bark = if kind == "spirit" then Color3.fromRGB(205, 200, 215) else COLORS.trunk
-		part(
-			tree,
-			"Trunk",
-			Enum.PartType.Cylinder,
-			Vector3.new(height, width, width),
-			CFrame.new(base + Vector3.new(0, height / 2, 0)) * UPRIGHT,
-			bark,
-			Enum.Material.Wood
-		)
-		part(
-			tree,
-			"Roots",
-			Enum.PartType.Cylinder,
-			Vector3.new(2, width * 1.6, width * 1.6),
-			CFrame.new(base + Vector3.new(0, 0.6, 0)) * UPRIGHT,
-			bark,
-			Enum.Material.Wood,
-			DECOR
-		)
-		local leaves = if deep then COLORS.deepLeaves else COLORS.leaves
-		local shade = leaves:Lerp(Color3.fromRGB(90, 120, 60), rng:NextNumber(0, 0.35))
-		if kind == "pine" then
-			-- Stacked tiers that narrow to a tip: a stylised fir.
-			local tiers = rng:NextInteger(4, 5)
-			local spread = crown * rng:NextNumber(0.75, 0.95)
-			local tierH = crown * 0.32
-			local pineColor = Color3.fromRGB(38, 70, 58):Lerp(shade, 0.3)
-			for t = 1, tiers do
-				local f = 1 - (t - 1) / tiers
-				part(
-					tree,
-					if t == 1 then "Crown" else "Tier",
-					Enum.PartType.Cylinder,
-					Vector3.new(tierH, spread * f, spread * f),
-					CFrame.new(base + Vector3.new(0, height + (t - 1) * tierH * 0.72, 0)) * turn * UPRIGHT,
-					pineColor:Lerp(Color3.new(0, 0, 0), 0.08 * (tiers - t)),
-					Enum.Material.LeafyGrass,
-					DECOR
-				)
+		if MESH_TREES then
+			-- One low-poly mesh per tree, plus an invisible trunk so players can't walk through it.
+			local total = if deep then rng:NextNumber(40, 56) else rng:NextNumber(30, 40)
+			if edge then
+				total *= 1.15
 			end
-		else
+			local name = if kind == "pine"
+				then pick({ "Tree_Pine_Classic", "Tree_Pine_Tall", "Tree_Pine_Tall", "Tree_Pine_Young" })
+				else pick({ "Tree_Oak_Round", "Tree_Oak_Small", "Tree_Oak_Tall" })
+			local mesh = asset(tree, name, total, CFrame.new(base) * turn, DECOR)
+			mesh.Name = "Crown"
 			if kind == "spirit" then
-				shade = if rng:NextNumber() < 0.5 then Color3.fromRGB(96, 170, 160) else Color3.fromRGB(150, 128, 190)
+				mesh.TextureID = "" -- the whole tree in one pale spirit colour
+				mesh.Color = if rng:NextNumber() < 0.5
+					then Color3.fromRGB(150, 225, 215)
+					else Color3.fromRGB(200, 180, 240)
 			end
-			-- A main crown and 2–4 lower lobes, so the canopy reads as a cloud, not a ball.
-			local lobes = {
-				{ 0, 0, 0, 1 },
-				{ 0.32, -0.28, 0.1, 0.72 },
-				{ -0.3, -0.22, -0.18, 0.66 },
-				{ 0.05, 0.22, -0.3, 0.6 },
-				{ -0.12, -0.32, 0.34, 0.58 },
-			}
-			local count = rng:NextInteger(3, 5)
-			for k = 1, count do
-				local lobe = lobes[k]
-				local size = crown * lobe[4] * rng:NextNumber(0.9, 1.1)
-				local offset = (turn * Vector3.new(lobe[1], 0, lobe[3])) * crown
-				part(
-					tree,
-					if k == 1 then "Crown" else "Lobe",
-					Enum.PartType.Ball,
-					Vector3.one * size,
-					CFrame.new(base + Vector3.new(offset.X, height + lobe[2] * crown, offset.Z)),
-					if k == 1 then shade else shade:Lerp(Color3.new(0, 0, 0), 0.08 + 0.04 * k),
-					Enum.Material.LeafyGrass,
-					DECOR
-				)
+			part(
+				tree,
+				"Trunk",
+				Enum.PartType.Cylinder,
+				Vector3.new(total * 0.45, width * 0.6, width * 0.6),
+				CFrame.new(base + Vector3.new(0, total * 0.225, 0)) * UPRIGHT,
+				bark,
+				nil,
+				{ Transparency = 1, CastShadow = false }
+			)
+		else
+			part(
+				tree,
+				"Trunk",
+				Enum.PartType.Cylinder,
+				Vector3.new(height, width, width),
+				CFrame.new(base + Vector3.new(0, height / 2, 0)) * UPRIGHT,
+				bark,
+				Enum.Material.Wood
+			)
+			part(
+				tree,
+				"Roots",
+				Enum.PartType.Cylinder,
+				Vector3.new(2, width * 1.6, width * 1.6),
+				CFrame.new(base + Vector3.new(0, 0.6, 0)) * UPRIGHT,
+				bark,
+				Enum.Material.Wood,
+				DECOR
+			)
+			local leaves = if deep then COLORS.deepLeaves else COLORS.leaves
+			local shade = leaves:Lerp(Color3.fromRGB(90, 120, 60), rng:NextNumber(0, 0.35))
+			if kind == "pine" then
+				-- Stacked tiers that narrow to a tip: a stylised fir.
+				local tiers = rng:NextInteger(4, 5)
+				local spread = crown * rng:NextNumber(0.75, 0.95)
+				local tierH = crown * 0.32
+				local pineColor = Color3.fromRGB(38, 70, 58):Lerp(shade, 0.3)
+				for t = 1, tiers do
+					local f = 1 - (t - 1) / tiers
+					part(
+						tree,
+						if t == 1 then "Crown" else "Tier",
+						Enum.PartType.Cylinder,
+						Vector3.new(tierH, spread * f, spread * f),
+						CFrame.new(base + Vector3.new(0, height + (t - 1) * tierH * 0.72, 0)) * turn * UPRIGHT,
+						pineColor:Lerp(Color3.new(0, 0, 0), 0.08 * (tiers - t)),
+						Enum.Material.LeafyGrass,
+						DECOR
+					)
+				end
+			else
+				if kind == "spirit" then
+					shade = if rng:NextNumber() < 0.5
+						then Color3.fromRGB(96, 170, 160)
+						else Color3.fromRGB(150, 128, 190)
+				end
+				-- A main crown and 2–4 lower lobes, so the canopy reads as a cloud, not a ball.
+				local lobes = {
+					{ 0, 0, 0, 1 },
+					{ 0.32, -0.28, 0.1, 0.72 },
+					{ -0.3, -0.22, -0.18, 0.66 },
+					{ 0.05, 0.22, -0.3, 0.6 },
+					{ -0.12, -0.32, 0.34, 0.58 },
+				}
+				local count = rng:NextInteger(3, 5)
+				for k = 1, count do
+					local lobe = lobes[k]
+					local size = crown * lobe[4] * rng:NextNumber(0.9, 1.1)
+					local offset = (turn * Vector3.new(lobe[1], 0, lobe[3])) * crown
+					part(
+						tree,
+						if k == 1 then "Crown" else "Lobe",
+						Enum.PartType.Ball,
+						Vector3.one * size,
+						CFrame.new(base + Vector3.new(offset.X, height + lobe[2] * crown, offset.Z)),
+						if k == 1 then shade else shade:Lerp(Color3.new(0, 0, 0), 0.08 + 0.04 * k),
+						Enum.Material.LeafyGrass,
+						DECOR
+					)
+				end
 			end
 		end
 		-- Deepwood trees sometimes grow a ring of glow mushrooms at the roots.
@@ -1058,6 +1146,28 @@ do
 			for m = 1, 3 do
 				local at = base + turn * Vector3.new(math.cos(m * 2.1), 0, math.sin(m * 2.1)) * (width * 0.8 + 1)
 				local stem = rng:NextNumber(0.8, 1.6)
+				if hasAsset("Mushroom_Red") then
+					-- A low-poly mushroom lit from inside: no texture, Neon in the glow colour.
+					local shroom = asset(
+						tree,
+						pick({ "Mushroom_Red", "Mushroom_Brown", "Mushroom_Golden" }),
+						stem * 1.4,
+						CFrame.new(at) * CFrame.Angles(0, rng:NextNumber(0, TAU), 0),
+						DECOR
+					)
+					shroom.TextureID = ""
+					shroom.Color = glow
+					shroom.Material = Enum.Material.Neon
+					if m == 1 and glowLights < MAX_GLOW_LIGHTS then
+						glowLights += 1
+						local light = Instance.new("PointLight")
+						light.Color = glow
+						light.Range = 12
+						light.Brightness = 1.2
+						light.Parent = shroom
+					end
+					continue
+				end
 				part(
 					tree,
 					"MushroomStem",
@@ -1110,7 +1220,16 @@ do
 	end
 	for n = 1, 220 do
 		local pos = spotIn(LAYOUT.clearingRadius - 4, LAYOUT.mapRadius - 14, 4)
-		if pos ~= nil then
+		if pos ~= nil and hasAsset("Bush_Round") then
+			asset(
+				props,
+				pick({ "Bush_Round", "Bush_Wide", "Bush_Compact", "Bush_Berries" }),
+				rng:NextNumber(2.6, 5),
+				CFrame.new(pos) * CFrame.Angles(0, rng:NextNumber(0, TAU), 0),
+				DECOR
+			).Name =
+				"Bush"
+		elseif pos ~= nil then
 			local bush = model("Bush", props)
 			local size = rng:NextNumber(3, 6)
 			local color = COLORS.leaves:Lerp(Color3.fromRGB(100, 130, 60), rng:NextNumber(0, 0.5))
@@ -1134,7 +1253,18 @@ do
 	end
 	for _ = 1, 90 do
 		local pos = spotIn(LAYOUT.clearingRadius - 6, LAYOUT.mapRadius - 14, 5)
-		if pos ~= nil then
+		if pos ~= nil and hasAsset("Rock_Mossy") then
+			local name =
+				pick({ "Rock_Mossy", "Rock_Mossy", "Rock_Boulder", "Rock_Stack", "Rock_Standing", "Rock_Flat" })
+			local template = (ASSETS :: Folder):FindFirstChild(name) :: MeshPart
+			asset(
+				props,
+				name,
+				template.Size.Y * rng:NextNumber(0.8, 1.5),
+				CFrame.new(pos) * CFrame.Angles(0, rng:NextNumber(0, TAU), 0)
+			).Name =
+				"Rock"
+		elseif pos ~= nil then
 			local size = Vector3.new(rng:NextNumber(3, 7), rng:NextNumber(2, 4), rng:NextNumber(3, 6))
 			local rock = part(
 				props,
@@ -1156,6 +1286,34 @@ do
 				Enum.Material.Grass,
 				DECOR
 			)
+		end
+	end
+	-- Forest-floor clutter (mesh props only): stumps, fallen logs, mushroom clusters, pebbles.
+	if hasAsset("Stump_Short") then
+		local clutter = {
+			{ "Stump_Short", 3 },
+			{ "Stump_Branch", 3.6 },
+			{ "Log_Fallen", 3 },
+			{ "Mushrooms_Brown_Cluster", 2.2 },
+			{ "Mushrooms_Red_Cluster", 1.8 },
+			{ "Mushrooms_Golden_Cluster", 2 },
+			{ "Rock_Pebble", 1.4 },
+		}
+		for n = 1, 160 do
+			local pos = spotIn(LAYOUT.clearingRadius + 4, LAYOUT.mapRadius - 14, 4)
+			if pos ~= nil then
+				local what = clutter[rng:NextInteger(1, #clutter)]
+				asset(
+					props,
+					what[1],
+					what[2] * rng:NextNumber(0.8, 1.3),
+					CFrame.new(pos) * CFrame.Angles(0, rng:NextNumber(0, TAU), 0),
+					DECOR
+				)
+			end
+			if n % 60 == 0 then
+				task.wait()
+			end
 		end
 	end
 	for _ = 1, 24 do
