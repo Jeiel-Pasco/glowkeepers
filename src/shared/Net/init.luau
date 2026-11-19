@@ -103,6 +103,32 @@ Net.remotes = {
 		args = { { type = "enum", values = { "glow", "embers" } } },
 		rate = { perSecond = 2, burst = 4 },
 	},
+	-- Decorations (§18): x and z are studs from the DecorZone centre; the server checks the rest.
+	DecorBuy = { dir = "c2s", args = { { type = "string", maxLen = 32 } }, rate = { perSecond = 5, burst = 8 } },
+	DecorPlace = {
+		dir = "c2s",
+		args = {
+			{ type = "string", maxLen = 32 },
+			{ type = "integer", min = -12, max = 12 },
+			{ type = "integer", min = -12, max = 12 },
+			{ type = "integer", min = 0, max = 3 },
+		},
+		rate = { perSecond = 10, burst = 10 },
+	},
+	DecorRemove = {
+		dir = "c2s",
+		args = {
+			{ type = "string", maxLen = 32 },
+			{ type = "integer", min = -12, max = 12 },
+			{ type = "integer", min = -12, max = 12 },
+		},
+		rate = { perSecond = 10, burst = 10 },
+	},
+	SetBaseName = {
+		dir = "c2s",
+		args = { { type = "integer", min = 1, max = 64 }, { type = "integer", min = 1, max = 64 } },
+		rate = { perSecond = 0.2, burst = 1 },
+	}, -- preset adjective and noun indices
 	DropShield = { dir = "c2s", args = {}, rate = { perSecond = 1, burst = 2 } }, -- ends the sender's new-player shield (they said yes to stealing)
 	Catch = { dir = "c2s", args = { { type = "string", maxLen = 16 } }, rate = { perSecond = 4, burst = 4 } }, -- wildId
 	-- Hold to revive a downed player (by userId; Studio test players have negative ids).
