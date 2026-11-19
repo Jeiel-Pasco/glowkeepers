@@ -17,6 +17,7 @@ local ORDER = {
 	"GlowlingService",
 	"RollService",
 	"ForestService",
+	"StalkerService",
 	"IncomeService",
 	"PlotService",
 	"StealService",

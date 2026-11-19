@@ -133,7 +133,7 @@ Client intent ──► Net (type check, rate limit) ──► Service (rules, s
 | LockService | Base Lock: 60 s lock then 90 s recharge (a Lock Charge skips it), none at night, pushes outsiders out of a locked zone at 10 Hz | 2 |
 | CampfireService | Fire meter, wood and shard pickups, feeding, the dawn result | 2 |
 | ForestService | Wild spawn waves, catch validation, tutorial-only spawns | 2 |
-| StalkerService | Stalker NPC state machine and pathfinding (built by GS, runs on the server) | 2 |
+| StalkerService | Stalker NPC: the brain is `Shared.Stalker` (Dormant, Prowl, Stalk, Lunge, Retreat); 10 Hz sensing; kinematic, server-owned movement, straight on line of sight, else a PathfindingService path recomputed every 0.5 s; first-night near-miss | 2 |
 | DownedService | Downed, bleed-out, revive holds, spectating until dawn | 2 |
 | RebirthService | Threshold check, wipe rules, Star grant | 4 |
 | GlowdexService | Entries, page tiers, rewards, odds tab data | 4 |
@@ -159,7 +159,7 @@ Client intent ──► Net (type check, rate limit) ──► Service (rules, s
 | CycleFXController | Lighting, Atmosphere and ColorCorrection tweens; dusk sky; night darkness |
 | GlowlingRenderer | Builds Glowling models from plot and wild state; picks which ones get real lights by brightness and distance; LOD |
 | RollRevealController | Roll reel showing the near-miss tier, stingers, and server announcements for Mythic and above |
-| StalkerFXController | Heartbeat layer by distance, vignette, telegraph cues, Calm-mode variants |
+| StalkerFXController | Screen-edge vignette (faint when the Stalker is near, growing through a stalk on this player, full at the lunge), halved in Calm mode; the heartbeat layer waits for its sound asset |
 | TutorialController | Both FTUE paths, arrows, guide Wisp, funnel analytics |
 | ShopUI / InventoryUI / GlowdexUI / RebirthUI / TradeUI / DecorController / QuestUI / NightPassUI / StoreUI | One screen each, built from Studio templates |
 | GoalTrackerController | Shows the next 3 goals (GAME_SYSTEMS §19) |
@@ -264,7 +264,7 @@ export type Profile = {
 | Catches left | The player | Player attribute `CatchesLeft` (nil by day) | On change |
 | Carrying | Everyone | Character attributes `CarrySp`, `CarryR`, `CarryM` and `CarryFrom` (the victim's userId) for a stolen Glowling, or `CarryFuel` (`"wood"`); `GrabUntil` (server time a grab's hold ends) while grabbing; `RunSpeed` while carrying or chase-boosted | On change |
 | Downed and revive | Everyone | Character attributes `Life` (`"downed"` or `"wisp"`; nil = alive), `BleedUntil` (server time; nil while a revive holds it), `ReviveUntil` on the reviver, `SafeUntil` after a revive | On change |
-| Stalker | Everyone | Server-owned model, replicated by the engine | Engine |
+| Stalker | Everyone | Server-owned model `Stalker` (streaming Persistent, only at night), with attributes `State`, `Target` (userId while stalking or lunging) and `LungeAt` (server time) | Engine; attributes on change |
 | Announcements and toasts | All, or one player | `Announce`, `Toast` | On event |
 
 ### 6a. Map contract
