@@ -64,6 +64,11 @@ Net.remotes = {
 	GrabStart = { dir = "c2s", args = { PLOT, PAD }, rate = { perSecond = 2, burst = 4 } },
 	GrabCancel = { dir = "c2s", args = {}, rate = { perSecond = 2, burst = 4 } },
 	Lock = { dir = "c2s", args = {}, rate = { perSecond = 1, burst = 2 } }, -- Base Lock, or a Lock Charge to skip the recharge
+	ShopBuy = {
+		dir = "c2s",
+		args = { { type = "enum", values = { "lure1", "lure2", "lure3", "lure4" } } },
+		rate = { perSecond = 5, burst = 8 },
+	}, -- a lure of rarity floor 1..4 (§8)
 	UpgradeBuy = {
 		dir = "c2s",
 		args = { { type = "enum", values = { "lantern", "boots", "slots" } }, { type = "boolean", optional = true } },

@@ -67,6 +67,7 @@ function Schema.template(): any
 		stars = 0,
 		up = { lantern = 0, boots = 0, slots = 0 },
 		lockCharges = 0,
+		shop = { window = 0, bought = { 0, 0, 0, 0 } }, -- lures bought this restock window (§8)
 		glowlings = {},
 		display = {},
 		vault = {},
