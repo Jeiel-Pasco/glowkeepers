@@ -31,6 +31,7 @@ local Progress = require(script.Parent:WaitForChild("Progress"))
 local CycleService = require(script.Parent:WaitForChild("CycleService"))
 local DownedService = require(script.Parent:WaitForChild("DownedService"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
+local LiveConfigService = require(script.Parent:WaitForChild("LiveConfigService"))
 
 local TICK_SECONDS = 0.25 -- 4 Hz
 local DEFAULT_FEED_RADIUS = 10
@@ -164,7 +165,9 @@ local function dawn()
 		end
 		local pieces = fed[player] or 0
 		local revives = DownedService.revives(player)
-		local embers = Fire.dawnEmbers(economy, survived, finalLevel, revives, pieces)
+		local embers = math.floor(
+			Fire.dawnEmbers(economy, survived, finalLevel, revives, pieces) * LiveConfigService.mult("embersMult")
+		)
 		local glowLost = 0
 		data.embers += embers
 		if survived then

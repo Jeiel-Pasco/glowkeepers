@@ -17,6 +17,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local Economy = require(Shared:WaitForChild("Economy"))
 local Env = require(Shared:WaitForChild("Env"))
+local Events = require(Shared:WaitForChild("Events"))
 local Roll = require(Shared:WaitForChild("Roll"))
 local Types = require(Shared:WaitForChild("Types"))
 local economy = require(Config:WaitForChild("economy")) :: any
@@ -24,6 +25,7 @@ local speciesConfig = require(Config:WaitForChild("species")) :: any
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
+local LiveConfigService = require(script.Parent:WaitForChild("LiveConfigService"))
 local CampfireService = require(script.Parent:WaitForChild("CampfireService"))
 local InventoryService = require(script.Parent:WaitForChild("InventoryService"))
 local GlowlingService = require(script.Parent:WaitForChild("GlowlingService"))
@@ -52,11 +54,13 @@ function RollService.luck(player: Player): number
 	if data == nil then
 		return 1
 	end
-	return Economy.luck(economy, data.up.lantern, data.stars, { fireSurvived = CampfireService.survivedLastNight() })
+	local luck =
+		Economy.luck(economy, data.up.lantern, data.stars, { fireSurvived = CampfireService.survivedLastNight() })
+	return luck * LiveConfigService.mult("luckMult") -- an event's luck boost (§21)
 end
 
 local function grant(player: Player, tier: number, poolName: string, src: string, species: string?): Types.Glowling?
-	local result = Roll.finish(economy, tier, rng)
+	local result = Roll.finish(economy, tier, rng, Events.mutationFlags(LiveConfigService.event()))
 	local record = GlowlingService.create(player, {
 		sp = species or Roll.species(pool(poolName), rng),
 		r = result.r,
@@ -82,7 +86,9 @@ end
 
 -- Picks a species from a pool: ForestService shows a wild's species before it's caught.
 function RollService.species(poolName: string): string
-	return Roll.species(pool(poolName), rng)
+	-- Today's featured Deepwood species has 2× weight (§21).
+	local featured = Events.featured(speciesConfig, os.time())
+	return Events.pickSpecies(pool(poolName), featured, economy.events.featuredWeight, rng)
 end
 
 -- A night catch from `poolName` ("Clearing" in the forest, "Deepwood" past it), with pity (§5).
