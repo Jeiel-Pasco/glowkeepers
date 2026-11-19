@@ -11,6 +11,7 @@ local ORDER = {
 	"Progress",
 	"LiveConfigService",
 	"DataService",
+	"ModerationService",
 	"GamePassService",
 	"PolicyGate",
 	"SettingsService",

@@ -220,5 +220,7 @@
   "revive":  { "holdSeconds": 3, "range": 8, "bleedOutSeconds": 30, "safeSeconds": 3 },
   "embers":  { "surviveBase": 10, "perFireTenPct": 1, "perRevive": 5, "reviveCap": 4, "perPiece": 1, "pieceCap": 6, "failConsolation": 3, "friendBonusPer": 0.10, "friendBonusCap": 0.30 },
   "trade":   { "minStars": 3, "minPlayDays": 3, "minAccountAgeDays": 7, "maxPerSide": 4, "confirmDelay": 5, "escrowSeconds": 120,
-               "feeByRarity": [1, 2, 5, 10, 25, 50, 100], "tradeLockHours": 24, "maxPerDay": 10 }
+               "feeByRarity": [1, 2, 5, 10, 25, 50, 100], "tradeLockHours": 24, "maxPerDay": 10 },
+  "moderation": { "windowSeconds": 600, "kickAt": 10, "logKeep": 50,
+                  "points": { "flood": 3, "invalid": 2, "rejected": 1, "Carry": 4 } }
 }

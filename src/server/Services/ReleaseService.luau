@@ -40,6 +40,9 @@ local function onRelease(player: Player, ids: { string })
 	end
 	local ok, why = Inventory.canRelease(data, ids, InventoryService.heldIds(player))
 	if not ok then
+		if why == "not_owned" or why == "duplicate" then
+			NetServer.reject(player, "Release", why)
+		end
 		local text = if why ~= nil then REJECT_TEXT[why] else nil
 		if text ~= nil and player.Parent == Players then
 			NetServer.send(player, "Toast", text, "bad")
