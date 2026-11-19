@@ -137,4 +137,21 @@ H.test("species: unique lowercase ids in known pools", function()
 	H.eq(pools.Deepwood, 24, "Deepwood species (CONTENT §A3)")
 end)
 
+H.test("species: every Glowling has a family and a rig", function()
+	local families = { Lantern = 0, Ember = 0, Crystal = 0, Grove = 0, Celestial = 0, Shadow = 0 }
+	local rigs = { tiny = true, small = true, medium = true, large = true }
+	for _, entry in species.species do
+		H.ok(families[entry.family] ~= nil, `{entry.id}: unknown family {tostring(entry.family)}`)
+		H.ok(rigs[entry.rig] == true, `{entry.id}: unknown rig {tostring(entry.rig)}`)
+		families[entry.family] += 1
+	end
+	-- CONTENT §A3 family counts
+	H.eq(families.Lantern, 7)
+	H.eq(families.Ember, 6)
+	H.eq(families.Crystal, 6)
+	H.eq(families.Grove, 10)
+	H.eq(families.Celestial, 8)
+	H.eq(families.Shadow, 3)
+end)
+
 H.finish("config")

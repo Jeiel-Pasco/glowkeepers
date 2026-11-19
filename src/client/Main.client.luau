@@ -12,6 +12,7 @@ local ORDER = {
 	"InputController",
 	"MovementController",
 	"CycleFXController",
+	"GlowlingRenderer",
 	"PlotController",
 	"CampfireController",
 	"ForestController",

@@ -1,8 +1,8 @@
 --!strict
 -- Every plot's replicated state (TECH_SPEC §6): PlotSnapshot once, then PlotDelta patches,
--- applied with Shared.Plots so client and server share one shape. GlowlingRenderer (GS) will
--- build the real models from this; until then each occupied pad gets a placeholder orb,
--- coloured by rarity, the owner's plot sign shows the base name and their name, a shielded plot
+-- applied with Shared.Plots so client and server share one shape. Each occupied pad gets a
+-- GlowlingRenderer model (rebuilt only when the pad changes; the rarest 8 get a light), the
+-- owner's plot sign shows the base name and their name, a shielded plot
 -- gets a bubble, and each placed decoration is a placeholder block on the DecorZone. The place streams, so a
 -- plot is drawn again when its pads or sign stream in.
 
@@ -15,18 +15,11 @@ local Decor = require(Shared:WaitForChild("Decor"))
 local Plots = require(Shared:WaitForChild("Plots"))
 local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
 local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
+local RarityLook = require(Shared:WaitForChild("RarityLook"))
 local NetClient = require(script.Parent.Parent:WaitForChild("Net"):WaitForChild("NetClient"))
+local GlowlingRenderer = require(script.Parent:WaitForChild("GlowlingRenderer"))
 
--- Placeholder colours, Common → Secret.
-local RARITY_COLORS = {
-	Color3.fromRGB(220, 220, 210),
-	Color3.fromRGB(120, 230, 120),
-	Color3.fromRGB(90, 160, 255),
-	Color3.fromRGB(190, 110, 255),
-	Color3.fromRGB(255, 190, 60),
-	Color3.fromRGB(255, 80, 140),
-	Color3.fromRGB(120, 255, 255),
-}
+local LIGHT_CAP = 8 -- PointLights per plot (Design & Asset Bible §8)
 
 local SHIELD_COLOR = Color3.fromRGB(150, 220, 255)
 local DECOR_COLOR = Color3.fromRGB(170, 140, 100)
@@ -37,6 +30,8 @@ PlotController.Changed = Signal.new() -- (plotId, view)
 local plots: { [number]: Plots.View } = {}
 local placeholders: Folder? = nil
 local renderQueued: { [number]: boolean } = {}
+-- Drawn Glowlings per plot and pad: rebuilt only when what is on the pad changes.
+local padModels: { [number]: { [string]: { key: string, model: Model } } } = {}
 
 function PlotController.get(plotId: number): Plots.View?
 	return plots[plotId]
@@ -62,6 +57,57 @@ local function plotModel(plotId: number): Instance?
 	return nil
 end
 
+local function clearPads(plotId: number)
+	for _, drawn in padModels[plotId] or {} do
+		drawn.model:Destroy()
+	end
+	padModels[plotId] = nil
+end
+
+local function renderPads(plotId: number, view: Plots.View, slots: Instance)
+	local folder = placeholders
+	if folder == nil then
+		return
+	end
+	local drawn = padModels[plotId] or {}
+	padModels[plotId] = drawn
+	local lights = RarityLook.lightPicks(view.pads, LIGHT_CAP)
+	local seen: { [string]: boolean } = {}
+	for _, pad in slots:GetChildren() do
+		local n = pad:GetAttribute("Slot")
+		local slot = if type(n) == "number" then tostring(n) else nil
+		local glowling = if slot ~= nil then view.pads[slot] else nil
+		if slot ~= nil and glowling ~= nil and pad:IsA("BasePart") then
+			seen[slot] = true
+			local light = lights[slot] == true
+			local key = `{glowling.sp}|{glowling.r}|{glowling.m}|{glowling.s}|{light}|{pad.Position}`
+			local old = drawn[slot]
+			if old == nil or old.key ~= key then
+				if old ~= nil then
+					old.model:Destroy()
+				end
+				local model = GlowlingRenderer.build({
+					sp = glowling.sp,
+					r = glowling.r,
+					m = glowling.m,
+					s = glowling.s,
+					light = light,
+				})
+				model.Name = `Plot{plotId}Pad{slot}`
+				GlowlingRenderer.place(model, pad.CFrame * CFrame.new(0, pad.Size.Y / 2, 0))
+				model.Parent = folder
+				drawn[slot] = { key = key, model = model }
+			end
+		end
+	end
+	for slot, old in drawn do
+		if not seen[slot] then
+			old.model:Destroy()
+			drawn[slot] = nil
+		end
+	end
+end
+
 local function render(plotId: number)
 	local folder = placeholders
 	local view = plots[plotId]
@@ -74,6 +120,7 @@ local function render(plotId: number)
 	end
 	local model = plotModel(plotId)
 	if model == nil then
+		clearPads(plotId)
 		return -- streamed out; rendered again when it streams in
 	end
 
@@ -87,6 +134,7 @@ local function render(plotId: number)
 
 	local slots = model:FindFirstChild("Slots")
 	if slots == nil then
+		clearPads(plotId)
 		return
 	end
 	local group = Instance.new("Folder")
@@ -127,24 +175,7 @@ local function render(plotId: number)
 			end
 		end
 	end
-	for _, pad in slots:GetChildren() do
-		local n = pad:GetAttribute("Slot")
-		local glowling = if type(n) == "number" then view.pads[tostring(n)] else nil
-		if glowling ~= nil and pad:IsA("BasePart") then
-			local orb = Instance.new("Part")
-			orb.Name = `Pad{n}`
-			orb.Shape = Enum.PartType.Ball
-			orb.Size = Vector3.one * 1.6 * glowling.s
-			orb.CFrame = pad.CFrame + Vector3.new(0, 1.5, 0)
-			orb.Color = RARITY_COLORS[glowling.r] or RARITY_COLORS[1]
-			orb.Material = Enum.Material.Neon
-			orb.Anchored = true
-			orb.CanCollide = false
-			orb.CanTouch = false
-			orb.CanQuery = false
-			orb.Parent = group
-		end
-	end
+	renderPads(plotId, view, slots)
 	group.Parent = folder
 end
 
