@@ -8,6 +8,7 @@ local NetClient = require(Client:WaitForChild("Net"):WaitForChild("NetClient"))
 
 -- Explicit order: a controller may use the controllers listed before it.
 local ORDER = {
+	"ThemeController", -- first: skins every screen the others build
 	"StateController",
 	"InputController",
 	"MovementController",
