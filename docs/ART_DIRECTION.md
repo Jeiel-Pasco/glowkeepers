@@ -37,3 +37,21 @@ in the same forest as the low-poly trees.
 | spirit | 150, 210, 200 | spirit tree, crystals (Neon tips only) |
 
 The code copy of this palette is `Shared.Palette`.
+
+## Glowlings (the exception)
+
+Glowlings are the product, so they follow the Design & Asset Bible's species art (figures 3.1 and
+3.2), not the low-poly prop rules above. `GlowlingBodies` sculpts one chibi body per species
+from smooth ellipsoids:
+
+- **Chibi proportions:** a big round head on a small body with stubby legs, or one round body
+  that is also the head.
+- **One shared face:** big glossy eyes with two white highlights, a tiny mouth and soft blush.
+  Some species get coloured eyes (owl, lynx, cat, fox) or glowing eyes (raven).
+- **One signature glowing feature per species,** in its family's glow colour: Glimmermouse's
+  bulb tail, Puffwick's candle, Mushpup's cap spots, Antlerlight's lanterns.
+- **Material:** SmoothPlastic. Glass is used for slime, jelly and wing membranes; Neon is used
+  only for the glowing feature and the eye highlights.
+- **Rarity:** the renderer dresses the accent zones (ears, wings, fins): a rim at Uncommon,
+  glass at Rare+, gold at Legendary. It places crowns, wings and inlays from the anchors each
+  body returns.

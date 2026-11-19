@@ -1,11 +1,12 @@
 --!strict
 -- Builds Glowling models (Design & Asset Bible §2–3, D24) and animates them.
 --
--- A Glowling is a stand-in creature on one of four rigs (tiny / small / medium / large, from
--- config/species.json) dressed by Shared.RarityLook for its rarity: Form I–III, glow parts in its
--- family colour, and the extras each tier adds. Mutations: Golden (gold foil body), Rainbow (the
--- glow cycles hue), Moonlit (silver body and glow). If ReplicatedStorage.Assets.Species.<id>
--- exists (an artist's model), it replaces the stand-in body and the rarity extras go on top.
+-- A Glowling is its species' sculpted chibi body (GlowlingBodies) on one of four rig sizes
+-- (tiny / small / medium / large, from config/species.json), dressed by Shared.RarityLook for
+-- its rarity: Form I–III, glow parts in its family colour, and the extras each tier adds, placed
+-- from the body's anchors. Mutations: Golden (gold foil body), Rainbow (the glow cycles hue),
+-- Moonlit (silver body and glow). If ReplicatedStorage.Assets.Species.<id> exists (an artist's
+-- model), it replaces the sculpted body and the rarity extras go on top.
 --
 -- Model layout: an anchored "Body" root (the PrimaryPart) with every creature part welded to it,
 -- ground pieces (halo, sigil) welded too, and an optional anchored "Orbit" root for the rune ring
@@ -22,6 +23,7 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local RarityLook = require(Shared:WaitForChild("RarityLook"))
+local GlowlingBodies = require(script.Parent:WaitForChild("GlowlingBodies"))
 local economy = require(Config:WaitForChild("economy")) :: any
 local speciesConfig = require(Config:WaitForChild("species")) :: any
 
@@ -50,7 +52,6 @@ type Live = {
 
 local ANIMATE_RANGE = 160 -- studs from the camera
 local SPARKLE = "rbxasset://textures/particles/sparkles_main.dds"
-local EYE = Color3.fromRGB(24, 22, 34)
 
 local GlowlingRenderer = {}
 
@@ -133,15 +134,14 @@ function GlowlingRenderer.build(spec: Spec): Model
 
 	local H = (RarityLook.RIGS[rig] or RarityLook.RIGS.small) * look.scale * math.clamp(spec.s, 0.5, 2)
 	local glowColor = c3(RarityLook.glow(family))
-	local tone = c3(RarityLook.tone(spec.sp))
-	local material = if look.smooth then Enum.Material.SmoothPlastic else Enum.Material.Fabric
+	local tint: Color3? = nil
+	local material = Enum.Material.SmoothPlastic
 	if mutationId == "Golden" then
-		tone, material = c3(RarityLook.GOLD), Enum.Material.Foil
+		tint, material = c3(RarityLook.GOLD), Enum.Material.Foil
 	elseif mutationId == "Moonlit" then
-		tone, material, glowColor = c3(RarityLook.MOONLIT), Enum.Material.SmoothPlastic, c3(RarityLook.MOONLIT)
+		tint, glowColor = c3(RarityLook.MOONLIT), c3(RarityLook.MOONLIT)
 	end
-	local dark = tone:Lerp(Color3.new(0, 0, 0), 0.35)
-	local up = look.levitate
+	local up = look.levitate + (GlowlingBodies.FLOAT[spec.sp] or 0) * H
 
 	local model = Instance.new("Model")
 	model.Name = spec.sp
@@ -150,14 +150,18 @@ function GlowlingRenderer.build(spec: Spec): Model
 		return CFrame.new(x * H, y * H + up, z * H)
 	end
 
-	local body = newPart(model, nil, "Body", Enum.PartType.Ball, Vector3.one * 0.75 * H, at(0, 0.45, 0), tone, material)
+	-- An invisible root every piece is welded to (the animated part).
+	local body =
+		newPart(model, nil, "Body", Enum.PartType.Ball, Vector3.one * 0.3 * H, at(0, 0.45, 0), glowColor, material, 1)
+	body.PivotOffset = body.CFrame:Inverse() -- the model's pivot is the ground under its feet
 	model.PrimaryPart = body
+	local anchors: GlowlingBodies.Anchors =
+		{ head = Vector3.new(0, 0.8, -0.2), top = 1.15, back = Vector3.new(0, 0.6, 0.14), width = 0.3 }
 	local asset = ReplicatedStorage:FindFirstChild("Assets")
 	local folder = if asset ~= nil then asset:FindFirstChild("Species") else nil
 	local art = if folder ~= nil then folder:FindFirstChild(spec.sp) else nil
 	if art ~= nil and art:IsA("Model") then
-		-- An artist's model: hide the stand-in body and weld the art over it.
-		body.Transparency = 1
+		-- An artist's model replaces the sculpted body; the rarity extras go on top.
 		local clone = art:Clone()
 		local _, extents = clone:GetBoundingBox()
 		if extents.Y > 0 then
@@ -175,52 +179,39 @@ function GlowlingRenderer.build(spec: Spec): Model
 		end
 		clone.Parent = model
 	else
-		local function piece(
-			name: string,
-			size: number,
-			x: number,
-			y: number,
-			z: number,
-			color: Color3,
-			mat: Enum.Material?
-		)
-			return newPart(
-				model,
-				body,
-				name,
-				Enum.PartType.Ball,
-				Vector3.one * size * H,
-				at(x, y, z),
-				color,
-				mat or material
-			)
-		end
-		if look.twoTone then
-			piece("Belly", 0.6, 0, 0.4, -0.13, tone:Lerp(Color3.new(1, 1, 1), 0.45))
-		end
-		piece("Head", 0.55, 0, 0.85, -0.25, tone)
-		for _, side in { -1, 1 } do
-			piece("Eye", 0.12, side * 0.11, 0.9, -0.48, EYE, Enum.Material.SmoothPlastic)
-			piece("Glint", 0.05, side * 0.09, 0.93, -0.54, Color3.new(1, 1, 1), Enum.Material.Neon)
-			local ear = piece("Ear", 0.22, side * 0.17, 1.1, -0.2, tone)
-			if look.glass or mutationId == "Moonlit" then
-				ear.Material, ear.Color, ear.Transparency = Enum.Material.Glass, glowColor, 0.25
-			end
-			for _, z in { -0.18, 0.18 } do
-				piece("Foot", 0.18, side * 0.2, 0.09, z, dark)
+		local accents: { BasePart } = {}
+		anchors = GlowlingBodies.build(spec.sp, {
+			model = model,
+			root = body,
+			H = H,
+			up = up,
+			glow = glowColor,
+			glows = glow,
+			accents = accents,
+			tint = tint,
+			mat = material,
+		})
+		-- Rarity on the accent zones (ears, wings, fins): a soft rim, then glass, then gold trim.
+		for _, part in accents do
+			if look.gold then
+				part.Color, part.Material = part.Color:Lerp(c3(RarityLook.GOLD), 0.6), Enum.Material.Metal
+			elseif look.glass or mutationId == "Moonlit" then
+				part.Color, part.Material, part.Transparency = glowColor, Enum.Material.Glass, 0.25
+				table.insert(glow, part)
+			elseif look.rim then
+				part.Color = part.Color:Lerp(glowColor, 0.45)
 			end
 		end
-		piece("Tail", 0.22, 0, 0.5, 0.42, tone)
-		table.insert(glow, piece("Tip", 0.2, 0, 0.72, 0.56, glowColor, Enum.Material.Neon))
 		if look.inlays then
 			for _, side in { -1, 1 } do
+				local back = anchors.back
 				local stripe = newPart(
 					model,
 					body,
 					"Inlay",
 					Enum.PartType.Block,
-					Vector3.new(0.07, 0.05, 0.32) * H,
-					at(side * 0.12, 0.8, 0.06),
+					Vector3.new(0.05, 0.04, 0.3) * H,
+					at(back.X + side * anchors.width * 0.35, back.Y + 0.01, back.Z) * CFrame.Angles(0, 0, side * 0.3),
 					glowColor,
 					Enum.Material.Neon
 				)
@@ -229,35 +220,34 @@ function GlowlingRenderer.build(spec: Spec): Model
 		end
 	end
 
-	if look.rim then
-		local collar = newPart(
-			model,
-			body,
-			"Collar",
-			Enum.PartType.Cylinder,
-			Vector3.new(0.07, 0.62, 0.62) * H,
-			at(0, 0.66, -0.16) * FLAT,
-			if look.gold then c3(RarityLook.GOLD) else glowColor,
-			Enum.Material.Neon
-		)
-		if not look.gold then
-			table.insert(glow, collar)
-		end
-	end
+	local head, crownY, back = anchors.head, anchors.top, anchors.back
 	if look.crown then
-		for i, x in { -0.12, 0, 0.12 } do
-			local tall = if i == 2 then 0.2 else 0.13
-			newPart(
+		for i, x in { -0.1, 0, 0.1 } do
+			local tall = if i == 2 then 0.18 else 0.12
+			local spike = newPart(
 				model,
 				body,
 				"Crown",
 				Enum.PartType.Block,
-				Vector3.new(0.07, tall, 0.07) * H,
-				at(x, 1.12 + tall / 2, -0.25),
+				Vector3.new(0.06, tall, 0.06) * H,
+				at(head.X + x, crownY + 0.04 + tall / 2, head.Z),
 				c3(RarityLook.GOLD),
 				Enum.Material.Neon
 			)
+			local mesh = Instance.new("SpecialMesh")
+			mesh.MeshType = Enum.MeshType.Sphere
+			mesh.Parent = spike
 		end
+		newPart(
+			model,
+			body,
+			"CrownBand",
+			Enum.PartType.Cylinder,
+			Vector3.new(0.05, 0.3, 0.3) * H,
+			at(head.X, crownY + 0.04, head.Z) * FLAT,
+			c3(RarityLook.GOLD),
+			Enum.Material.Metal
+		)
 	end
 	for i = 1, look.wings do
 		local side = if i % 2 == 1 then -1 else 1
@@ -269,12 +259,15 @@ function GlowlingRenderer.build(spec: Spec): Model
 			"Wing",
 			Enum.PartType.Block,
 			size * H,
-			at(side * (0.36 + pair * 0.04), 0.82 - pair * 0.12, 0.12 + pair * 0.06)
+			at(side * (anchors.width + 0.04 + pair * 0.04), back.Y + 0.14 - pair * 0.12, back.Z + pair * 0.06)
 				* CFrame.Angles(0, side * 0.35, side * (0.45 + pair * 0.25)),
 			glowColor,
 			Enum.Material.Glass,
 			0.35
 		)
+		local mesh = Instance.new("SpecialMesh")
+		mesh.MeshType = Enum.MeshType.Sphere
+		mesh.Parent = wing
 		table.insert(glow, wing)
 	end
 	local ground = not spec.carried
