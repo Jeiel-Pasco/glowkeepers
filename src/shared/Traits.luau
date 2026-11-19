@@ -2,9 +2,10 @@
 -- Pet traits on placed Glowlings (GAME_SYSTEMS §31, D20–D23). Pure: callers pass config and
 -- which species sits on which pad, so the server, the client and Lune all run the same rules.
 --
--- v1: family link, Harmonizer (neighbours, or the whole plot for Skywhale Calf and Lunadrake),
--- the ×cap on the combined Glow/s multiplier, and Guardian grab time (Elder Sapling: every
--- display pad). Infuser Overcharge, Forager pouches and the night companion traits come later.
+-- Family link, Harmonizer (neighbours, or the whole plot for Skywhale Calf and Lunadrake),
+-- Infuser Overcharge (Aurora Lynx: up to 6 pads), the ×cap on the combined Glow/s multiplier,
+-- Guardian grab time (Elder Sapling: every display pad) and Forager pouches. The night
+-- companion traits come later.
 --
 -- Pads use the map's Slot numbers (Inventory, TECH_SPEC §6a). PAD_POS mirrors
 -- tools/BuildGreybox.luau: pads 1–6 in two side strips, pads 7–30 in three rows of eight, 4 studs
@@ -68,7 +69,12 @@ end
 
 -- The Glow/s multiplier of every occupied pad: family link × Harmonizer × whole-plot bonus,
 -- at most cfg.traits.cap.
-function Traits.multipliers(cfg: any, species: { [string]: Species }, placed: Placed): { [number]: number }
+function Traits.multipliers(
+	cfg: any,
+	species: { [string]: Species },
+	placed: Placed,
+	overcharged: { [number]: any }?
+): { [number]: number }
 	local t = cfg.traits
 	local plotGlow = 0 -- whole-plot bonuses don't stack: the highest counts
 	for _, id in placed do
@@ -95,7 +101,8 @@ function Traits.multipliers(cfg: any, species: { [string]: Species }, placed: Pl
 		end
 		local link = 1 + math.min(t.familyLinkMax, t.familyLinkPer * same)
 		local harmony = if harmonized then 1 + t.harmonizer else 1
-		result[pad] = math.min(t.cap, link * harmony * (1 + plotGlow))
+		local over = if overcharged ~= nil and overcharged[pad] ~= nil then t.infuser.mult else 1
+		result[pad] = math.min(t.cap, link * harmony * (1 + plotGlow) * over)
 	end
 	return result
 end
@@ -133,6 +140,115 @@ function Traits.grabBonus(
 		end
 	end
 	return math.min(t.guardianMax, localBonus + plotBonus)
+end
+
+-- Timers for Infusers and Foragers, and the Overcharges running, for one plot. Not saved: a
+-- rejoin starts the timers again (§31). `infuse`/`forage` are pad → { id, at } (the Glowling the
+-- timer belongs to, and when it fires next); `over` is pad → { id, ends }.
+export type Timers = {
+	infuse: { [number]: { id: string, at: number } },
+	forage: { [number]: { id: string, at: number } },
+	over: { [number]: { id: string, ends: number } },
+}
+
+function Traits.newTimers(): Timers
+	return { infuse = {}, forage = {}, over = {} }
+end
+
+-- Keeps `timers[pad]` for the Glowling now on the pad; a new Glowling starts a fresh period.
+-- Returns true when the timer is due (and restarts it).
+local function due(
+	list: { [number]: { id: string, at: number } },
+	pad: number,
+	id: string,
+	every: number,
+	now: number
+): boolean
+	local timer = list[pad]
+	if timer == nil or timer.id ~= id then
+		list[pad] = { id = id, at = now + every }
+		return false
+	end
+	if now >= timer.at then
+		timer.at = now + every
+		return true
+	end
+	return false
+end
+
+-- Advances the timers to `now`. `ids` is pad → Glowling id, `placed` pad → species id (the same
+-- pads). Overcharges end after their time or when their Glowling leaves the pad; Infusers start
+-- new ones on a neighbour (Aurora Lynx: up to infuseTargets pads anywhere on the plot) that isn't
+-- already overcharged. Returns whether the set of Overcharges changed, and the Forager pads whose
+-- pouch is ready.
+function Traits.step(
+	cfg: any,
+	species: { [string]: Species },
+	placed: Placed,
+	ids: { [number]: string },
+	timers: Timers,
+	now: number,
+	rng: () -> number
+): (boolean, { number })
+	local t = cfg.traits
+	local changed = false
+	for pad, over in timers.over do
+		if now >= over.ends or ids[pad] ~= over.id then
+			timers.over[pad] = nil
+			changed = true
+		end
+	end
+	for _, list in { timers.infuse, timers.forage } do
+		for pad, timer in list do
+			if ids[pad] ~= timer.id then
+				list[pad] = nil
+			end
+		end
+	end
+
+	local function overcharge(candidates: { number }, count: number)
+		local free = {}
+		for _, pad in candidates do
+			if ids[pad] ~= nil and timers.over[pad] == nil then
+				table.insert(free, pad)
+			end
+		end
+		for _ = 1, math.min(count, #free) do
+			local k = math.min(#free, 1 + math.floor(rng() * #free))
+			local pad = table.remove(free, k) :: number
+			timers.over[pad] = { id = ids[pad], ends = now + t.infuser.seconds }
+			changed = true
+		end
+	end
+
+	local pouches = {}
+	local pads = {}
+	for pad in placed do
+		table.insert(pads, pad)
+	end
+	table.sort(pads) -- the same order every run, so a seeded rng gives the same result
+	for _, pad in pads do
+		local s = species[placed[pad]]
+		local id = ids[pad]
+		if s ~= nil and id ~= nil then
+			local a = apex(cfg, s.id)
+			if s.trait == "Infuser" then
+				local every = if a ~= nil and a.infuseEvery ~= nil then a.infuseEvery else t.infuser.everySeconds
+				if due(timers.infuse, pad, id, every, now) then
+					if a ~= nil and a.infuseTargets ~= nil then
+						overcharge(pads, a.infuseTargets)
+					else
+						overcharge(Traits.neighbours(pad), 1)
+					end
+				end
+			elseif s.trait == "Forager" then
+				if due(timers.forage, pad, id, t.forager.everySeconds, now) then
+					table.insert(pouches, pad)
+				end
+			end
+		end
+	end
+	return changed, pouches
 end
 
 return Traits

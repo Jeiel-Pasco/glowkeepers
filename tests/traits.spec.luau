@@ -106,4 +106,98 @@ H.test("floors come from minRarity", function()
 	H.eq(Traits.floor(cfg, species.lunadrake), 5)
 end)
 
+local function zero(): number
+	return 0
+end
+
+H.test("Infuser: Overcharge on a neighbour every 60 s, ×1.5 for 30 s", function()
+	local placed = { [8] = "glimmermouse", [9] = "mothlet" } -- Mothlet is a Lantern Infuser
+	local ids = { [8] = "a", [9] = "b" }
+	local timers = Traits.newTimers()
+	local changed = Traits.step(cfg, species, placed, ids, timers, 0, zero)
+	H.ok(not changed and next(timers.over) == nil, "nothing at once")
+	changed = Traits.step(cfg, species, placed, ids, timers, 59, zero)
+	H.ok(not changed, "not before 60 s")
+	changed = Traits.step(cfg, species, placed, ids, timers, 60, zero)
+	H.ok(changed and timers.over[8] ~= nil, "the neighbour is overcharged")
+	local m = Traits.multipliers(cfg, species, placed, timers.over)
+	H.ok(near(m[8], 1.05 * 1.5), `link × Overcharge {m[8]}`)
+	H.ok(near(m[9], 1.05), "the Infuser itself isn't")
+	H.ok(not Traits.step(cfg, species, placed, ids, timers, 89, zero), "still running")
+	H.ok(Traits.step(cfg, species, placed, ids, timers, 90, zero) and timers.over[8] == nil, "ends after 30 s")
+end)
+
+H.test("Overcharge ends when its Glowling leaves, and never stacks", function()
+	local placed = { [8] = "glimmermouse", [9] = "mothlet", [10] = "mothlet" }
+	local ids = { [8] = "a", [9] = "b", [10] = "c" }
+	local timers = Traits.newTimers()
+	Traits.step(cfg, species, placed, ids, timers, 0, zero)
+	Traits.step(cfg, species, placed, ids, timers, 60, zero)
+	local count = 0
+	for _ in timers.over do
+		count += 1
+	end
+	H.eq(count, 2, "two Infusers, two different targets") -- 9 overcharges 8, 10 overcharges 9
+	H.ok(timers.over[8] ~= nil and timers.over[9] ~= nil, "8 and 9")
+	placed[8], ids[8] = nil, nil
+	H.ok(Traits.step(cfg, species, placed, ids, timers, 61, zero), "changed")
+	H.eq(timers.over[8], nil, "moved away: over")
+	ids[9] = "z"
+	Traits.step(cfg, species, placed, ids, timers, 62, zero)
+	H.eq(timers.over[9], nil, "a different Glowling on the pad: over")
+end)
+
+H.test("Aurora Lynx overcharges up to 6 pads anywhere every 45 s", function()
+	local placed, ids = { [1] = "auroralynx" }, { [1] = "lynx" }
+	for pad = 7, 16 do
+		placed[pad], ids[pad] = "puffwick", `p{pad}`
+	end
+	local timers = Traits.newTimers()
+	Traits.step(cfg, species, placed, ids, timers, 0, zero)
+	H.ok(Traits.step(cfg, species, placed, ids, timers, 45, zero), "fires at 45 s")
+	local count = 0
+	for _ in timers.over do
+		count += 1
+	end
+	H.eq(count, 6)
+end)
+
+H.test("Forager: a pouch every 90 s", function()
+	local placed, ids = { [8] = "glimmermouse" }, { [8] = "a" }
+	local timers = Traits.newTimers()
+	local _, pouches = Traits.step(cfg, species, placed, ids, timers, 0, zero)
+	H.eq(#pouches, 0)
+	_, pouches = Traits.step(cfg, species, placed, ids, timers, 90, zero)
+	H.eq(pouches[1], 8)
+	_, pouches = Traits.step(cfg, species, placed, ids, timers, 120, zero)
+	H.eq(#pouches, 0, "once per period")
+	_, pouches = Traits.step(cfg, species, placed, ids, timers, 180, zero)
+	H.eq(pouches[1], 8)
+end)
+
+H.test("with Overcharge the cap holds (random plots)", function()
+	local state = 11
+	local function rand(): number
+		state = (state * 1103515245 + 12345) % 2147483648
+		return state / 2147483648
+	end
+	local hit = false
+	for _ = 1, 1000 do
+		local placed, over = {}, {}
+		for pad = 1, 30 do
+			if rand() < 0.8 then
+				placed[pad] = ids[1 + math.floor(rand() * #ids)]
+				if rand() < 0.5 then
+					over[pad] = true
+				end
+			end
+		end
+		for _, mult in Traits.multipliers(cfg, species, placed, over) do
+			H.ok(mult <= cfg.traits.cap + 1e-9, `over the cap: {mult}`)
+			hit = hit or near(mult, cfg.traits.cap)
+		end
+	end
+	H.ok(hit, "the cap is reached with Overcharge")
+end)
+
 H.finish("traits")
