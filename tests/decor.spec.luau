@@ -28,7 +28,7 @@ H.test("buy: price, or unknown / not_for_sale / max_owned / too_poor", function(
 	H.eq(Decor.canBuy(cfg, decor(), 100, "hedge"), 40)
 	H.eq(select(2, Decor.canBuy(cfg, decor(), 100, "nope")), "unknown")
 	H.eq(select(2, Decor.canBuy(cfg, decor(), 1000, "gift_lantern_arch")), "not_for_sale")
-	H.eq(select(2, Decor.canBuy(cfg, decor({ hedge = 10 }), 1000, "hedge")), "max_owned")
+	H.eq(select(2, Decor.canBuy(cfg, decor({ hedge = cfg.decor.maxPerItem }), 1000, "hedge")), "max_owned")
 	H.eq(select(2, Decor.canBuy(cfg, decor(), 39, "hedge")), "too_poor")
 end)
 

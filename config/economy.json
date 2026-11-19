@@ -78,8 +78,8 @@
   "decor": {
     "grid": 2,
     "zoneSize": 24,
-    "maxPlaced": 60,
-    "maxPerItem": 10,
+    "maxPlaced": 100,
+    "maxPerItem": 20,
     "items": [
       { "id": "string_lights",    "name": "String Lights",    "price": 40,  "w": 4, "d": 2 },
       { "id": "paper_lanterns",   "name": "Paper Lanterns",   "price": 50,  "w": 2, "d": 2 },
