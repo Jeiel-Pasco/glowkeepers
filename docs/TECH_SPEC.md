@@ -133,7 +133,7 @@ Client intent ──► Net (type check, rate limit) ──► Service (rules, s
 | UpgradeService | Lantern, Boots and Slots for Glow (one level or Buy max, `Economy.upgradePurchase`), Lock Charges for Glow or Embers (5 held); applies Boots to `RunSpeed` and tonight's catches, and Slots to the layout | 3 |
 | StealService | Grab, carry, tag, deliver, chase boost, victim cooldown, validation; Guardian grab-time bonus (`Shared.Traits`) | 2 |
 | LockService | Base Lock: 60 s lock then 90 s recharge (a Lock Charge skips it), none at night, pushes outsiders out of a locked zone at 10 Hz | 2 |
-| TutorialService | The FTUE (GAME_SYSTEMS §22): path and step bitmask in `ftue`, `FtueStep` attribute (`Shared.Ftue` picks the step), Free Lure and stash grants, the first night catch at least Rare (`FtueRareCatch`), onboarding funnel events | 3 |
+| TutorialService | The FTUE (GAME_SYSTEMS §22): path and step bitmask in `ftue`, `FtueStep` attribute (`Shared.Ftue` picks the step), Free Lure and stash grants, step 9's personal Rare wild (`ForestService.spawnFor`, id in the `FtueWild` attribute), onboarding funnel events | 3 |
 | ShieldService | New-player shield: 45 min of saved play time, ends early when its owner drops it to steal (or at the first rebirth, Phase 4); `Shielded` / `ShieldEndsAt` attributes; the plot view's `shield` | 3 |
 | CampfireService | Fire meter, wood and shard pickups, feeding, the dawn result | 2 |
 | ForestService | Wild spawn waves, catch validation, tutorial-only spawns | 2 |

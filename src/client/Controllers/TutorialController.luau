@@ -1,7 +1,7 @@
 --!strict
 -- The new-player tutorial on screen (GAME_SYSTEMS §22). TutorialService picks the step and
 -- publishes it as the Player attribute `FtueStep`; this draws it:
---   a banner low in the middle with what to do (it pulses after HINT_SECONDS without progress),
+--   a banner at the bottom with what to do (it pulses after HINT_SECONDS without progress),
 --   a guide Wisp that floats ahead of you toward the target, with a soft beam to it,
 --   the Free Lure (step 1): a lantern by you; the context button says "Open"
 --   the Wisp's Stash grab (step 5): next to the stash the context button says "Take"; hold it
@@ -29,6 +29,7 @@ local HINT_SECONDS = 20
 local HOLD_SECONDS = 1
 local STASH_REACH = 12
 local LURE_REACH = 12
+local LURE_FIRE_CLEAR = 10 -- studs from the fire's centre
 local WISP_LEAD = 5
 
 local TutorialController = {}
@@ -49,7 +50,7 @@ local TEXT: { [number]: string | (boolean) -> string } = {
 	function(carrying: boolean)
 		return if carrying then "Bring it to the fire!" else "Grab wood from a pile and feed the fire"
 	end,
-	"Catch a Glowling in the dark. Your first one is Rare!",
+	"A Rare Glowling by the fire, just for you. Catch it!",
 	"You survived the night! Next goal: Rebirth at 250K Glow ⭐",
 }
 
@@ -59,6 +60,7 @@ local wisp: Part? = nil
 local beam: Beam? = nil
 local toAttach: Attachment? = nil
 local lure: Model? = nil
+local lureBase: CFrame? = nil
 local shownStep: number? = nil
 local shownAt = 0
 local holdStarted: number? = nil
@@ -142,6 +144,11 @@ local function target(n: number, from: Vector3): Vector3?
 		return campfire()
 	elseif n == 8 then
 		return if carrying() then campfire() else nearestPile(from)
+	elseif n == 9 then
+		local id = Players.LocalPlayer:GetAttribute("FtueWild")
+		local wilds = workspace:FindFirstChild("Wilds")
+		local wild = if wilds ~= nil and id ~= nil then wilds:FindFirstChild(`Wild{id}`) else nil
+		return if wild ~= nil and wild:IsA("Model") then wild:GetPivot().Position else nil
 	end
 	return nil
 end
@@ -165,8 +172,23 @@ local function buildLure(at: CFrame): Model
 	light.Color, light.Range, light.Brightness = Palette.lantern, 12, 1.5
 	light.Parent = pane
 	m.PrimaryPart = pane
+	pane.PivotOffset = pane.CFrame:ToObjectSpace(at) -- the pivot stays on the ground
 	m.Parent = workspace
 	return m
+end
+
+-- The personal Rare is hard to spot in the dark: a soft spirit light on it.
+local function lightWild()
+	local id = Players.LocalPlayer:GetAttribute("FtueWild")
+	local wilds = workspace:FindFirstChild("Wilds")
+	local wild = if wilds ~= nil and id ~= nil then wilds:FindFirstChild(`Wild{id}`) else nil
+	local part = if wild ~= nil then wild:FindFirstChildWhichIsA("BasePart", true) else nil
+	if part ~= nil and part:FindFirstChild("FtueLight") == nil then
+		local light = Instance.new("PointLight")
+		light.Name = "FtueLight"
+		light.Color, light.Range, light.Brightness = Palette.spirit, 14, 1.6
+		light.Parent = part
+	end
 end
 
 local function clearLure()
@@ -220,8 +242,10 @@ local function buildGui()
 	local label = Instance.new("TextLabel")
 	label.Name = "Banner"
 	label.AnchorPoint = Vector2.new(0.5, 1)
-	label.Position = UDim2.new(0.5, 0, 1, -190) -- above the context button and the hold bars
-	label.Size = UDim2.new(0.9, 0, 0, 44)
+	-- At the bottom, under the character and the hold bars (y -140), clear of the touch
+	-- buttons on the right.
+	label.Position = UDim2.new(0.5, 0, 1, -24)
+	label.Size = UDim2.new(0.62, 0, 0, 40)
 	label.BackgroundColor3 = Color3.fromRGB(28, 34, 30)
 	label.BackgroundTransparency = 0.25
 	label.Font = Enum.Font.GothamBold
@@ -229,10 +253,10 @@ local function buildGui()
 	label.TextColor3 = Color3.fromRGB(240, 232, 210)
 	label.Visible = false
 	local size = Instance.new("UITextSizeConstraint")
-	size.MaxTextSize = 24
+	size.MaxTextSize = 22
 	size.Parent = label
 	local maxWidth = Instance.new("UISizeConstraint")
-	maxWidth.MaxSize = Vector2.new(620, 44)
+	maxWidth.MaxSize = Vector2.new(620, 40)
 	maxWidth.Parent = label
 	local padding = Instance.new("UIPadding")
 	padding.PaddingLeft, padding.PaddingRight = UDim.new(0, 12), UDim.new(0, 12)
@@ -283,8 +307,27 @@ local function update()
 		end
 	end
 	if n == 1 and lure == nil and r ~= nil then
-		local ahead = r.CFrame * CFrame.new(0, -3, -7)
-		lure = buildLure(CFrame.new(ahead.Position) * CFrame.Angles(0, math.rad(r.Orientation.Y), 0))
+		-- Ahead and to the right, and never in the fire pit (players spawn facing the fire).
+		local spot = (r.CFrame * CFrame.new(5, -3, -4)).Position
+		local fire = campfire()
+		if fire ~= nil then
+			local away = Vector3.new(spot.X - fire.X, 0, spot.Z - fire.Z)
+			if away.Magnitude < LURE_FIRE_CLEAR then
+				local dir = if away.Magnitude > 0.1 then away.Unit else Vector3.xAxis
+				spot = Vector3.new(fire.X, spot.Y, fire.Z) + dir * LURE_FIRE_CLEAR
+			end
+		end
+		lureBase = CFrame.new(spot) * CFrame.Angles(0, math.rad(r.Orientation.Y), 0)
+		lure = buildLure(lureBase :: CFrame)
+	end
+	if lure ~= nil and lureBase ~= nil then -- a slow bob and turn, so it reads as a pickup
+		local t = os.clock()
+		lure:PivotTo(
+			(lureBase :: CFrame) * CFrame.new(0, 0.25 + math.sin(t * 2) * 0.25, 0) * CFrame.Angles(0, t * 0.6, 0)
+		)
+	end
+	if n == 9 then
+		lightWild()
 	end
 	if n ~= nil and pulse == nil and os.clock() - shownAt > HINT_SECONDS then
 		setPulse(true)
