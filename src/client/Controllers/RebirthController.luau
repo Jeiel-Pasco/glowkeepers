@@ -26,6 +26,8 @@ local HOLD_SECONDS = 2
 local LOST = "Lost: Glow, Lantern, Boots, Slots (back to 8), display and storage Glowlings"
 local KEPT = "Kept: the vault, your best other Glowling, Embers, Stars, Lock Charges, Glowdex"
 
+local HudLayout = require(script.Parent:WaitForChild("HudLayout"))
+
 local RebirthController = {}
 
 local panel: Frame? = nil
@@ -99,8 +101,6 @@ local function build()
 
 	local toggle = Instance.new("TextButton")
 	toggle.Name = "RebirthButton"
-	toggle.AnchorPoint = Vector2.new(0, 0.5)
-	toggle.Position = UDim2.new(0, 12, 0.5, 144) -- under "Storage"
 	toggle.Size = UDim2.fromOffset(120, 40)
 	toggle.BackgroundColor3 = PANEL
 	toggle.BackgroundTransparency = 0.15
@@ -109,7 +109,7 @@ local function build()
 	toggle.TextColor3 = Color3.fromRGB(200, 170, 255)
 	toggle.Text = "Rebirth"
 	corner(toggle, 10)
-	toggle.Parent = gui
+	HudLayout.dock("left", toggle, 4)
 
 	local frame = Instance.new("Frame")
 	frame.Name = "Rebirth"

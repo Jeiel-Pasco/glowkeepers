@@ -31,6 +31,8 @@ local WAIT_COLOR = Color3.fromRGB(60, 60, 70)
 
 type Walls = { model: Model, zone: BasePart, passThrough: boolean, untilTime: number }
 
+local HudLayout = require(script.Parent:WaitForChild("HudLayout"))
+
 local LockController = {}
 
 local button: TextButton? = nil
@@ -168,8 +170,6 @@ local function buildButton(): TextButton
 	gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
 	local lockButton = Instance.new("TextButton")
 	lockButton.Name = "LockButton"
-	lockButton.AnchorPoint = Vector2.new(1, 0)
-	lockButton.Position = UDim2.new(1, -12, 0, 112) -- under the cycle ring
 	lockButton.Size = UDim2.fromOffset(170, 40)
 	lockButton.BackgroundColor3 = READY_COLOR
 	lockButton.BackgroundTransparency = 0.15
@@ -181,7 +181,7 @@ local function buildButton(): TextButton
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 10)
 	corner.Parent = lockButton
-	lockButton.Parent = gui
+	HudLayout.dock("right", lockButton, 1)
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	return lockButton
 end

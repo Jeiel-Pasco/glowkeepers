@@ -36,6 +36,8 @@ local TEXT: { [string]: string } = {
 
 type Row = { label: TextLabel, claim: TextButton, reroll: TextButton? }
 
+local HudLayout = require(script.Parent:WaitForChild("HudLayout"))
+
 local QuestController = {}
 
 local panel: Frame? = nil
@@ -102,8 +104,6 @@ local function build()
 
 	local toggle = Instance.new("TextButton")
 	toggle.Name = "QuestsButton"
-	toggle.AnchorPoint = Vector2.new(0, 0.5)
-	toggle.Position = UDim2.new(0, 12, 0.5, 288) -- under "Gift"
 	toggle.Size = UDim2.fromOffset(120, 40)
 	toggle.BackgroundColor3 = PANEL
 	toggle.BackgroundTransparency = 0.15
@@ -112,7 +112,7 @@ local function build()
 	toggle.TextColor3 = Color3.fromRGB(140, 200, 255)
 	toggle.Text = "Quests"
 	corner(toggle, 10)
-	toggle.Parent = gui
+	HudLayout.dock("left", toggle, 7)
 
 	local frame = Instance.new("Frame")
 	frame.Name = "Quests"

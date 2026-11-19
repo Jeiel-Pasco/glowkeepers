@@ -23,6 +23,8 @@ local ROW_HEIGHT = 40
 
 type Row = { label: TextLabel, buy: TextButton, place: TextButton, remove: TextButton }
 
+local HudLayout = require(script.Parent:WaitForChild("HudLayout"))
+
 local DecorController = {}
 
 local panel: Frame? = nil
@@ -100,8 +102,6 @@ local function build()
 
 	local toggle = Instance.new("TextButton")
 	toggle.Name = "DecorButton"
-	toggle.AnchorPoint = Vector2.new(1, 0)
-	toggle.Position = UDim2.new(1, -12, 0, 282) -- under the goal tracker
 	toggle.Size = UDim2.fromOffset(120, 36)
 	toggle.BackgroundColor3 = PANEL
 	toggle.BackgroundTransparency = 0.15
@@ -110,7 +110,7 @@ local function build()
 	toggle.TextColor3 = Color3.fromRGB(230, 190, 140)
 	toggle.Text = "Decor"
 	corner(toggle, 10)
-	toggle.Parent = gui
+	HudLayout.dock("right", toggle, 3)
 
 	local frame = Instance.new("Frame")
 	frame.Name = "Decor"

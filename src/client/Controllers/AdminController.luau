@@ -28,6 +28,8 @@ local COMMANDS = {
 	{ "live_confirm", "" },
 }
 
+local HudLayout = require(script.Parent:WaitForChild("HudLayout"))
+
 local AdminController = {}
 
 local output: TextLabel? = nil
@@ -58,15 +60,13 @@ local function build()
 
 	local toggle = Instance.new("TextButton")
 	toggle.Name = "AdminButton"
-	toggle.AnchorPoint = Vector2.new(0, 1)
-	toggle.Position = UDim2.new(0, 12, 1, -12)
 	toggle.Size = UDim2.fromOffset(80, 30)
 	toggle.Font = Enum.Font.GothamBold
 	toggle.TextSize = 14
 	toggle.TextColor3 = Color3.new(1, 1, 1)
 	toggle.BackgroundColor3 = PICKED
 	toggle.Text = "Admin"
-	toggle.Parent = gui
+	HudLayout.dock("left", toggle, 99)
 
 	local frame = Instance.new("Frame")
 	frame.Name = "Admin"

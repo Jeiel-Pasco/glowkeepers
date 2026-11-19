@@ -21,6 +21,8 @@ local ROW_HEIGHT = 38
 
 type Row = { frame: Frame, button: TextButton, pass: boolean }
 
+local HudLayout = require(script.Parent:WaitForChild("HudLayout"))
+
 local StoreController = {}
 
 local rows: { [string]: Row } = {}
@@ -66,8 +68,6 @@ local function build()
 
 	local toggle = Instance.new("TextButton")
 	toggle.Name = "StoreButton"
-	toggle.AnchorPoint = Vector2.new(1, 0)
-	toggle.Position = UDim2.new(1, -12, 0, 324) -- under "Decor"
 	toggle.Size = UDim2.fromOffset(120, 36)
 	toggle.BackgroundColor3 = PANEL
 	toggle.BackgroundTransparency = 0.15
@@ -76,7 +76,7 @@ local function build()
 	toggle.TextColor3 = Color3.fromRGB(140, 230, 160)
 	toggle.Text = "Store"
 	corner(toggle, 10)
-	toggle.Parent = gui
+	HudLayout.dock("right", toggle, 4)
 
 	local frame = Instance.new("Frame")
 	frame.Name = "Store"
