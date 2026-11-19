@@ -19,7 +19,24 @@
 -- The Map folder carries the ring radii as attributes.
 
 local CollectionService = game:GetService("CollectionService")
+local Lighting = game:GetService("Lighting")
 local ServerStorage = game:GetService("ServerStorage")
+
+-- Lighting the mood pass needs (Bible §1, OD-1); CycleFXController moves the rest through the
+-- day. Lighting.Technology must be Future: plugin and MCP scripts may not set it, so set it by
+-- hand in the Properties panel if this warns.
+do
+	local lighting: any = Lighting
+	if not pcall(function()
+		lighting.Technology = Enum.Technology.Future
+	end) then
+		warn("[BuildGreybox] Set Lighting.Technology = Future by hand (Properties panel).")
+	end
+	lighting.GlobalShadows = true
+	lighting.ShadowSoftness = 0.25
+	lighting.EnvironmentDiffuseScale = 1
+	lighting.EnvironmentSpecularScale = 1
+end
 
 local GENERATOR = "tools/BuildGreybox.luau"
 
@@ -363,6 +380,18 @@ do
 			local cf = CFrame.lookAt(polar(r, a, 0.4), Vector3.new(0, 0.4, 0))
 				* CFrame.Angles(0, rng:NextNumber(-0.3, 0.3), 0)
 			part(stones, "Stone", nil, Vector3.new(2.2, 1, 1.6), cf, COLORS.stone, Enum.Material.Slate, DECOR)
+			-- A thin Neon rune on top; CampfireController lights it by the fire's state.
+			local rune = part(
+				stones,
+				"Rune",
+				nil,
+				Vector3.new(1.4, 0.06, 0.5),
+				cf * CFrame.new(0, 0.53, 0),
+				Color3.fromRGB(40, 36, 32),
+				Enum.Material.Neon,
+				{ CanCollide = false, CanTouch = false, CanQuery = false, CastShadow = false, Transparency = 0.85 }
+			)
+			CollectionService:AddTag(rune, "SafeRune")
 		end
 	end
 

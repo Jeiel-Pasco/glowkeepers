@@ -1,10 +1,13 @@
 --!strict
 -- The night fire loop on the client (GAME_SYSTEMS §12). Sets the context button to "Pick up"
 -- next to an available wood pile and to "Feed" next to the fire while carrying, and sends the
--- intents. Hides piles while they respawn, and dims the fire light with workspace `Fire`.
+-- intents. Hides piles while they respawn. The fire's look follows workspace `Fire` through
+-- the five states of Shared.FireLook (Roaring … Cold, Bible §5B): flame size and colour, the
+-- light's range, ember sparks, smoke, and the safe-circle runes (tag SafeRune), all eased so
+-- changes never pop.
 -- The server checks every range again; nothing here is trusted.
 --
--- The light and pile visuals are placeholders for GS to replace; tune LIGHT_* at the G1 test.
+-- Tune the looks in Shared.FireLook at the G1 mood test.
 -- The place streams (StreamingEnabled), so the campfire is looked up again whenever its parts
 -- are missing, and pile logs are hidden as they stream in.
 
@@ -15,6 +18,7 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
+local FireLook = require(Shared:WaitForChild("FireLook"))
 local NetClient = require(script.Parent.Parent:WaitForChild("Net"):WaitForChild("NetClient"))
 local InputController = require(script.Parent:WaitForChild("InputController"))
 
@@ -24,19 +28,23 @@ local PRIORITY = 10 -- below Revive, Catch and Grab
 local CHECK_SECONDS = 0.15
 local MARGIN = 1 -- studs inside the server's ranges, so the button never shows where the server says no
 
--- Fire light at night: base brightness × (LIGHT_MIN + LIGHT_PER_LEVEL × level); off at 0.
-local LIGHT_MIN = 0.4
-local LIGHT_PER_LEVEL = 0.8
+local EASE = 2.5 -- per second: how fast the look catches up with a new state
 
 local CampfireController = {}
 
 local pit: BasePart? = nil
 local feedRadius = 10
 local light: PointLight? = nil
-local baseBrightness: number? = nil -- read once: the light may stream out and back in
 local flames: Fire? = nil
-local baseFlameSize: number? = nil
+local core: BasePart? = nil -- the Neon flame ball
+local coreSize: Vector3? = nil -- read once: it may stream out and back in
+local embers: ParticleEmitter? = nil
+local smoke: Smoke? = nil
 local targetPile: string? = nil
+
+-- The eased look: numbers and colours move toward FireLook.look(level) every frame.
+local shown: any = nil
+local clock = 0
 
 local function fireLevel(): number?
 	local level = workspace:GetAttribute("Fire")
@@ -61,12 +69,43 @@ local function bindCampfire()
 	local radius = campfire:GetAttribute("FeedRadius")
 	feedRadius = if type(radius) == "number" then radius else feedRadius
 	light = campfire:FindFirstChildWhichIsA("PointLight", true)
-	if light ~= nil and baseBrightness == nil then
-		baseBrightness = light.Brightness
-	end
 	flames = campfire:FindFirstChildWhichIsA("Fire", true)
-	if flames ~= nil and baseFlameSize == nil then
-		baseFlameSize = flames.Size
+	local ball = campfire:FindFirstChild("Flame")
+	core = if ball ~= nil and ball:IsA("BasePart") then ball else nil
+	if core ~= nil then
+		coreSize = coreSize or core.Size
+		-- Embers and smoke are client-only effects on the flame ball.
+		local emitter = core:FindFirstChild("Embers")
+		if emitter == nil then
+			local e = Instance.new("ParticleEmitter")
+			e.Name = "Embers"
+			e.LightEmission = 1
+			e.Brightness = 3
+			e.Color = ColorSequence.new(Color3.fromRGB(255, 220, 140), Color3.fromRGB(255, 90, 30))
+			e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.25), NumberSequenceKeypoint.new(1, 0) })
+			e.Transparency = NumberSequence.new(0, 1)
+			e.Lifetime = NumberRange.new(1.2, 2.6)
+			e.Speed = NumberRange.new(4, 9)
+			e.SpreadAngle = Vector2.new(25, 25)
+			e.Acceleration = Vector3.new(0, 2, 0)
+			e.RotSpeed = NumberRange.new(-90, 90)
+			e.Rate = 0
+			e.Parent = core
+			emitter = e
+		end
+		embers = emitter :: ParticleEmitter
+		local puff = core:FindFirstChild("Smoke")
+		if puff == nil then
+			local s = Instance.new("Smoke")
+			s.Color = Color3.fromRGB(70, 70, 80)
+			s.RiseVelocity = 4
+			s.Size = 4
+			s.Opacity = 0
+			s.Enabled = false
+			s.Parent = core
+			puff = s
+		end
+		smoke = puff :: Smoke
 	end
 end
 
@@ -91,18 +130,64 @@ local function bindPile(pile: Instance)
 	end)
 end
 
-local function updateLight()
-	local level = fireLevel()
-	local lit = level == nil or level > 0
-	local fireLight, brightness = light, baseBrightness
-	if fireLight ~= nil and brightness ~= nil then
-		fireLight.Enabled = lit
-		fireLight.Brightness = if level == nil then brightness else brightness * (LIGHT_MIN + LIGHT_PER_LEVEL * level)
+local NUMBERS =
+	{ "flameSize", "heat", "coreScale", "lightRange", "lightBrightness", "embers", "smoke", "runeGlow", "flicker" }
+local COLORS = { "flameColor", "flameSecondary", "coreColor", "lightColor", "runeColor" }
+
+-- Eases `shown` toward the target look and applies it.
+local function applyLook(dt: number)
+	clock += dt
+	local target = FireLook.look(fireLevel())
+	if shown == nil then
+		shown = table.clone(target)
 	end
-	local fireFlames, size = flames, baseFlameSize
-	if fireFlames ~= nil and size ~= nil then
-		fireFlames.Enabled = lit
-		fireFlames.Size = if level == nil then size else size * (0.5 + level)
+	local k = 1 - math.exp(-EASE * dt)
+	for _, key in NUMBERS do
+		shown[key] += (target[key] - shown[key]) * k
+	end
+	for _, key in COLORS do
+		shown[key] = shown[key]:Lerp(target[key], k)
+	end
+	shown.runePulse = target.runePulse
+
+	local wobble = 1 + shown.flicker * (math.noise(clock * 3.1, 0.5) + 0.4 * math.sin(clock * 17))
+	local fireLight = light
+	if fireLight ~= nil then
+		fireLight.Enabled = shown.lightBrightness > 0.05
+		fireLight.Brightness = shown.lightBrightness * wobble
+		fireLight.Range = shown.lightRange
+		fireLight.Color = shown.lightColor
+	end
+	local fireFlames = flames
+	if fireFlames ~= nil then
+		fireFlames.Enabled = shown.flameSize > 0.3
+		fireFlames.Size = math.max(shown.flameSize, 2)
+		fireFlames.Heat = shown.heat
+		fireFlames.Color = shown.flameColor
+		fireFlames.SecondaryColor = shown.flameSecondary
+	end
+	local ball, size = core, coreSize
+	if ball ~= nil and size ~= nil then
+		local scale = shown.coreScale * (1 + 0.06 * math.sin(clock * 9))
+		ball.Size = size * math.max(scale, 0.05)
+		ball.Color = shown.coreColor
+		ball.LocalTransparencyModifier = if shown.coreScale < 0.05 then 1 else 0
+	end
+	if embers ~= nil then
+		embers.Rate = shown.embers
+	end
+	local puff = smoke
+	if puff ~= nil then
+		puff.Enabled = shown.smoke > 0.02
+		puff.Opacity = shown.smoke
+	end
+
+	local glow = FireLook.runeGlow(shown, clock)
+	for _, rune in CollectionService:GetTagged("SafeRune") do
+		if rune:IsA("BasePart") then
+			rune.Color = Color3.fromRGB(40, 36, 32):Lerp(shown.runeColor, glow)
+			rune.Transparency = 0.85 - 0.85 * glow
+		end
 	end
 end
 
@@ -166,10 +251,10 @@ function CampfireController.Start()
 		if elapsed >= CHECK_SECONDS then
 			elapsed = 0
 			bindCampfire()
-			updateLight() -- every check, so a light that streams back in is dimmed again
 			updateContext()
 		end
 	end)
+	RunService.RenderStepped:Connect(applyLook)
 end
 
 return CampfireController
