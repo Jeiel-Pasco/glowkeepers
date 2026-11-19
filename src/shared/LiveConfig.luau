@@ -20,10 +20,7 @@ export type Live = {
 
 local function copyDefaults(cfg: any): Live
 	local d = cfg.live.defaults
-	local products = {}
-	for key, on in d.killSwitches.products do
-		products[key] = on
-	end
+	local products = table.clone(d.killSwitches.products)
 	local switches: { [string]: any } = { products = products }
 	for key, on in d.killSwitches do
 		if key ~= "products" then
