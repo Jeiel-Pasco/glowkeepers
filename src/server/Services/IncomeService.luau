@@ -12,7 +12,9 @@
 -- before the join recompute overwrites lastIncomePerSec, and shown in the OfflineEarnings popup
 -- once the client is ready.
 --
--- Not yet: the VIP, event and Glowdex multipliers.
+-- Claimed Glowdex pages add their income bonus (Shared.Glowdex.incomeBonus).
+--
+-- Not yet: the VIP and event multipliers.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,6 +22,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Economy = require(Shared:WaitForChild("Economy"))
 local EconomyMath = require(Shared:WaitForChild("EconomyMath"))
+local Glowdex = require(Shared:WaitForChild("Glowdex"))
 local Inventory = require(Shared:WaitForChild("Inventory"))
 local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
 local DataService = require(script.Parent:WaitForChild("DataService"))
@@ -114,7 +117,8 @@ function IncomeService.recompute(player: Player)
 		return -- not joined yet: the join computes it
 	end
 	accrue(player, now())
-	local rate = Inventory.placedValue(data, InventoryService.valueOf) * Economy.incomeMultiplier(economy, data.stars)
+	local rate = Inventory.placedValue(data, InventoryService.valueOf)
+		* Economy.incomeMultiplier(economy, data.stars, 1 + Glowdex.incomeBonus(economy, data.dexClaimed))
 	if rate ~= rates[player] then
 		rates[player] = rate
 		DataService.setIncomeRate(player, rate)
