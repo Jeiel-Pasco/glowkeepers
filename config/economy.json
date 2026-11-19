@@ -142,6 +142,12 @@
     { "key": "days7",      "name": "7 Play Days",             "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
     { "key": "trade1",     "name": "First Trade",             "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } }
   ],
+  "live": {
+    "pollSeconds": 300,
+    "maxMult": 5,
+    "multKeys": ["luckMult", "embersMult", "spawnMult", "glowMult", "passXpMult"],
+    "defaults": { "killSwitches": { "trading": false, "stealing": false, "serverLuck": false, "products": {} }, "codes": {} }
+  },
   "pass": {
     "s1Start": 1794787200,
     "seasonWeeks": 8,

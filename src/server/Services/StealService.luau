@@ -43,6 +43,7 @@ local CycleService = require(script.Parent:WaitForChild("CycleService"))
 local InventoryService = require(script.Parent:WaitForChild("InventoryService"))
 local GlowlingService = require(script.Parent:WaitForChild("GlowlingService"))
 local PlotService = require(script.Parent:WaitForChild("PlotService"))
+local LiveConfigService = require(script.Parent:WaitForChild("LiveConfigService"))
 
 local TICK_SECONDS = 0.1 -- 10 Hz: tags, delivery and the carry check (TECH_SPEC §8)
 local GRAB_SLACK = 2 -- studs past grabRange before a hold in progress cancels (latency)
@@ -269,6 +270,9 @@ local REJECT_TEXT: { [string]: string } = {
 local function grabStart(thief: Player, plotId: number, pad: number)
 	local thiefData = DataService.get(thief)
 	if thiefData == nil then
+		return
+	elseif LiveConfigService.killed("stealing") then
+		NetServer.send(thief, "Toast", "Stealing is paused right now", "bad")
 		return
 	end
 	local victim = PlotService.ownerOf(plotId)
