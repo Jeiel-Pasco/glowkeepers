@@ -29,6 +29,7 @@ local DataService = require(script.Parent:WaitForChild("DataService"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
 local InventoryService = require(script.Parent:WaitForChild("InventoryService"))
+local LiveConfigService = require(script.Parent:WaitForChild("LiveConfigService"))
 local NetServer = require(script.Parent.Parent:WaitForChild("Net"):WaitForChild("NetServer"))
 
 local TICK_SECONDS = 1
@@ -121,6 +122,7 @@ function IncomeService.recompute(player: Player)
 	accrue(player, now())
 	local rate = Inventory.placedValue(data, InventoryService.valueOf)
 		* Economy.incomeMultiplier(economy, data.stars, 1 + Glowdex.incomeBonus(economy, data.dexClaimed))
+		* LiveConfigService.mult("glowMult") -- an event's Glow boost (§21); EventService recomputes at its edges
 	if rate ~= rates[player] then
 		rates[player] = rate
 		DataService.setIncomeRate(player, rate)

@@ -28,6 +28,7 @@ local DataService = require(script.Parent:WaitForChild("DataService"))
 local GlowlingService = require(script.Parent:WaitForChild("GlowlingService"))
 local RollService = require(script.Parent:WaitForChild("RollService"))
 local ClaimService = require(script.Parent:WaitForChild("ClaimService"))
+local LiveConfigService = require(script.Parent:WaitForChild("LiveConfigService"))
 
 local GAMEPLAY = Enum.AnalyticsEconomyTransactionType.Gameplay.Name
 local SHOP = Enum.AnalyticsEconomyTransactionType.Shop.Name
@@ -113,7 +114,7 @@ function NightPassService.addXp(player: Player, amount: number): number
 		return 0
 	end
 	local before = Pass.tier(economy, data.pass.xp)
-	local added = Pass.xpFor(economy, amount, os.time())
+	local added = math.floor(Pass.xpFor(economy, amount, os.time()) * LiveConfigService.mult("passXpMult"))
 	data.pass.xp += added
 	DataService.changed(player, "pass")
 	local after = Pass.tier(economy, data.pass.xp)

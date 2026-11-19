@@ -32,6 +32,7 @@ local CycleService = require(script.Parent:WaitForChild("CycleService"))
 local DownedService = require(script.Parent:WaitForChild("DownedService"))
 local GlowlingService = require(script.Parent:WaitForChild("GlowlingService"))
 local RollService = require(script.Parent:WaitForChild("RollService"))
+local LiveConfigService = require(script.Parent:WaitForChild("LiveConfigService"))
 
 local TICK_SECONDS = 0.25
 local JITTER = 3 -- studs: wilds sharing a marker stand a little apart
@@ -94,7 +95,10 @@ local function view(wild: Wild): any
 end
 
 local function spawnWave(index: number)
-	local sizes = Forest.waveSizes(economy, #Players:GetPlayers(), CycleService.modifier())
+	local modifier = CycleService.modifier()
+	local spawnMult = (if modifier ~= nil and modifier.spawnMult ~= nil then modifier.spawnMult else 1)
+		* LiveConfigService.mult("spawnMult") -- an event's spawn boost (§21)
+	local sizes = Forest.waveSizes(economy, #Players:GetPlayers(), { spawnMult = spawnMult })
 	local taken: { [number]: boolean } = {}
 	for _, wild in wilds do
 		taken[wild.marker] = true

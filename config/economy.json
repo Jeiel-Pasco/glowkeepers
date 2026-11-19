@@ -142,6 +142,7 @@
     { "key": "days7",      "name": "7 Play Days",             "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
     { "key": "trade1",     "name": "First Trade",             "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } }
   ],
+  "events": { "featuredWeight": 2 },
   "live": {
     "pollSeconds": 300,
     "maxMult": 5,
