@@ -1,13 +1,15 @@
 --!strict
 -- Every plot's replicated state (TECH_SPEC §6): PlotSnapshot once, then PlotDelta patches,
--- applied with Shared.Plots so client and server share one shape. Each occupied pad gets a
--- GlowlingRenderer model (rebuilt only when the pad changes; the rarest 8 get a light), the
+-- applied with Shared.Plots so client and server share one shape. Each placed Glowling gets a
+-- GlowlingRenderer model (rebuilt only when it changes; the rarest 8 get a light) that wanders
+-- the yard by Shared.Roam (vault ones sleep by the den; a grabbed one stands still), the
 -- owner's plot sign shows the base name and their name, a shielded plot
 -- gets a bubble, BaseDresser dresses the plot for its size (home, fence, lamps) and draws
 -- each placed decoration on the DecorZone. The place streams, so a
--- plot is drawn again when its pads or sign stream in.
+-- plot is drawn again when its floor or sign streams in.
 
 local CollectionService = game:GetService("CollectionService")
+local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -15,11 +17,15 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Plots = require(Shared:WaitForChild("Plots"))
 local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
 local RarityLook = require(Shared:WaitForChild("RarityLook"))
+local Roam = require(Shared:WaitForChild("Roam"))
 local NetClient = require(script.Parent.Parent:WaitForChild("Net"):WaitForChild("NetClient"))
 local GlowlingRenderer = require(script.Parent:WaitForChild("GlowlingRenderer"))
 local BaseDresser = require(script.Parent:WaitForChild("BaseDresser"))
 
 local LIGHT_CAP = 8 -- PointLights per plot (Design & Asset Bible §8)
+local CULL_DISTANCE = 220 -- Glowlings farther than this from the camera stop walking
+local HOP_RATE = 9
+local HOP_HEIGHT = 0.35
 
 local SHIELD_COLOR = Color3.fromRGB(150, 220, 255)
 
@@ -30,7 +36,7 @@ local plots: { [number]: Plots.View } = {}
 local placeholders: Folder? = nil
 local renderQueued: { [number]: boolean } = {}
 -- Drawn Glowlings per plot and pad: rebuilt only when what is on the pad changes.
-local padModels: { [number]: { [string]: { key: string, model: Model } } } = {}
+local padModels: { [number]: { [string]: { key: string, model: Model, at: CFrame } } } = {}
 
 function PlotController.get(plotId: number): Plots.View?
 	return plots[plotId]
@@ -63,7 +69,34 @@ local function clearPads(plotId: number)
 	padModels[plotId] = nil
 end
 
-local function renderPads(plotId: number, view: Plots.View, slots: Instance)
+local function floorOf(plotId: number): BasePart?
+	local model = plotModel(plotId)
+	local floor = if model ~= nil then model:FindFirstChild("Floor") else nil
+	return if floor ~= nil and floor:IsA("BasePart") then floor else nil
+end
+
+-- Where the Glowling on `pad` stands now (Shared.Roam), with its heading and whether it walks;
+-- the same spot the server measures a grab from. nil when the plot hasn't streamed in.
+function PlotController.spot(plotId: number, pad: number): (CFrame?, boolean)
+	local view = plots[plotId]
+	local floor = floorOf(plotId)
+	local glowling = if view ~= nil then view.pads[tostring(pad)] else nil
+	if view == nil or floor == nil or glowling == nil then
+		return nil, false
+	end
+	local area = { halfW = floor.Size.X / 2, halfD = floor.Size.Z / 2 }
+	local x, z, heading, walking = Roam.spot(area, plotId, pad, view.vault, workspace:GetServerTimeNow(), glowling.f)
+	return floor.CFrame * CFrame.new(x, floor.Size.Y / 2, z) * CFrame.Angles(0, heading, 0), walking
+end
+
+-- The drawn model of the Glowling on a pad (TraitFXController hangs its rings on it).
+function PlotController.model(plotId: number, pad: number): Model?
+	local drawn = padModels[plotId]
+	local entry = if drawn ~= nil then drawn[tostring(pad)] else nil
+	return if entry ~= nil then entry.model else nil
+end
+
+local function renderPads(plotId: number, view: Plots.View)
 	local folder = placeholders
 	if folder == nil then
 		return
@@ -72,39 +105,64 @@ local function renderPads(plotId: number, view: Plots.View, slots: Instance)
 	padModels[plotId] = drawn
 	local lights = RarityLook.lightPicks(view.pads, LIGHT_CAP)
 	local seen: { [string]: boolean } = {}
-	for _, pad in slots:GetChildren() do
-		local n = pad:GetAttribute("Slot")
-		local slot = if type(n) == "number" then tostring(n) else nil
-		local glowling = if slot ~= nil then view.pads[slot] else nil
-		if slot ~= nil and glowling ~= nil and pad:IsA("BasePart") then
-			seen[slot] = true
-			local light = lights[slot] == true
-			local over = glowling.o == true
-			local key = `{glowling.sp}|{glowling.r}|{glowling.m}|{glowling.s}|{light}|{over}|{pad.Position}`
-			local old = drawn[slot]
-			if old == nil or old.key ~= key then
-				if old ~= nil then
-					old.model:Destroy()
-				end
-				local model = GlowlingRenderer.build({
-					sp = glowling.sp,
-					r = glowling.r,
-					m = glowling.m,
-					s = glowling.s,
-					light = light,
-					overcharged = over,
-				})
-				model.Name = `Plot{plotId}Pad{slot}`
-				GlowlingRenderer.place(model, pad.CFrame * CFrame.new(0, pad.Size.Y / 2, 0))
-				model.Parent = folder
-				drawn[slot] = { key = key, model = model }
+	for slot, glowling in view.pads do
+		local pad = tonumber(slot)
+		local spot = if pad ~= nil then PlotController.spot(plotId, pad) else nil
+		if spot == nil then
+			continue
+		end
+		seen[slot] = true
+		local light = lights[slot] == true
+		local over = glowling.o == true
+		local key = `{glowling.sp}|{glowling.r}|{glowling.m}|{glowling.s}|{light}|{over}`
+		local old = drawn[slot]
+		if old == nil or old.key ~= key then
+			if old ~= nil then
+				old.model:Destroy()
 			end
+			local model = GlowlingRenderer.build({
+				sp = glowling.sp,
+				r = glowling.r,
+				m = glowling.m,
+				s = glowling.s,
+				light = light,
+				overcharged = over,
+			})
+			model.Name = `Plot{plotId}Pad{slot}`
+			GlowlingRenderer.place(model, spot)
+			model.Parent = folder
+			drawn[slot] = { key = key, model = model, at = spot }
 		end
 	end
 	for slot, old in drawn do
 		if not seen[slot] then
 			old.model:Destroy()
 			drawn[slot] = nil
+		end
+	end
+end
+
+-- Every frame: walk each nearby drawn Glowling toward its Roam spot, with a little hop.
+local function stepGlowlings(dt: number)
+	local camera = workspace.CurrentCamera
+	local eye = if camera ~= nil then camera.CFrame.Position else Vector3.zero
+	local now = os.clock()
+	for plotId, drawn in padModels do
+		for slot, entry in drawn do
+			local pad = tonumber(slot)
+			if pad == nil then
+				continue
+			end
+			local spot, walking = PlotController.spot(plotId, pad)
+			if spot == nil or (spot.Position - eye).Magnitude > CULL_DISTANCE then
+				continue
+			end
+			-- Ease toward the spot (a cancelled grab or a late patch walks over, never teleports).
+			local alpha = math.min(1, dt * 8)
+			local at = entry.at:Lerp(spot, alpha)
+			entry.at = at
+			local hop = if walking then math.abs(math.sin(now * HOP_RATE + pad)) * HOP_HEIGHT else 0
+			GlowlingRenderer.place(entry.model, at + Vector3.new(0, hop, 0))
 		end
 	end
 end
@@ -133,11 +191,6 @@ local function render(plotId: number)
 		label.Text = if view.name ~= "" and owner ~= nil then `{view.name}\n{who}` else who
 	end
 
-	local slots = model:FindFirstChild("Slots")
-	if slots == nil then
-		clearPads(plotId)
-		return
-	end
 	local group = Instance.new("Folder")
 	group.Name = `Plot{plotId}`
 	local floor = model:FindFirstChild("Floor")
@@ -162,7 +215,7 @@ local function render(plotId: number)
 	if zone ~= nil and zone:IsA("BasePart") then
 		BaseDresser.decor(zone, view.decor, group)
 	end
-	renderPads(plotId, view, slots)
+	renderPads(plotId, view)
 	group.Parent = folder
 end
 
@@ -184,7 +237,7 @@ local function watchPlot(model: Instance)
 		return
 	end
 	model.DescendantAdded:Connect(function(added: Instance)
-		local relevant = added:IsA("BasePart") and (added:GetAttribute("Slot") ~= nil or added.Name == "DecorZone")
+		local relevant = added:IsA("BasePart") and (added.Name == "Floor" or added.Name == "DecorZone")
 		if relevant or added:IsA("TextLabel") then
 			renderSoon(id)
 		end
@@ -229,6 +282,7 @@ function PlotController.Start()
 		watchPlot(model)
 	end
 	CollectionService:GetInstanceAddedSignal("Plot"):Connect(watchPlot)
+	RunService.RenderStepped:Connect(stepGlowlings)
 end
 
 return PlotController

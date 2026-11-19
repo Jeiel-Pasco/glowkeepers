@@ -2,51 +2,27 @@
 -- Pet traits on placed Glowlings (GAME_SYSTEMS §31, D20–D23). Pure: callers pass config and
 -- which species sits on which pad, so the server, the client and Lune all run the same rules.
 --
--- Family link, Harmonizer (neighbours, or the whole plot for Skywhale Calf and Lunadrake),
--- Infuser Overcharge (Aurora Lynx: up to 6 pads), the ×cap on the combined Glow/s multiplier,
--- Guardian grab time (Elder Sapling: every display pad) and Forager pouches. The night
--- companion traits come later.
+-- Family link, Harmonizer, Infuser Overcharge (Aurora Lynx: up to 6 Glowlings), the ×cap on the
+-- combined Glow/s multiplier, Guardian grab time and Forager pouches. The night companion traits
+-- come later.
 --
--- Pads use the map's Slot numbers (Inventory, TECH_SPEC §6a). PAD_POS mirrors
--- tools/BuildGreybox.luau: pads 1–6 in two side strips, pads 7–30 in three rows of eight, 4 studs
--- apart; two pads are neighbours when they share an edge (4 studs apart).
+-- Glowlings wander their base (Shared.Roam), so traits count the whole base: every other
+-- Glowling placed there, not pad neighbours. Pads are only the map's Slot numbers (Inventory).
 
 local Traits = {}
 
 export type Species = { id: string, family: string?, trait: string?, minRarity: string? }
 export type Placed = { [number]: string } -- pad → species id
 
-local PAD_POS: { { number } } = {}
-for _, z in { 8, 4, 0 } do
-	table.insert(PAD_POS, { -15, z })
-	table.insert(PAD_POS, { 15, z })
-end
-for _, z in { -8, -12, -16 } do
-	for x = -14, 14, 4 do
-		table.insert(PAD_POS, { x, z })
-	end
-end
-Traits.PAD_POS = PAD_POS
-
-local neighbourCache: { [number]: { number } } = {}
-
--- Pads that share an edge with `pad`.
-function Traits.neighbours(pad: number): { number }
-	local cached = neighbourCache[pad]
-	if cached ~= nil then
-		return cached
-	end
+-- Every other occupied pad in the base, in pad order.
+function Traits.mates(placed: Placed, pad: number): { number }
 	local list = {}
-	local at = PAD_POS[pad]
-	if at ~= nil then
-		for other, pos in PAD_POS do
-			local dx, dz = math.abs(pos[1] - at[1]), math.abs(pos[2] - at[2])
-			if other ~= pad and dx + dz > 3.9 and dx + dz < 4.1 then
-				table.insert(list, other)
-			end
+	for other in placed do
+		if other ~= pad then
+			table.insert(list, other)
 		end
 	end
-	neighbourCache[pad] = list
+	table.sort(list)
 	return list
 end
 
@@ -67,7 +43,8 @@ local function apex(cfg: any, speciesId: string): any
 	return cfg.traits.apex[speciesId]
 end
 
--- The Glow/s multiplier of every occupied pad: family link × Harmonizer × whole-plot bonus,
+-- The Glow/s multiplier of every occupied pad: family link (per other same-family Glowling in
+-- the base) × Harmonizer (a same-family one in the base) × whole-plot bonus,
 -- at most cfg.traits.cap.
 function Traits.multipliers(
 	cfg: any,
@@ -88,13 +65,13 @@ function Traits.multipliers(
 		local mine = species[id]
 		local family = if mine ~= nil then mine.family else nil
 		local same, harmonized = 0, false
-		for _, n in Traits.neighbours(pad) do
+		for _, n in Traits.mates(placed, pad) do
 			local other = placed[n]
-			local theirs = if other ~= nil then species[other] else nil
+			local theirs = species[other]
 			if theirs ~= nil and family ~= nil and theirs.family == family then
 				same += 1
-				-- An apex Harmonizer works on the whole plot instead of its neighbours.
-				if theirs.trait == "Harmonizer" and apex(cfg, other :: string) == nil then
+				-- An apex Harmonizer gives its whole-plot bonus instead.
+				if theirs.trait == "Harmonizer" and apex(cfg, other) == nil then
 					harmonized = true
 				end
 			end
@@ -107,13 +84,13 @@ function Traits.multipliers(
 	return result
 end
 
--- Extra grab seconds on `pad` from Guardians: the best one on the pad or next to it (+more for a
--- floor of Rare or higher), plus the best whole-plot bonus on display pads; at most guardianMax.
+-- Extra grab seconds on `pad` from Guardians: the best one in the base (+more for a floor of
+-- Rare or higher), plus the best whole-plot bonus on display pads; at most guardianMax.
 function Traits.grabBonus(
 	cfg: any,
 	species: { [string]: Species },
 	placed: Placed,
-	pad: number,
+	_pad: number, -- every display Glowling in the base gets the same bonus
 	display: boolean
 ): number
 	local t = cfg.traits
@@ -126,9 +103,8 @@ function Traits.grabBonus(
 			localBonus = math.max(localBonus, bonus)
 		end
 	end
-	consider(placed[pad])
-	for _, n in Traits.neighbours(pad) do
-		consider(placed[n])
+	for _, id in placed do
+		consider(id)
 	end
 	local plotBonus = 0
 	if display then
@@ -178,7 +154,7 @@ end
 
 -- Advances the timers to `now`. `ids` is pad → Glowling id, `placed` pad → species id (the same
 -- pads). Overcharges end after their time or when their Glowling leaves the pad; Infusers start
--- new ones on a neighbour (Aurora Lynx: up to infuseTargets pads anywhere on the plot) that isn't
+-- new ones on another Glowling in the base (Aurora Lynx: up to infuseTargets of them) that isn't
 -- already overcharged. Returns whether the set of Overcharges changed, and the Forager pads whose
 -- pouch is ready.
 function Traits.step(
@@ -238,7 +214,7 @@ function Traits.step(
 					if a ~= nil and a.infuseTargets ~= nil then
 						overcharge(pads, a.infuseTargets)
 					else
-						overcharge(Traits.neighbours(pad), 1)
+						overcharge(Traits.mates(placed, pad), 1)
 					end
 				end
 			elseif s.trait == "Forager" then

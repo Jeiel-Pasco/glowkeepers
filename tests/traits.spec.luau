@@ -14,23 +14,19 @@ local function near(a: number, b: number): boolean
 	return math.abs(a - b) < 1e-9
 end
 
-H.test("neighbours share an edge on the pad grid", function()
-	H.eq(#Traits.PAD_POS, 30)
-	local function has(list, n)
-		return table.find(list, n) ~= nil
-	end
-	H.ok(has(Traits.neighbours(1), 3) and not has(Traits.neighbours(1), 2), "side strip runs front to back")
-	H.ok(has(Traits.neighbours(7), 8) and has(Traits.neighbours(7), 15), "rows and columns")
-	H.ok(not has(Traits.neighbours(7), 5), "the strips don't touch the rows")
-	H.eq(#Traits.neighbours(16), 4, "a middle pad has four")
+H.test("mates are every other Glowling in the base", function()
+	local mates = Traits.mates({ [1] = "a", [9] = "b", [30] = "c" }, 9)
+	H.eq(#mates, 2)
+	H.eq(mates[1], 1)
+	H.eq(mates[2], 30)
 end)
 
-H.test("family link: +5% per same-family neighbour, up to +10%", function()
+H.test("family link: +5% per other same-family Glowling in the base, up to +10%", function()
 	-- glimmermouse, mothlet, fireflypip, owlumen: Lantern family, none of them a Harmonizer
 	local m = Traits.multipliers(cfg, species, { [8] = "glimmermouse", [9] = "mothlet" })
 	H.ok(near(m[8], 1.05) and near(m[9], 1.05), "both rise")
-	m = Traits.multipliers(cfg, species, { [8] = "glimmermouse", [10] = "mothlet" })
-	H.ok(near(m[8], 1) and near(m[10], 1), "two pads apart: nothing")
+	m = Traits.multipliers(cfg, species, { [7] = "glimmermouse", [30] = "mothlet" })
+	H.ok(near(m[7], 1.05) and near(m[30], 1.05), "anywhere in the base")
 	m = Traits.multipliers(
 		cfg,
 		species,
@@ -41,7 +37,7 @@ H.test("family link: +5% per same-family neighbour, up to +10%", function()
 	H.ok(near(m[8], 1), "other families don't link")
 end)
 
-H.test("Harmonizer boosts same-family neighbours, not itself", function()
+H.test("Harmonizer boosts same-family Glowlings in the base, not itself", function()
 	local m = Traits.multipliers(cfg, species, { [8] = "glimmermouse", [9] = "lanternbug" })
 	H.ok(near(m[8], 1.05 * 1.15), `neighbour {m[8]}`)
 	H.ok(near(m[9], 1.05), `harmonizer itself {m[9]}`)
@@ -86,10 +82,11 @@ H.test("no Glowling's multiplier ever exceeds the cap (random plots)", function(
 	H.ok(worst <= m[16] + 1e-9, "the random plots found nothing above it")
 end)
 
-H.test("Guardian grab time: neighbours, higher floors, whole plot, at most 1.5 s", function()
+H.test("Guardian grab time: anywhere in the base, higher floors, at most 1.5 s", function()
 	H.eq(Traits.grabBonus(cfg, species, { [8] = "sparkhop" }, 9, true), 0.5)
 	H.eq(Traits.grabBonus(cfg, species, { [8] = "sparkhop" }, 8, true), 0.5, "its own pad")
-	H.eq(Traits.grabBonus(cfg, species, { [8] = "sparkhop" }, 10, true), 0)
+	H.eq(Traits.grabBonus(cfg, species, { [8] = "sparkhop" }, 30, true), 0.5, "across the base")
+	H.eq(Traits.grabBonus(cfg, species, { [8] = "glimmermouse" }, 30, true), 0, "no Guardian")
 	H.eq(
 		Traits.grabBonus(cfg, species, { [8] = "sparkhop", [10] = "gloomraven" }, 9, true),
 		1.0,
@@ -110,7 +107,7 @@ local function zero(): number
 	return 0
 end
 
-H.test("Infuser: Overcharge on a neighbour every 60 s, ×1.5 for 30 s", function()
+H.test("Infuser: Overcharge on another Glowling every 60 s, ×1.5 for 30 s", function()
 	local placed = { [8] = "glimmermouse", [9] = "mothlet" } -- Mothlet is a Lantern Infuser
 	local ids = { [8] = "a", [9] = "b" }
 	local timers = Traits.newTimers()
@@ -119,7 +116,7 @@ H.test("Infuser: Overcharge on a neighbour every 60 s, ×1.5 for 30 s", function
 	changed = Traits.step(cfg, species, placed, ids, timers, 59, zero)
 	H.ok(not changed, "not before 60 s")
 	changed = Traits.step(cfg, species, placed, ids, timers, 60, zero)
-	H.ok(changed and timers.over[8] ~= nil, "the neighbour is overcharged")
+	H.ok(changed and timers.over[8] ~= nil, "the other Glowling is overcharged")
 	local m = Traits.multipliers(cfg, species, placed, timers.over)
 	H.ok(near(m[8], 1.05 * 1.5), `link × Overcharge {m[8]}`)
 	H.ok(near(m[9], 1.05), "the Infuser itself isn't")

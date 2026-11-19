@@ -23,6 +23,7 @@ local Server = script.Parent.Parent
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Decor = require(Shared:WaitForChild("Decor"))
 local Plots = require(Shared:WaitForChild("Plots"))
+local Roam = require(Shared:WaitForChild("Roam"))
 local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
 local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
@@ -42,6 +43,7 @@ local plotOf: { [Player]: number } = {}
 local views: { [number]: Plots.View } = {} -- what clients were last sent; never mutated
 local locks: { [number]: number } = {} -- plotId → server time its Base Lock ends (LockService)
 local overcharged: { [Player]: { [number]: any }? } = {}
+local frozen: { [number]: { [number]: number } } = {} -- plotId → pad → when a grab froze it
 local synced: { [Player]: boolean } = {} -- has the snapshot, so gets deltas
 
 function PlotService.plotOf(player: Player): number?
@@ -130,7 +132,7 @@ local function buildView(plotId: number): Plots.View
 	end
 	local name = Decor.baseName(economy, data.baseName.a, data.baseName.n)
 	local layout = InventoryService.layout(owner, data)
-	return Plots.view(plotId, owner.UserId, data, layout, locks[plotId], name, overcharged[owner])
+	return Plots.view(plotId, owner.UserId, data, layout, locks[plotId], name, overcharged[owner], frozen[plotId])
 end
 
 -- Rebuilds one plot's view and sends what changed to every ready client.
@@ -154,6 +156,30 @@ end
 
 function PlotService.isLocked(plotId: number): boolean
 	return (locks[plotId] or 0) > workspace:GetServerTimeNow()
+end
+
+-- StealService: a grabbed Glowling stands still from `at` (server time) until unfrozen (nil).
+function PlotService.setFrozen(plotId: number, pad: number, at: number?)
+	local pads = frozen[plotId] or {}
+	pads[pad] = at
+	frozen[plotId] = if next(pads) ~= nil then pads else nil
+	publish(plotId)
+end
+
+-- Where the Glowling on `pad` stands right now (Shared.Roam), on the plot's floor; nil when
+-- the plot or its floor is missing. Uses the view everyone was sent.
+function PlotService.spot(plotId: number, pad: number): Vector3?
+	local plot = plots[plotId]
+	local floor = if plot ~= nil then plot.model:FindFirstChild("Floor") else nil
+	local view = views[plotId]
+	if floor == nil or not floor:IsA("BasePart") or view == nil then
+		return nil
+	end
+	local glowling = view.pads[tostring(pad)]
+	local area = { halfW = floor.Size.X / 2, halfD = floor.Size.Z / 2 }
+	local frozenAt = if glowling ~= nil then glowling.f else nil
+	local x, z = Roam.spot(area, plotId, pad, view.vault, workspace:GetServerTimeNow(), frozenAt)
+	return (floor.CFrame * CFrame.new(x, floor.Size.Y / 2, z)).Position
 end
 
 -- Sends a player's plot to everyone again (ShieldService, when their shield ends).
@@ -220,6 +246,7 @@ local function release(player: Player)
 	overcharged[player] = nil
 	owners[id] = nil
 	locks[id] = nil
+	frozen[id] = nil
 	publish(id)
 	PlotService.Released:Fire(player, id)
 end

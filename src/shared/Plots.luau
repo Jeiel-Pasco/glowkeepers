@@ -10,7 +10,8 @@
 
 local Plots = {}
 
-export type PadView = { sp: string, r: number, m: number, s: number, o: boolean? } -- o: Overcharged (§31)
+-- o: Overcharged (§31); f: server time a thief started grabbing it (it stands still, Shared.Roam)
+export type PadView = { sp: string, r: number, m: number, s: number, o: boolean?, f: number? }
 
 export type DecorView = { id: string, x: number, z: number, rot: number }
 
@@ -111,7 +112,8 @@ function Plots.view(
 	layout: { slots: number, vault: number },
 	lock: number?,
 	name: string?,
-	overcharged: { [number]: any }?
+	overcharged: { [number]: any }?,
+	frozen: { [number]: number }?
 ): View
 	local pads: { [string]: PadView } = {}
 	for _, map in { data.vault, data.display } do
@@ -120,7 +122,14 @@ function Plots.view(
 			if record ~= nil then
 				local pad = tonumber(key)
 				local over = overcharged ~= nil and pad ~= nil and overcharged[pad] ~= nil
-				pads[key] = { sp = record.sp, r = record.r, m = record.m, s = record.s, o = if over then true else nil }
+				pads[key] = {
+					sp = record.sp,
+					r = record.r,
+					m = record.m,
+					s = record.s,
+					o = if over then true else nil,
+					f = if frozen ~= nil and pad ~= nil then frozen[pad] else nil,
+				}
 			end
 		end
 	end
@@ -150,7 +159,7 @@ local function samePad(a: PadView?, b: PadView?): boolean
 	if a == nil or b == nil then
 		return a == b
 	end
-	return a.sp == b.sp and a.r == b.r and a.m == b.m and a.s == b.s and a.o == b.o
+	return a.sp == b.sp and a.r == b.r and a.m == b.m and a.s == b.s and a.o == b.o and a.f == b.f
 end
 
 -- The patch that turns `old` into `new`, or nil if nothing changed.

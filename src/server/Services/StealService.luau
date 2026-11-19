@@ -233,6 +233,9 @@ local function snapHome(job: Job, why: string, tagger: Player?)
 	jobs[job.thief] = nil
 	clearCharacter(job)
 	InventoryService.hold(job.victim, job.id, false)
+	if job.stage == "grab" then
+		PlotService.setFrozen(job.plotId, job.pad, nil) -- it wanders again
+	end
 	if job.stage == "carry" then
 		local data = DataService.get(job.victim)
 		local key = tostring(job.pad)
@@ -266,12 +269,13 @@ local function tagger(job: Job, root: BasePart): Player?
 	return nil
 end
 
+-- Reach from the thief to the Glowling itself, wherever it has wandered (Shared.Roam).
 local function padDistance(plotId: number, pad: number, root: BasePart?): number
-	local part = PlotService.pad(plotId, pad)
-	if part == nil or root == nil then
+	local spot = PlotService.spot(plotId, pad)
+	if spot == nil or root == nil then
 		return math.huge
 	end
-	local offset = part.Position - root.Position
+	local offset = spot - root.Position
 	return Steal.reach(economy, offset.X, offset.Y, offset.Z)
 end
 
@@ -351,6 +355,7 @@ local function grabStart(thief: Player, plotId: number, pad: number)
 		samples = {},
 	}
 	jobs[thief] = job
+	PlotService.setFrozen(plotId, pad, now) -- it stands still while being grabbed
 	InventoryService.hold(victim, id, true)
 	character:SetAttribute("GrabUntil", job.ends)
 	toast(victim, `{thief.DisplayName} is stealing your {nameOf(record)}!`, "alarm")
@@ -362,6 +367,7 @@ local function beginCarry(job: Job, now: number)
 		snapHome(job, "gone") -- the pad turned into a vault pad mid-grab
 		return
 	end
+	PlotService.setFrozen(job.plotId, job.pad, nil)
 	Inventory.forget(data, job.id)
 	InventoryService.notify(job.victim)
 	job.stage = "carry"

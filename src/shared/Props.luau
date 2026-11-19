@@ -268,6 +268,30 @@ local BUILDERS: { [string]: Builder } = {
 		end
 	end,
 
+	-- The den where vault Glowlings sleep: a low thatch burrow with a dark doorway (front -Z).
+	Den = function(m)
+		piece(
+			m,
+			Vector3.new(5, 3, 2.6),
+			at(-1.3, 1.5, 0) * CFrame.Angles(0, math.pi / 2, 0),
+			Palette.thatch,
+			M.Fabric,
+			WEDGE
+		)
+		piece(
+			m,
+			Vector3.new(5, 3, 2.6),
+			at(1.3, 1.5, 0) * CFrame.Angles(0, -math.pi / 2, 0),
+			Palette.thatch:Lerp(Palette.bark, 0.12),
+			M.Fabric,
+			WEDGE
+		)
+		piece(m, Vector3.new(1.4, 1.6, 0.2), at(0, 0.8, -2.45), Color3.fromRGB(46, 36, 30), M.Wood)
+		piece(m, Vector3.new(5.6, 0.25, 5.6), at(0, 0.12, 0), Palette.leaf:Lerp(Palette.stone, 0.3), M.Grass)
+		glow(m, Vector3.new(0.35, 0.45, 0.35), at(1.2, 2, -2.3))
+		forest(m, "Bush_Round", 1.6, at(-2.6, 0, -1.6), { self = Palette.leafDeep })
+	end,
+
 	-- Fences (8 studs along X) and lamps ------------------------------------------------------
 	FenceRope = fenceBuilder("rope"),
 	FenceWood = fenceBuilder("wood"),

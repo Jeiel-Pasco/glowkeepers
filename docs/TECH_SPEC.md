@@ -279,7 +279,7 @@ The map lives in the place (Team Create), not in Rojo, as `Workspace.Map`. Code 
 
 | Tag | Instance | Attributes | Children code uses |
 | --- | --- | --- | --- |
-| `Plot` | Model | `PlotId` 1–8 | `Floor` (PrimaryPart), `Zone` (invisible volume over the plot), `Gate` (invisible, at the gate), `DecorZone` (24 × 24), `Slots/SlotNN` pads with `Slot` 1–30, `Sign` (the home, fence and lamps are drawn client-side by `BaseDresser` from the tier) |
+| `Plot` | Model | `PlotId` 1–8 | `Floor` (PrimaryPart), `Zone` (invisible volume over the plot), `Gate` (invisible, at the gate), `DecorZone` (24 × 24), `Slots/SlotNN` invisible data slots with `Slot` 1–30, `Sign` (the home, fence, lamps and den are drawn client-side by `BaseDresser` from `Shared.Props`; Glowlings wander the yard by `Shared.Roam`, and a grab freezes one through the plot view's pad field `f`) |
 | `Campfire` | Model | `LightRadius` (30, safe from the Stalker), `FeedRadius` (10) | `Pit` (PrimaryPart), `Pit.LightPoint` (the PointLight) |
 | `WoodPile` | Model | `PileId` `"W01"`…; the server adds `Available` at runtime | |
 | `WildSpawn` | Part (invisible) | `Area` `"Forest"` or `"Deepwood"` | |
@@ -288,7 +288,7 @@ The map lives in the place (Team Create), not in Rojo, as `Workspace.Map`. Code 
 
 The place has StreamingEnabled, so client code must expect tagged models whose parts haven't streamed in yet, and look parts up again when they arrive.
 
-`Workspace.Map` carries the ring radii as attributes: `FireLightRadius`, `PlotRingRadius`, `ClearingRadius`, `ForestOuter`, `MapRadius`. Slots 1–6 sit in the plot's side strips (the vault pedestals come first); 7–30 sit in three rows in front of the decoration zone.
+`Workspace.Map` carries the ring radii as attributes: `FireLightRadius`, `PlotRingRadius`, `ClearingRadius`, `ForestOuter`, `MapRadius`. Slot parts are hidden and only number the slots; where a Glowling stands comes from `Shared.Roam`.
 
 The greybox comes from `tools/BuildGreybox.luau` (run it in Studio's command bar). It rebuilds only a map it made itself; once the map is edited by hand, set `Map.HandEdited = true` and it refuses to overwrite it. The art pass keeps the tags and attributes above.
 

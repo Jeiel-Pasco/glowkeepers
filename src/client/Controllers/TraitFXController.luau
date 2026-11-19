@@ -1,12 +1,12 @@
 --!strict
--- Shows pet traits on every plot (GAME_SYSTEMS §31), from the replicated plot views:
---   family link   a soft beam between same-family neighbours (brighter if one is a Harmonizer)
---   Harmonizer    a family-coloured ring under its pad
---   Guardian      a pale blue ring under its pad
---   Overcharge    when a pad becomes Overcharged: a gold beam from its Infuser (a neighbour) or the
---                 plot's Aurora Lynx, and a burst of sparks
---   Forager       TraitPouch (plotId, pad, amount): "+3.9K" rises from the pad
--- Links and rings are rebuilt only when a plot's pads change.
+-- Shows pet traits on every plot (GAME_SYSTEMS §31), from the replicated plot views. Everything
+-- hangs on the Glowling's drawn model (PlotController.model), so it follows it as it wanders:
+--   Harmonizer    a family-coloured ring at its feet
+--   Guardian      a pale blue ring at its feet
+--   Overcharge    when a Glowling becomes Overcharged: a gold beam from the Infuser that did it
+--                 (or the plot's Aurora Lynx), and a burst of sparks
+--   Forager       TraitPouch (plotId, pad, amount): "+3.9K" rises from the Glowling
+-- Rings are rebuilt only when a plot's Glowlings change.
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -42,18 +42,16 @@ local function c3(rgb: { number }): Color3
 	return Color3.fromRGB(rgb[1], rgb[2], rgb[3])
 end
 
--- Pad number → pad part, for a plot that has streamed in.
+-- Pad number → the Body (root part) of the Glowling drawn there, for a plot that has streamed in.
 local function padParts(plotId: number): { [number]: BasePart }
 	local parts = {}
-	for _, model in CollectionService:GetTagged("Plot") do
-		if model:GetAttribute("PlotId") == plotId then
-			local slots = model:FindFirstChild("Slots")
-			for _, pad in if slots ~= nil then slots:GetChildren() else {} do
-				local n = pad:GetAttribute("Slot")
-				if type(n) == "number" and pad:IsA("BasePart") then
-					parts[n] = pad
-				end
-			end
+	local view = PlotController.get(plotId)
+	for key in if view ~= nil then view.pads else {} do
+		local pad = tonumber(key)
+		local model = if pad ~= nil then PlotController.model(plotId, pad) else nil
+		local body = if model ~= nil then model.PrimaryPart else nil
+		if pad ~= nil and body ~= nil then
+			parts[pad] = body
 		end
 	end
 	return parts
@@ -83,18 +81,23 @@ local function beam(from: BasePart, to: BasePart, color: Color3, width: number, 
 	return b
 end
 
-local function ring(pad: BasePart, color: Color3, parent: Instance)
+-- A thin glowing disc at the Glowling's feet, welded to its Body so it walks with it.
+local function ring(body: BasePart, color: Color3, parent: Instance)
+	local model = body.Parent
+	local feet = if model ~= nil and model:IsA("Model") then model:GetPivot() else body.CFrame
 	local p = Instance.new("Part")
 	p.Name = "TraitRing"
 	p.Shape = Enum.PartType.Cylinder
-	-- A disc just under the pad's top, a little wider than the pad: only a halo shows round it.
-	local across = math.max(pad.Size.X, pad.Size.Z) + 0.9
-	p.Size = Vector3.new(0.1, across, across)
-	p.CFrame = pad.CFrame * CFrame.new(0, pad.Size.Y / 2 - 0.08, 0) * CFrame.Angles(0, 0, math.pi / 2)
+	p.Size = Vector3.new(0.1, 3.4, 3.4)
+	p.CFrame = feet * CFrame.new(0, 0.06, 0) * CFrame.Angles(0, 0, math.pi / 2)
 	p.Material = Enum.Material.Neon
 	p.Color = color
-	p.Transparency = 0.3
-	p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = true, false, false, false, false
+	p.Transparency = 0.55
+	p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = false, false, false, false, false
+	p.Massless = true
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0, weld.Part1 = body, p
+	weld.Parent = p
 	p.Parent = parent
 end
 
@@ -122,7 +125,20 @@ local function speciesOn(view: any, pad: number): any
 	return if glowling ~= nil then speciesById[glowling.sp] else nil
 end
 
--- Links and rings for one plot.
+-- A number per drawn Body, so a Glowling drawn again gets its ring again.
+local serials: { [BasePart]: number } = setmetatable({}, { __mode = "k" }) :: any
+local nextSerial = 0
+local function serialOf(body: BasePart): number
+	local n = serials[body]
+	if n == nil then
+		nextSerial += 1
+		n = nextSerial
+		serials[body] = n
+	end
+	return n
+end
+
+-- Rings for one plot.
 local function drawStatic(plotId: number, view: any)
 	local folderRoot = root
 	if folderRoot == nil then
@@ -132,7 +148,8 @@ local function drawStatic(plotId: number, view: any)
 	local keyParts = {}
 	for pad = 1, 30 do
 		local s = speciesOn(view, pad)
-		table.insert(keyParts, if s ~= nil and parts[pad] ~= nil then s.id else "")
+		local body = parts[pad]
+		table.insert(keyParts, if s ~= nil and body ~= nil then `{s.id}@{serialOf(body)}` else "")
 	end
 	local key = table.concat(keyParts, ",")
 	local old = drawn[plotId]
@@ -155,20 +172,20 @@ local function drawStatic(plotId: number, view: any)
 			elseif s.trait == "Guardian" then
 				ring(part, GUARD, folder)
 			end
-			for _, n in Traits.neighbours(pad) do
-				local other = speciesOn(view, n)
-				if n > pad and other ~= nil and parts[n] ~= nil and other.family == s.family then
-					local harmony = s.trait == "Harmonizer" or other.trait == "Harmonizer"
-					beam(part, parts[n], c3(RarityLook.glow(s.family)), if harmony then 0.35 else 0.18, folder)
-				end
-			end
 		end
 	end
 end
 
--- The pad an Overcharge on `pad` most likely came from: a neighbouring Infuser, else an Aurora Lynx.
+-- The pad an Overcharge on `pad` most likely came from: an Infuser in the base, else an Aurora Lynx.
 local function sourceOf(view: any, pad: number): number?
-	for _, n in Traits.neighbours(pad) do
+	local placed = {}
+	for key, glowling in view.pads do
+		local n = tonumber(key)
+		if n ~= nil then
+			placed[n] = glowling.sp
+		end
+	end
+	for _, n in Traits.mates(placed, pad) do
 		local s = speciesOn(view, n)
 		if s ~= nil and s.trait == "Infuser" then
 			return n
