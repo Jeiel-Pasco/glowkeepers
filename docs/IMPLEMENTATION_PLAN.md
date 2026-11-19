@@ -82,6 +82,13 @@ The GDD's loop and maths hold up, but some rules conflict and some are missing. 
 | D15 | "Every number in the simulation section comes from its final run" of `sim.py` | It wasn't in the project | **Done.** `sim/sim.py` is your original. `sim/sim_v3.py` reads `config/economy.json`, the file the game will load, and reproduces sim.py's results exactly. | done |
 | D16 | The audience is 9–16 and the game has a horror monster | If the Stalker is rated past Roblox's **Mild** content label, the game becomes 13+ (the age line at the time of writing; check the current rules) and loses the 9–12 audience. | Design the Stalker to Mild: no gore, scares built on telegraphing and sound, and a Calm-mode setting. Submit a practice questionnaire in week 7. | approved |
 | D17 | Vault slots "can never be stolen" | Whether the vault is extra slots or part of the slot count isn't stated | Part of the slot count, as the sim models it: your top 3 + Stars slots are protected. Extra slots would raise income above every tested number. | sim ✓ |
+| D18 | Overhaul review (Nov 2026): give every species one fixed rarity | The Glowdex pages need each species at 4–7 rarities, so pages would top out at 1 of 7. The Clearing pool has 1 Epic-looking species and no Legendary+, so a high lure roll would have no species. Only 1 Secret species. | Rarity is still rolled per catch with the same odds. Each species gets a **minimum rarity** (`minRarity`): the species is picked uniformly among the pool's species whose floor ≤ the rolled rarity. Apex species never show up as Common. Floors: CONTENT §A3. The Glowdex counts only reachable rarities (GAME_SYSTEMS §16). | odds unchanged; sim for the Glowdex bonus |
+| D19 | Overhaul: a different base Glow/s per species | Breaks the sim's milestone timings; the claim that the sim "stays 100% valid" only holds with one value per tier | **Glow/s stays per rarity tier** (`1 / 4 / 20 / 120 / 1k / 10k / 150k`). Species differ by family and trait, never by base Glow/s. | — |
+| D20 | Overhaul: Glowlings "do something" on the plot | Pads that only print Glow/s feel lifeless | **Pet traits v1** (GAME_SYSTEMS §31): 6 families with a small family link bonus; Harmonizers (neighbour bonus), Guardians (more grab time), Infusers (timed **Overcharge**, never a mutation), Foragers (auto Glow pouch). All income bonuses stack to at most **×1.6** per Glowling. Pure rules in `Shared.Traits`, applied when placements change, no new per-second loop. | **sim** (pending: add traits to sim_v3) |
+| D21 | Overhaul: pet abilities hand out Embers | Embers are sold for Robux; free Ember faucets undercut the store and the Ember sinks | Pet traits give **no Embers** at launch. If the Forager basket ships later, Ember drops are capped at 6 a day per player. | — |
+| D22 | Overhaul: Mossbear knockback, Emberwing "fire loss costs you nothing", Lunadrake +15% server night luck and a guaranteed daily mutation, Gloom Raven longer Base Lock, permanent Rainbow from Infusers | Knockback fights the carry speed check; the others remove the night's stakes, compete with Server Luck and Lock Charges, or inflate income | **Cut.** Bespoke abilities only for the 5 apex species (Mythic and Secret floors), and those are whole-plot versions of the 4 trait engines. A rare permanent upgrade at dawn ("Dawn Jackpot") may come after launch, only after a sim run. | — |
+| D23 | Overhaul: a Night Companion follows you into the forest | Needs a rule for where the Glowling is while it follows you | One **companion slot**, chosen from your **vault** Glowlings: it stays on its pad (still earns, still safe) and a client-only copy floats beside you at night. Firebinder: fuel value +15–50%; Wayfinder: pings the nearest Rare+ wild Glowling or shard; Savior: revive hold −0.6 s (minimum 1.8 s). Ships after traits v1, before G3. | playtest |
+| D24 | Overhaul: 3 model forms per species (120 meshes) | 360 artist-days | 40 base meshes. **Forms come from rarity**: Form I Common–Rare, Form II Epic–Legendary, Form III Mythic–Secret, made of shared accessories (crowns, wings, rune rings) on standard rig sockets plus shader swaps. Fuse (week L3) needs no extra art. | — |
 
 **What the plan's changes do together** (sim, 200 players per style, 30 days). The GDD's numbers are in brackets.
 
@@ -227,6 +234,14 @@ After the feature freeze (end of week 11), the only work is bug fixes, config tu
 - no P0 bugs
 - saves verified across rejoins and server shutdowns
 - every analytics event firing in DEV
+
+### Added after the overhaul review (Nov 2026, D18–D24)
+
+The code is ahead of the calendar, so these land before G2 without moving a gate:
+1. **Traits v1** (LS): `minRarity`, `family`, `trait` in `species.json`; `Shared.Traits` with Lune tests; Income, Steal and Roll wired; the Glowdex reachable-rarity rule. **DP** adds traits to sim_v3 and reruns it before the numbers are final.
+2. **Trait visuals** (GS, AR): family link beams, Overcharge beam, Guardian bramble ring, Forager pouch pop; all client-driven from plot state. Rarity forms I–III from shared accessories.
+3. **Night Companion** (LS, GS): before G3.
+4. **Later, only if the data asks:** the Forager basket (capped Embers), the Dawn Jackpot, Sanctuary Blooms (week L5 at the earliest).
 
 ### Phase 5: Beta + tuning (weeks 10–11)
 

@@ -55,7 +55,7 @@ glowkeepers/
 ├─ rokit.toml  selene.toml  stylua.toml  .luaurc
 ├─ config/                     single source of truth; the game and the sim both read it
 │  ├─ economy.json             every number in GAME_SYSTEMS §0
-│  ├─ species.json             40 species: id, name, pool (model path and colours come with the art)
+│  ├─ species.json             40 species: id, name, pool, minRarity, family, trait (+ trait numbers); model path and colours come with the art
 │  ├─ decor.json  quests.json  pass_s1.json  badges.json
 │  ├─ products.json            pass/product IDs per environment
 │  └─ environments.json
@@ -128,10 +128,10 @@ Client intent ──► Net (type check, rate limit) ──► Service (rules, s
 | GlowlingService / InventoryService | Create, move and transfer Glowling records; storage cap; auto-place | 2 |
 | ReleaseService | Release storage Glowlings for 60 s of their income each (Star bonus included); all or nothing; refuses placed or held ones | 3 |
 | RollService | Wraps `Roll` with a per-server `Random`; pity; tutorial overrides | 2 |
-| IncomeService | Recomputes Glow/s when inventory changes; 1 Hz accrual; offline payout on join (at the saved `lastIncomePerSec`, before the join recompute), shown by `OfflineEarnings (amount, away)` once the client is ready | 2 |
+| IncomeService | Recomputes Glow/s when inventory changes, including pet-trait multipliers from `Shared.Traits` (GAME_SYSTEMS §31) and Overcharge start/end; Forager pouches; 1 Hz accrual; offline payout on join (at the saved `lastIncomePerSec`, before the join recompute), shown by `OfflineEarnings (amount, away)` once the client is ready | 2 |
 | ShopService | Lures for Glow from each player's own stock per restock window (`os.time() // 300`, saved in `shop` so a rejoin doesn't refill it); check and spend with no yield between, refund if the roll can't be granted | 3 |
 | UpgradeService | Lantern, Boots and Slots for Glow (one level or Buy max, `Economy.upgradePurchase`), Lock Charges for Glow or Embers (5 held); applies Boots to `RunSpeed` and tonight's catches, and Slots to the layout | 3 |
-| StealService | Grab, carry, tag, deliver, chase boost, victim cooldown, validation | 2 |
+| StealService | Grab, carry, tag, deliver, chase boost, victim cooldown, validation; Guardian grab-time bonus (`Shared.Traits`) | 2 |
 | LockService | Base Lock: 60 s lock then 90 s recharge (a Lock Charge skips it), none at night, pushes outsiders out of a locked zone at 10 Hz | 2 |
 | ShieldService | New-player shield: 45 min of saved play time, ends early when its owner drops it to steal (or at the first rebirth, Phase 4); `Shielded` / `ShieldEndsAt` attributes; the plot view's `shield` | 3 |
 | CampfireService | Fire meter, wood and shard pickups, feeding, the dawn result | 2 |
@@ -161,7 +161,7 @@ Client intent ──► Net (type check, rate limit) ──► Service (rules, s
 | InputController | Action map for touch, keyboard/mouse and gamepad; one context button (Catch / Grab / Feed / Revive / Place); hold actions |
 | HUDController | Glow counter extrapolated from `{balance, perSec, t}`, Embers, cycle ring, catches left, fire meter, lock button, carry indicator |
 | CycleFXController | Lighting, Atmosphere and ColorCorrection tweens; dusk sky; night darkness |
-| GlowlingRenderer | Builds Glowling models from plot and wild state; picks which ones get real lights by brightness and distance; LOD |
+| GlowlingRenderer | Builds Glowling models from plot and wild state; rarity forms I–III from shared accessories on rig sockets; trait VFX (link beams, Overcharge, Guardian ring) and the Night Companion copy, all client-side; picks which ones get real lights by brightness and distance; LOD |
 | RollRevealController | Roll reel showing the near-miss tier, stingers, and server announcements for Mythic and above |
 | StalkerFXController | Screen-edge vignette (faint when the Stalker is near, growing through a stalk on this player, full at the lunge), halved in Calm mode; the heartbeat layer waits for its sound asset |
 | TutorialController | Both FTUE paths, arrows, guide Wisp, funnel analytics |
