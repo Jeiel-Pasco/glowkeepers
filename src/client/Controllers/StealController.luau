@@ -1,6 +1,6 @@
 --!strict
--- Stealing on the client (GAME_SYSTEMS §10). By day, next to another player's display pad
--- with a Glowling on it, the context button says "Grab": holding it sends GrabStart, letting
+-- Stealing on the client (GAME_SYSTEMS §10). By day, next to a Glowling wandering another
+-- player's yard, the context button says "Grab": holding it sends GrabStart, letting
 -- go early sends GrabCancel. The server times the hold and checks every rule again; the bar
 -- here only follows the character's `GrabUntil`. Carriers (character `CarryFrom`) are Marked
 -- with a glow everyone sees; the owner they robbed sees them through walls.
@@ -35,7 +35,8 @@ local bar: Frame? = nil
 local fill: Frame? = nil
 local carryLabel: TextLabel? = nil
 
--- The closest stealable pad within reach: another player's display pad with a Glowling.
+-- The closest stealable Glowling within reach: one wandering another player's yard (vault
+-- Glowlings sleep by the den and can't be taken). Measured to where it stands (Shared.Roam).
 local function nearestPad(position: Vector3): (number?, number?)
 	local me = Players.LocalPlayer.UserId
 	local bestDistance = economy.steal.grabRange - MARGIN
@@ -43,14 +44,14 @@ local function nearestPad(position: Vector3): (number?, number?)
 	for _, model in CollectionService:GetTagged("Plot") do
 		local plotId = model:GetAttribute("PlotId")
 		local view = if type(plotId) == "number" then PlotController.get(plotId) else nil
-		local slots = model:FindFirstChild("Slots")
-		if view == nil or view.owner == 0 or view.owner == me or slots == nil then
+		if view == nil or view.owner == 0 or view.owner == me then
 			continue
 		end
-		for _, pad in slots:GetChildren() do
-			local n = pad:GetAttribute("Slot")
-			if pad:IsA("BasePart") and type(n) == "number" and n > view.vault and view.pads[tostring(n)] ~= nil then
-				local offset = pad.Position - position
+		for slot in view.pads do
+			local n = tonumber(slot)
+			local spot = if n ~= nil and n > view.vault then PlotController.spot(plotId :: number, n) else nil
+			if spot ~= nil then
+				local offset = spot.Position - position
 				local distance = Steal.reach(economy, offset.X, offset.Y, offset.Z)
 				if distance <= bestDistance then
 					bestDistance, bestPlot, bestPad = distance, plotId :: number, n

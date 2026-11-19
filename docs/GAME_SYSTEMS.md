@@ -39,9 +39,8 @@ Every other number is the GDD's.
 - When a player leaves, their plot is cleared from the world (the data stays in their profile) and is free for the next joiner. A carry *from* the leaving player's plot snaps back and is cancelled.
 - Each plot has:
   - a gate
-  - 30 slot pads (8 unlocked at the start). The first 3 + Stars of them (+2 with the pass) are vault pedestals (§7).
+  - a fenced yard with room for 30 Glowlings (8 at the start). Placed Glowlings **wander the yard** (`Shared.Roam`: deterministic from plot, slot and server time, so server and clients agree). Slots are data only, with no pads on the map. The first 3 + Stars of them (+2 with the pass) are vault slots: those Glowlings **sleep by the den** in the back corner and can't be grabbed (§7).
   - a decoration zone of 24 × 24 studs on a 2-stud grid
-  - a trophy pedestal
   - a name sign
 - One player slot is kept free for friends joining.
 
@@ -232,8 +231,8 @@ Every upgrade has a "Buy max" button, which walks the real price list and stops 
 ## 10. Stealing
 
 **Flow**
-1. **Grab.** The thief stands within 6 studs of a display slot on another plot and holds the button.
-   - Hold time: 1 s for Common to Rare, 2 s for Epic and Legendary, 3 s for Mythic and Secret (†), plus any Guardian bonus on that pad (§31).
+1. **Grab.** The thief walks up to a Glowling wandering another player's yard (within 6 studs of where it stands, by `Shared.Roam`) and holds the button. The Glowling stands still while it's being grabbed, and wanders on if the grab fails.
+   - Hold time: 1 s for Common to Rare, 2 s for Epic and Legendary, 3 s for Mythic and Secret (†), plus any Guardian bonus in that base (§31).
    - The owner gets an alarm and a toast at once: "Sam is stealing your Rare Mothlet!", with an arrow.
 2. **Carry.** The thief moves at ×0.85 and glows (**Marked**). The owner sees them through walls (a Highlight).
    - The owner gets the **chase boost**: ×1.2 speed for 10 s (D11, **sim**).
@@ -595,19 +594,19 @@ The GDD added night-only bots because small servers struggled. D1's drain formul
 
 Every species has a **family** and one **trait** (CONTENT_AND_LIVEOPS §A3). Traits are rules on placed Glowlings, not physics: the server applies them when placements change (and at Overcharge start and end), with no new per-second loop. The rules live in `Shared.Traits`; numbers live in `config/species.json` (per species) and `economy.traits` (shared). All numbers are † and **sim**.
 
-**Neighbours:** the pads that share an edge on the plot's pad grid (vault and display pads alike).
+**The base:** Glowlings wander, so traits count every other Glowling placed in the same base (vault and display alike), not pad neighbours.
 
 **Shipped in traits v1:** family link, Harmonizer (and the whole-plot Skywhale Calf and Lunadrake), Guardian (and Elder Sapling), the cap, species floors (with D25 for wilds), and Glowdex reachable entries. **Traits v1b:** Infuser Overcharge, Aurora Lynx and Forager pouches (TraitService, a 2 s tick; Overcharge shows as a gold aura). **Night Companion** shipped (CompanionService; save field `companion`, attribute `Companion` = "sp|r|m"). Wayfinder points at wilds only, and judges them by **species floor** (Rare or higher), since a wild's rarity stays hidden until caught; Glow-Shards aren't targeted yet. With today's numbers the best stack is ×1.581 (two links, a Harmonizer, Lunadrake), so the ×1.6 cap is a guard for tuning.
 
-**Family link (everyone):** +5% Glow/s for each neighbour of the same family, up to +10%.
+**Family link (everyone):** +5% Glow/s for each other Glowling of the same family in the base, up to +10%.
 
 **Day traits (on the plot)**
 
 | Trait | Effect | Notes |
 | --- | --- | --- |
-| Harmonizer | Its same-family neighbours get +15% Glow/s | Doesn't boost itself; several Harmonizers next to one Glowling don't stack (the highest counts) |
-| Guardian | Its own pad and its neighbours get +0.5 s grab time (+1.0 s if the species' floor is Rare or higher) | Highest bonus per pad counts; at most +1.5 s on any pad |
-| Infuser | Every 60 s, one random neighbour gets **Overcharge**: ×1.5 Glow/s for 30 s | Overcharge never stacks, isn't saved, isn't a mutation, and ends if the Glowling moves or is stolen |
+| Harmonizer | Same-family Glowlings in the base get +15% Glow/s | Doesn't boost itself; several Harmonizers don't stack (the highest counts) |
+| Guardian | Every display Glowling in the base gets +0.5 s grab time (+1.0 s if the species' floor is Rare or higher) | The best Guardian counts; at most +1.5 s |
+| Infuser | Every 60 s, one random other Glowling in the base gets **Overcharge**: ×1.5 Glow/s for 30 s | Overcharge never stacks, isn't saved, isn't a mutation, and ends if the Glowling moves or is stolen |
 | Forager | Every 90 s, adds a Glow pouch worth 30 × its own Glow/s | Auto-collected at launch (a basket later); never Embers (D21) |
 
 **Apex species** (floors of Epic or Legendary) use the whole-plot version of their trait. Whole-plot effects don't stack with each other: the highest applies.

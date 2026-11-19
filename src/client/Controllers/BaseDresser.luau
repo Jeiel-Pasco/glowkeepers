@@ -13,6 +13,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local BaseTier = require(Shared:WaitForChild("BaseTier"))
 local Decor = require(Shared:WaitForChild("Decor"))
 local Props = require(Shared:WaitForChild("Props"))
+local Roam = require(Shared:WaitForChild("Roam"))
 local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
 
 local BaseDresser = {}
@@ -133,6 +134,12 @@ function BaseDresser.dress(plot: Instance, slots: number, owned: boolean, parent
 		fence(fenceModel, top, Vector3.new(-hw, 0, hd), Vector3.new(hw, 0, hd), dressing)
 		fence(fenceModel, top, Vector3.new(-hw, 0, -hd), Vector3.new(-GATE_HALF, 0, -hd), dressing)
 		fence(fenceModel, top, Vector3.new(GATE_HALF, 0, -hd), Vector3.new(hw, 0, -hd), dressing)
+	end
+
+	-- The den in the back corner, where vault Glowlings sleep (Shared.Roam), facing the yard.
+	local den = if owned then template("Tiers", "Den") else nil
+	if den ~= nil then
+		place(den, 1, top * CFrame.new(Roam.DEN.x, 0, Roam.DEN.z) * CFrame.Angles(0, math.rad(-45), 0), dressing)
 	end
 
 	-- The home stands behind the plot, its door toward the fire.

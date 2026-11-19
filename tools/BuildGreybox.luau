@@ -798,9 +798,10 @@ do
 				Vector3.new(3, 0.2, 3),
 				cf * CFrame.new(x, 0.4, z),
 				COLORS.pad,
-				Enum.Material.Slate
+				Enum.Material.Slate,
+				GHOST
 			)
-			p:SetAttribute("Slot", n)
+			p:SetAttribute("Slot", n) -- a data slot only: Glowlings wander the yard (Shared.Roam)
 		end
 		for _, z in { 8, 4, 0 } do
 			pad(-15, z)
