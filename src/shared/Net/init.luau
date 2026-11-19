@@ -73,6 +73,7 @@ Net.remotes = {
 
 	-- Server → client
 	PlayerState = { dir = "s2c" }, -- (full: boolean, data): a snapshot, then top-level patches
+	OfflineEarnings = { dir = "s2c" }, -- (amount: number, away: number seconds): the join popup
 	Wallet = { dir = "s2c" }, -- (glow, perSec, serverTime, embers): the client extrapolates
 	Toast = { dir = "s2c" }, -- (text, kind?)
 	Announce = { dir = "s2c" }, -- (text)
