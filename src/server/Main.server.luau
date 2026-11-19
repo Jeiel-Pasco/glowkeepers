@@ -44,6 +44,7 @@ local ORDER = {
 	"EventService",
 	"MonetizationService",
 	"TradeService",
+	"CompanionService",
 	"AdminService",
 }
 

@@ -26,6 +26,7 @@ local Server = script.Parent.Parent
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Env = require(Shared:WaitForChild("Env"))
 local Revive = require(Shared:WaitForChild("Revive"))
+local Companion = require(Shared:WaitForChild("Companion"))
 local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
 local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
@@ -33,6 +34,17 @@ local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 local CycleService = require(script.Parent:WaitForChild("CycleService"))
+
+local speciesById: { [string]: any } = {}
+for _, entry in (require(Shared:WaitForChild("Config"):WaitForChild("species")) :: any).species do
+	speciesById[entry.id] = entry
+end
+
+-- The player's Night Companion species (D23), or nil.
+local function companionOf(player: Player): any
+	local data = DataService.get(player)
+	return if data ~= nil then Companion.species(data, speciesById) else nil
+end
 
 local TICK_SECONDS = 0.1
 local RANGE_SLACK = 2 -- studs past revive.range before a hold in progress breaks (latency)
@@ -231,7 +243,7 @@ local function reviveStart(reviver: Player, userId: number)
 		reviver = reviver,
 		target = target,
 		character = character,
-		ends = now() + economy.revive.holdSeconds,
+		ends = now() + Companion.reviveHold(economy, companionOf(reviver), economy.revive.holdSeconds),
 	}
 	holds[reviver] = hold
 	holdOn[target] = hold
