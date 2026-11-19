@@ -19,6 +19,7 @@ local function check(overrides: { [string]: any }?): any
 		padTaken = false,
 		locked = false,
 		shielded = false,
+		thiefShielded = false,
 		now = 1000,
 		victimSafeUntil = 0,
 		stolenToday = 0,
@@ -66,6 +67,8 @@ H.test("each rule rejects with its own reason", function()
 	H.eq(reason({ padTaken = true }), "taken", "someone else has it")
 	H.eq(reason({ locked = true }), "locked", "Base Lock")
 	H.eq(reason({ shielded = true }), "shielded", "shield")
+	H.eq(reason({ thiefShielded = true }), "thief_shielded", "a shielded thief drops it first")
+	H.eq(reason({ thiefShielded = true, locked = true }), "locked", "only asked when the grab could happen")
 	H.eq(reason({ victimSafeUntil = 1001 }), "cooldown", "victim cooldown")
 	H.eq(reason({ stolenToday = 1 }), "daily_limit", "once per victim per day phase")
 	H.eq(reason({ distance = cfg.steal.grabRange + 0.01 }), "too_far", "out of range")

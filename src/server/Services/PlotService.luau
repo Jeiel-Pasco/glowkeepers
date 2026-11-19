@@ -9,9 +9,10 @@
 -- there). Never by position, so the map can move. Rules for assignment and the view live in
 -- Shared.Plots.
 --
--- Each view carries its Base Lock's end time, set by LockService through setLock.
+-- Each view carries its Base Lock's end time, set by LockService through setLock, and whether
+-- the owner has the new-player shield (ShieldService calls refresh when it ends).
 --
--- Not yet: the shield bubble (Phase 3), decorations and the base name (Phase 4), and
+-- Not yet: decorations and the base name (Phase 4), and
 -- spawning the player at their plot.
 
 local CollectionService = game:GetService("CollectionService")
@@ -149,6 +150,14 @@ end
 
 function PlotService.isLocked(plotId: number): boolean
 	return (locks[plotId] or 0) > workspace:GetServerTimeNow()
+end
+
+-- Sends a player's plot to everyone again (ShieldService, when their shield ends).
+function PlotService.refresh(player: Player)
+	local id = plotOf[player]
+	if id ~= nil then
+		publish(id)
+	end
 end
 
 local function sendSnapshot(player: Player)

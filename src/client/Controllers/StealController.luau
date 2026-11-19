@@ -17,6 +17,7 @@ local Steal = require(Shared:WaitForChild("Steal"))
 local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
 local NetClient = require(script.Parent.Parent:WaitForChild("Net"):WaitForChild("NetClient"))
 local InputController = require(script.Parent:WaitForChild("InputController"))
+local ShieldController = require(script.Parent:WaitForChild("ShieldController"))
 local CycleFXController = require(script.Parent:WaitForChild("CycleFXController"))
 local PlotController = require(script.Parent:WaitForChild("PlotController"))
 
@@ -184,6 +185,9 @@ function StealController.Start()
 		end
 		local grab = target
 		if began and grab ~= nil then
+			if not ShieldController.allowGrab() then
+				return -- asked to drop the shield first
+			end
 			NetClient.send("GrabStart", grab.plotId, grab.pad)
 		elseif not began then
 			NetClient.send("GrabCancel")

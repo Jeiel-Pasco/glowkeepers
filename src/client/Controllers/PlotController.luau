@@ -2,7 +2,7 @@
 -- Every plot's replicated state (TECH_SPEC §6): PlotSnapshot once, then PlotDelta patches,
 -- applied with Shared.Plots so client and server share one shape. GlowlingRenderer (GS) will
 -- build the real models from this; until then each occupied pad gets a placeholder orb,
--- coloured by rarity, and the owner's plot sign shows their name. The place streams, so a
+-- coloured by rarity, the owner's plot sign shows their name, and a shielded plot gets a bubble. The place streams, so a
 -- plot is drawn again when its pads or sign stream in.
 
 local CollectionService = game:GetService("CollectionService")
@@ -24,6 +24,8 @@ local RARITY_COLORS = {
 	Color3.fromRGB(255, 80, 140),
 	Color3.fromRGB(120, 255, 255),
 }
+
+local SHIELD_COLOR = Color3.fromRGB(150, 220, 255)
 
 local PlotController = {}
 PlotController.Changed = Signal.new() -- (plotId, view)
@@ -84,6 +86,23 @@ local function render(plotId: number)
 	end
 	local group = Instance.new("Folder")
 	group.Name = `Plot{plotId}`
+	local floor = model:FindFirstChild("Floor")
+	if view.shield and floor ~= nil and floor:IsA("BasePart") then
+		-- The new-player shield: a soft bubble over the plot (placeholder).
+		local bubble = Instance.new("Part")
+		bubble.Name = "Shield"
+		bubble.Shape = Enum.PartType.Ball
+		bubble.Size = Vector3.one * 50
+		bubble.CFrame = floor.CFrame
+		bubble.Color = SHIELD_COLOR
+		bubble.Material = Enum.Material.ForceField
+		bubble.Anchored = true
+		bubble.CanCollide = false
+		bubble.CanTouch = false
+		bubble.CanQuery = false
+		bubble.CastShadow = false
+		bubble.Parent = group
+	end
 	for _, pad in slots:GetChildren() do
 		local n = pad:GetAttribute("Slot")
 		local glowling = if type(n) == "number" then view.pads[tostring(n)] else nil

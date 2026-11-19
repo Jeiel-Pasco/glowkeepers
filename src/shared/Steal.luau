@@ -16,7 +16,8 @@ export type Check = {
 	busy: boolean, -- the thief is already grabbing or carrying (one at a time)
 	padTaken: boolean, -- someone else is grabbing or carrying this pad's Glowling
 	locked: boolean, -- the target plot's Base Lock is on (LockService)
-	shielded: boolean, -- the victim has the new-player shield (Phase 3; a thief's grab ends their own)
+	shielded: boolean, -- the victim has the new-player shield
+	thiefShielded: boolean, -- the thief has it: they must drop it first (DropShield, after a confirm)
 	now: number,
 	victimSafeUntil: number, -- the victim cooldown after losing a Glowling
 	stolenToday: number, -- steals by this thief from this victim in this day phase
@@ -70,6 +71,8 @@ function Steal.canGrab(cfg: any, c: Check): (boolean, string?)
 		return false, "cooldown"
 	elseif c.stolenToday >= s.perThiefPerVictimPerDay then
 		return false, "daily_limit"
+	elseif c.thiefShielded then
+		return false, "thief_shielded"
 	elseif not (c.distance <= s.grabRange) then
 		return false, "too_far"
 	end
