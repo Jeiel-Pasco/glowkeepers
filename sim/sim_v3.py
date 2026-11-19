@@ -21,6 +21,8 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CFG_PATH = os.path.join(HERE, "..", "config", "economy.json")
+# Trait income factor by slot count, measured with the real Shared.Traits (sim/trait_income.luau).
+TRAIT_PATH = os.path.join(HERE, "trait_income.json")
 RAR = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret"]
 LEG = 4  # zero-based index of Legendary
 
@@ -61,6 +63,8 @@ SCENARIOS = {
     "plan": ("config/economy.json as committed (all plan decisions)", {"sim.fireBonus": True}),
     "plan_clamp": ("plan + lure results capped at Epic (rejected)", {"sim.fireBonus": True, "lures.resultCap": 4}),
     "plan_nostep": ("plan without the rebirth step-down", {"sim.fireBonus": True, "rebirth.stepEnabled": False}),
+    "plan_traits": ("plan + traits, Place best order (casual-like)", {"sim.fireBonus": True, "sim.traits": "placeBest"}),
+    "plan_traits_arr": ("plan + traits, pads arranged for links (engaged-like)", {"sim.fireBonus": True, "sim.traits": "arranged"}),
 }
 
 
@@ -100,6 +104,12 @@ def simulate(args):
     inc_cfg, rb, vault_cfg, store_cfg = cfg["income"], cfg["rebirth"], cfg["vault"], cfg["storage"]
     pity_n = cfg["pity"]["legendaryAfterNightCatches"]
     fire_bonus = cfg["sim"]["fireBonus"]
+    trait_mode = cfg["sim"].get("traits")
+    if trait_mode:
+        with open(TRAIT_PATH, encoding="utf-8") as f:
+            table = json.load(f)
+        trait_x = [row["slots"] for row in table]
+        trait_y = [row[trait_mode] for row in table]
 
     def roll(luck, floor_t=0):
         # Rarest first; luck multiplies the odds of Rare and above, capped per tier.
@@ -131,7 +141,8 @@ def simulate(args):
 
     def income():
         best = sorted(pets, key=lambda x: -x[1])[:slots]
-        return sum(v for _, v in best) * (1 + inc_cfg["starBonus"] * stars)
+        traits = float(np.interp(slots, trait_x, trait_y)) if trait_mode else 1.0
+        return sum(v for _, v in best) * (1 + inc_cfg["starBonus"] * stars) * traits
 
     def luck():
         return (1 + lk["perLanternLevel"] * lan) * (1 + lk["perStar"] * stars)

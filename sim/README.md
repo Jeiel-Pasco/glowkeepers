@@ -86,3 +86,23 @@ These are the next additions, in order of likely impact:
 Profiles come from the GDD: casual 3×8 min, engaged 4×20 min, hardcore 6×45 min. Sessions are rounded to whole 6-minute cycles, so a casual session is 1 cycle.
 
 `sim.py` line 15 has a stale comment ("2.5e5*6^k"). The code uses `reb_g = 3.2`. It's left unedited so the baseline stays byte-for-byte the original.
+
+## Traits (GAME_SYSTEMS §31), 19 Nov 2026
+
+`sim/trait_income.luau` runs the real `Shared.Traits` (multipliers, Overcharge, Forager pouches) on random collections for 30 minutes of 2 s ticks and writes `trait_income.json`: income with traits ÷ income without, by slot count. `sim.traits` ("placeBest" or "arranged") multiplies the sim's income by it.
+
+| Slots | Place best | Arranged |
+| --- | --- | --- |
+| 8 | ×1.11 | ×1.19 |
+| 18 | ×1.12 | ×1.23 |
+| 30 | ×1.14 | ×1.27 |
+
+Pacing effect (200 seeds, 30 days):
+
+| Scenario | casual Star 5 | engaged Star 5 | Stars d30 casual / engaged / hardcore |
+| --- | --- | --- | --- |
+| plan | d7 | d3 | 8 / 10 / 13 |
+| plan_traits | d6 | d3 | 8 / 10 / 14 |
+| plan_traits_arr | d6 | d2 | 8 / 10 / 14 |
+
+Rarity milestones move only within noise (traits don't touch luck). Verdict: no retune needed; the ×1.6 cap is never near the average.
