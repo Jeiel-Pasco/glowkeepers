@@ -33,6 +33,7 @@ export type Spec = {
 	light: boolean?, -- gets a PointLight (the caller enforces the per-plot cap)
 	wild: boolean?, -- rarity hidden: Form I look whatever the tier
 	carried: boolean?, -- no ground pieces or sky beam
+	overcharged: boolean?, -- an Infuser's Overcharge (§31): a gold aura and a brighter light
 }
 
 type Live = {
@@ -387,10 +388,26 @@ function GlowlingRenderer.build(spec: Spec): Model
 		beam.Segments = 1
 		beam.Parent = body
 	end
-	if spec.light then
+	if spec.overcharged then
+		local aura = newPart(
+			model,
+			body,
+			"Overcharge",
+			Enum.PartType.Ball,
+			Vector3.one * 1.25 * H,
+			at(0, 0.6, 0),
+			c3(RarityLook.GOLD),
+			Enum.Material.ForceField,
+			0.2
+		)
+		table.insert(glow, aura)
+		local burst = sparkles(body, 12, c3(RarityLook.GOLD), 0.2 * H + 0.1)
+		burst.Speed = NumberRange.new(1, 2.5)
+	end
+	if spec.light then -- Overcharge brightens a light but never adds one (8 per plot)
 		local light = Instance.new("PointLight")
-		light.Color = glowColor
-		light.Brightness = look.light
+		light.Color = if spec.overcharged then c3(RarityLook.GOLD) else glowColor
+		light.Brightness = look.light * (if spec.overcharged then 1.8 else 1)
 		light.Range = 6 + 2 * H
 		light.Shadows = false
 		light.Parent = body

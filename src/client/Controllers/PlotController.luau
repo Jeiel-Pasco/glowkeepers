@@ -80,7 +80,8 @@ local function renderPads(plotId: number, view: Plots.View, slots: Instance)
 		if slot ~= nil and glowling ~= nil and pad:IsA("BasePart") then
 			seen[slot] = true
 			local light = lights[slot] == true
-			local key = `{glowling.sp}|{glowling.r}|{glowling.m}|{glowling.s}|{light}|{pad.Position}`
+			local over = glowling.o == true
+			local key = `{glowling.sp}|{glowling.r}|{glowling.m}|{glowling.s}|{light}|{over}|{pad.Position}`
 			local old = drawn[slot]
 			if old == nil or old.key ~= key then
 				if old ~= nil then
@@ -92,6 +93,7 @@ local function renderPads(plotId: number, view: Plots.View, slots: Instance)
 					m = glowling.m,
 					s = glowling.s,
 					light = light,
+					overcharged = over,
 				})
 				model.Name = `Plot{plotId}Pad{slot}`
 				GlowlingRenderer.place(model, pad.CFrame * CFrame.new(0, pad.Size.Y / 2, 0))

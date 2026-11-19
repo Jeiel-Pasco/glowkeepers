@@ -41,6 +41,7 @@ local owners: { [number]: Player } = {}
 local plotOf: { [Player]: number } = {}
 local views: { [number]: Plots.View } = {} -- what clients were last sent; never mutated
 local locks: { [number]: number } = {} -- plotId → server time its Base Lock ends (LockService)
+local overcharged: { [Player]: { [number]: any }? } = {}
 local synced: { [Player]: boolean } = {} -- has the snapshot, so gets deltas
 
 function PlotService.plotOf(player: Player): number?
@@ -128,7 +129,8 @@ local function buildView(plotId: number): Plots.View
 		return Plots.empty(plotId)
 	end
 	local name = Decor.baseName(economy, data.baseName.a, data.baseName.n)
-	return Plots.view(plotId, owner.UserId, data, InventoryService.layout(owner, data), locks[plotId], name)
+	local layout = InventoryService.layout(owner, data)
+	return Plots.view(plotId, owner.UserId, data, layout, locks[plotId], name, overcharged[owner])
 end
 
 -- Rebuilds one plot's view and sends what changed to every ready client.
@@ -155,6 +157,12 @@ function PlotService.isLocked(plotId: number): boolean
 end
 
 -- Sends a player's plot to everyone again (ShieldService, when their shield ends).
+-- TraitService's Overcharges for this player's pads; the plot view shows them.
+function PlotService.setOvercharged(player: Player, over: { [number]: any }?)
+	overcharged[player] = over
+	PlotService.refresh(player)
+end
+
 function PlotService.refresh(player: Player)
 	local id = plotOf[player]
 	if id ~= nil then
@@ -209,6 +217,7 @@ local function release(player: Player)
 		return
 	end
 	plotOf[player] = nil
+	overcharged[player] = nil
 	owners[id] = nil
 	locks[id] = nil
 	publish(id)

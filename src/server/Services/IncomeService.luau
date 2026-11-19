@@ -53,8 +53,12 @@ for _, entry in speciesConfig.species do
 	speciesById[entry.id] = entry
 end
 
--- Glow/s of the placed Glowlings, each × its trait multiplier (GAME_SYSTEMS §31).
-local function placedValue(data: any): number
+local overcharged: { [Player]: { [number]: any } } = {} -- TraitService's running Overcharges
+local padValues: { [Player]: { [number]: number } } = {} -- pad → Glow/s before the plot-wide multipliers
+local globalMults: { [Player]: number } = {}
+
+-- Glow/s of the placed Glowlings, each × its trait multiplier (GAME_SYSTEMS §31), and per pad.
+local function placedValue(data: any, over: { [number]: any }?): (number, { [number]: number })
 	local pads = Inventory.placedPads(data)
 	local placed: Traits.Placed = {}
 	for pad, id in pads do
@@ -63,15 +67,16 @@ local function placedValue(data: any): number
 			placed[pad] = record.sp
 		end
 	end
-	local mults = Traits.multipliers(economy, speciesById, placed)
-	local sum = 0
+	local mults = Traits.multipliers(economy, speciesById, placed, over)
+	local sum, perPad = 0, {}
 	for pad, id in pads do
 		local record = data.glowlings[id]
 		if record ~= nil then
-			sum += InventoryService.valueOf(record) * (mults[pad] or 1)
+			perPad[pad] = InventoryService.valueOf(record) * (mults[pad] or 1)
+			sum += perPad[pad]
 		end
 	end
-	return sum
+	return sum, perPad
 end
 
 local function now(): number
@@ -112,6 +117,9 @@ local function forget(player: Player)
 	unlogged[player] = nil
 	offline[player] = nil
 	clientReady[player] = nil
+	overcharged[player] = nil
+	padValues[player] = nil
+	globalMults[player] = nil
 end
 
 -- Sends the offline popup once both the payout and the client are ready (either comes first).
@@ -143,6 +151,34 @@ function IncomeService.perSec(player: Player): number
 	return rates[player] or 0
 end
 
+-- What the Glowling on `pad` earns per second, with every multiplier (0 if none).
+function IncomeService.padPerSec(player: Player, pad: number): number
+	local perPad = padValues[player]
+	return if perPad ~= nil then (perPad[pad] or 0) * (globalMults[player] or 1) else 0
+end
+
+-- TraitService's Overcharges changed: income switches to the new rate now.
+function IncomeService.setOvercharged(player: Player, over: { [number]: any })
+	overcharged[player] = over
+	IncomeService.recompute(player)
+end
+
+-- A one-off payment (a Forager pouch): paid now, logged as a Gameplay source.
+function IncomeService.bonus(player: Player, amount: number, reason: string)
+	local data = DataService.get(player)
+	if data == nil or amount <= 0 then
+		return
+	end
+	accrue(player, now())
+	data.glow += amount
+	data.glowSinceRebirth += amount
+	data.lifetimeGlow += amount
+	Progress.add(player, "glow", amount)
+	local gameplay = Enum.AnalyticsEconomyTransactionType.Gameplay.Name
+	Telemetry.economy(player, "Source", "Glow", amount, math.floor(data.glow), gameplay, reason)
+	DataService.sendWallet(player)
+end
+
 -- Pays what is owed at the old rate, then switches to the new one and resends the Wallet.
 function IncomeService.recompute(player: Player)
 	local data = DataService.get(player)
@@ -150,10 +186,12 @@ function IncomeService.recompute(player: Player)
 		return -- not joined yet: the join computes it
 	end
 	accrue(player, now())
-	local rate = placedValue(data)
-		* Economy.incomeMultiplier(economy, data.stars, 1 + Glowdex.incomeBonus(economy, data.dexClaimed))
+	local value, perPad = placedValue(data, overcharged[player])
+	local global = Economy.incomeMultiplier(economy, data.stars, 1 + Glowdex.incomeBonus(economy, data.dexClaimed))
 		* LiveConfigService.mult("glowMult")
 		* (if GamePassService.owns(player, "vip") then (Store.pass(economy, "vip") :: any).incomeMult else 1) -- an event's Glow boost (§21); EventService recomputes at its edges
+	padValues[player], globalMults[player] = perPad, global
+	local rate = value * global
 	if rate ~= rates[player] then
 		rates[player] = rate
 		DataService.setIncomeRate(player, rate)
