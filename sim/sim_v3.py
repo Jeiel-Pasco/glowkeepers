@@ -21,7 +21,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CFG_PATH = os.path.join(HERE, "..", "config", "economy.json")
-# Trait income factor by slot count, measured with the real Shared.Traits (tools/trait_income.luau).
+# Trait income factor by slot count, measured with the real Shared.Traits (sim/trait_income.luau).
 TRAIT_PATH = os.path.join(HERE, "trait_income.json")
 RAR = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret"]
 LEG = 4  # zero-based index of Legendary

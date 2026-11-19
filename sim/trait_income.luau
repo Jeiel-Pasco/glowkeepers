@@ -7,7 +7,7 @@
 -- Overcharges, plus Forager pouches, divided by the same plot with no traits.
 -- "arranged" also swaps pads greedily to raise the static multipliers, like an engaged player.
 --
---   lune run tools/trait_income.luau
+--   lune run sim/trait_income.luau   (from the repo root)
 local fs = require("@lune/fs")
 local serde = require("@lune/serde")
 local Traits = require("../src/shared/Traits")

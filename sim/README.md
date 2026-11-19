@@ -89,7 +89,7 @@ Profiles come from the GDD: casual 3×8 min, engaged 4×20 min, hardcore 6×45 m
 
 ## Traits (GAME_SYSTEMS §31), 19 Nov 2026
 
-`tools/trait_income.luau` runs the real `Shared.Traits` (multipliers, Overcharge, Forager pouches) on random collections for 30 minutes of 2 s ticks and writes `trait_income.json`: income with traits ÷ income without, by slot count. `sim.traits` ("placeBest" or "arranged") multiplies the sim's income by it.
+`sim/trait_income.luau` runs the real `Shared.Traits` (multipliers, Overcharge, Forager pouches) on random collections for 30 minutes of 2 s ticks and writes `trait_income.json`: income with traits ÷ income without, by slot count. `sim.traits` ("placeBest" or "arranged") multiplies the sim's income by it.
 
 | Slots | Place best | Arranged |
 | --- | --- | --- |
