@@ -67,6 +67,7 @@ export type Profile = {
 		rebirths: number,
 		trades: number,
 		piecesFed: number,
+		fireSaves: number,
 	},
 	daily: { day: number, buys: { [string]: number } }, -- purchase caps
 	receipts: { [string]: number }, -- PurchaseId → time (the last 200)
@@ -74,6 +75,8 @@ export type Profile = {
 	notifyOptIn: boolean,
 	crewId: string?,
 	flags: { [string]: any }, -- moderation and exploit flags
+	badges: { [string]: boolean },
+	lb: { week: string, revives: number, nights: number }, -- weekly board counts
 }
 
 return {}
