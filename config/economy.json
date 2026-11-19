@@ -105,7 +105,9 @@
       { "id": "star_arch",        "name": "Star Arch",        "price": 300, "w": 4, "d": 2 },
       { "id": "welcome_sign",     "name": "Welcome Sign",     "price": 35,  "w": 2, "d": 2 },
       { "id": "fire_bowl",        "name": "Fire Bowl",        "price": 90,  "w": 2, "d": 2 },
-      { "id": "gift_lantern_arch", "name": "Lantern Arch",    "price": 0,   "w": 4, "d": 2, "exclusive": true }
+      { "id": "gift_lantern_arch", "name": "Lantern Arch",    "price": 0,   "w": 4, "d": 2, "exclusive": true },
+      { "id": "pass_moth_banner", "name": "Moth Banner",      "price": 0,   "w": 2, "d": 2, "exclusive": true },
+      { "id": "pass_star_lamp",   "name": "Star Lamp",        "price": 0,   "w": 2, "d": 2, "exclusive": true }
     ],
     "nameAdjectives": ["Mossy", "Glowing", "Quiet", "Hidden", "Starry", "Misty", "Golden", "Silver", "Cozy", "Bright",
       "Gentle", "Wild", "Amber", "Velvet", "Dewy", "Ember", "Moonlit", "Sunny", "Hollow", "Whispering",
@@ -140,6 +142,19 @@
     { "key": "days7",      "name": "7 Play Days",             "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
     { "key": "trade1",     "name": "First Trade",             "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } }
   ],
+  "pass": {
+    "s1Start": 1794787200,
+    "seasonWeeks": 8,
+    "tiers": 50,
+    "xpPerTier": 1000,
+    "catchUpWeeks": 2,
+    "catchUpMult": 1.5,
+    "xp": { "survive": 100, "lost": 40, "revive": 25 },
+    "premiumEmbers": 3500,
+    "lureFallbackEmbers": 25,
+    "free": { "embers": 25, "lureEvery": 3, "lureFloor": 2, "decor": { "20": "pass_moth_banner", "50": "pass_star_lamp" } },
+    "premium": { "embers": 38, "cosmeticEvery": 5, "cosmetics": ["lantern_skin", "base_banner", "aura", "trail"] }
+  },
   "glowdex": {
     "credit": ["lure", "night", "event", "tutorial"],
     "tiers": [

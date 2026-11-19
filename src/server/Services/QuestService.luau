@@ -22,6 +22,7 @@ local DataService = require(script.Parent:WaitForChild("DataService"))
 local GlowlingService = require(script.Parent:WaitForChild("GlowlingService"))
 local IncomeService = require(script.Parent:WaitForChild("IncomeService"))
 local ShieldService = require(script.Parent:WaitForChild("ShieldService"))
+local NightPassService = require(script.Parent:WaitForChild("NightPassService"))
 
 local GAMEPLAY = Enum.AnalyticsEconomyTransactionType.Gameplay.Name
 local CHECK_SECONDS = 30 -- how often to look for a new UTC day or week
@@ -75,10 +76,10 @@ local function onClaim(player: Player, id: string)
 	local list = if scope == "d" then data.quests.daily else data.quests.weekly
 	list[slot].claimed = true
 	data.embers += reward.embers
-	data.pass.xp += reward.xp
-	DataService.changed(player, "quests", "pass")
+	local xp = NightPassService.addXp(player, reward.xp) -- with the catch-up bonus
+	DataService.changed(player, "quests")
 	DataService.sendWallet(player)
-	toast(player, `Quest done: +{reward.embers} Embers, +{reward.xp} pass XP`, "good")
+	toast(player, `Quest done: +{reward.embers} Embers, +{xp} pass XP`, "good")
 	Telemetry.economy(player, "Source", "Embers", reward.embers, data.embers, GAMEPLAY, "quest", { list[slot].id })
 end
 

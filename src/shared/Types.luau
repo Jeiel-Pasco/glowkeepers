@@ -75,6 +75,7 @@ export type Profile = {
 	notifyOptIn: boolean,
 	crewId: string?,
 	flags: { [string]: any }, -- moderation and exploit flags
+	cosmetics: { [string]: number },
 	badges: { [string]: boolean },
 	lb: { week: string, revives: number, nights: number }, -- weekly board counts
 }
