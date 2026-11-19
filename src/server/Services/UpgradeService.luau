@@ -11,8 +11,9 @@
 --
 -- Replicates: `up`, `lockCharges` in PlayerState, and the Wallet after every purchase.
 --
--- Not yet: resetting Lantern, Boots and Slots on rebirth (RebirthService, Phase 4) and the
--- Swift Boots pass (Phase 5).
+-- Rebirth resets Lantern, Boots and Slots (RebirthService).
+--
+-- Not yet: the Swift Boots pass (Phase 5).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

@@ -103,7 +103,15 @@ local function sendWallet(player: Player)
 		return
 	end
 	local data = profile.Data
-	NetServer.send(player, "Wallet", data.glow, incomeRate[player] or 0, workspace:GetServerTimeNow(), data.embers)
+	NetServer.send(
+		player,
+		"Wallet",
+		data.glow,
+		incomeRate[player] or 0,
+		workspace:GetServerTimeNow(),
+		data.embers,
+		data.glowSinceRebirth
+	)
 end
 
 -- The full snapshot goes out once both the profile and the client are ready.

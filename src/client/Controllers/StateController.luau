@@ -9,7 +9,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
 local NetClient = require(script.Parent.Parent:WaitForChild("Net"):WaitForChild("NetClient"))
 
-export type Wallet = { glow: number, perSec: number, t: number, embers: number }
+-- `since` is Glow earned since the last rebirth (it ticks with income, like `glow`).
+export type Wallet = { glow: number, perSec: number, t: number, embers: number, since: number }
 
 local StateController = {}
 StateController.Loaded = Signal.new() -- (): the first snapshot arrived
@@ -17,7 +18,7 @@ StateController.Changed = Signal.new() -- (key: string, value: any)
 StateController.WalletChanged = Signal.new() -- (wallet: Wallet)
 
 local data: { [string]: any }? = nil
-local wallet: Wallet = { glow = 0, perSec = 0, t = 0, embers = 0 }
+local wallet: Wallet = { glow = 0, perSec = 0, t = 0, embers = 0, since = 0 }
 
 function StateController.get(): { [string]: any }?
 	return data
@@ -34,6 +35,11 @@ end
 -- Glow at server time `now`, extrapolated from the last Wallet.
 function StateController.glowAt(now: number): number
 	return wallet.glow + wallet.perSec * math.max(0, now - wallet.t)
+end
+
+-- Glow earned since the last rebirth at server time `now` (the rebirth progress bar).
+function StateController.sinceRebirthAt(now: number): number
+	return wallet.since + wallet.perSec * math.max(0, now - wallet.t)
 end
 
 function StateController.Init()
@@ -55,8 +61,8 @@ function StateController.Init()
 		end
 	end)
 
-	NetClient.on("Wallet", function(glow: number, perSec: number, serverTime: number, embers: number)
-		wallet = { glow = glow, perSec = perSec, t = serverTime, embers = embers }
+	NetClient.on("Wallet", function(glow: number, perSec: number, serverTime: number, embers: number, since: number?)
+		wallet = { glow = glow, perSec = perSec, t = serverTime, embers = embers, since = since or 0 }
 		StateController.WalletChanged:Fire(wallet)
 	end)
 end
