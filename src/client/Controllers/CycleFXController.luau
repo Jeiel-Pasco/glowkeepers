@@ -52,8 +52,8 @@ local LOOKS: { [string]: Look } = {
 	afternoon = { clock = 15.8, brightness = 2.4,  ambient = rgb(128, 110, 92),  outdoor = rgb(165, 140, 118), tint = rgb(255, 236, 208), haze = 0.32, air = rgb(238, 206, 168), decay = rgb(155, 122, 100), glare = 0.4, mist = 1.5, saturation = 0.2,  contrast = 0.1,  bloom = 0.5,  rays = 0.2 },
 	dusk      = { clock = 17.8, brightness = 1.6,  ambient = rgb(132, 70, 60),   outdoor = rgb(188, 90, 70),   tint = rgb(255, 188, 162), haze = 0.42, air = rgb(242, 138, 108), decay = rgb(112, 50, 72),  glare = 0.8, mist = 2.2, saturation = 0.15, contrast = 0.12, bloom = 0.7,  rays = 0.3 },
 	nightfall = { clock = 19.0, brightness = 0.6,  ambient = rgb(40, 38, 76),    outdoor = rgb(46, 46, 92),    tint = rgb(214, 218, 255), haze = 0.45, air = rgb(70, 80, 132),   decay = rgb(30, 30, 62),   glare = 0,   mist = 1.5, saturation = 0.05, contrast = 0.12, bloom = 0.9,  rays = 0 },
-	night     = { clock = 21.0, brightness = 0.2,  ambient = rgb(24, 30, 66),    outdoor = rgb(30, 38, 84),    tint = rgb(205, 212, 255), haze = 0.50, air = rgb(24, 34, 70),    decay = rgb(10, 12, 30),   glare = 0,   mist = 1.2, saturation = 0.1,  contrast = 0.18, bloom = 0.9,  rays = 0 },
-	predawn   = { clock = 28.8, brightness = 0.25, ambient = rgb(30, 28, 56),    outdoor = rgb(40, 36, 72),    tint = rgb(218, 212, 245), haze = 0.45, air = rgb(62, 56, 102),   decay = rgb(30, 25, 56),   glare = 0,   mist = 1.4, saturation = 0.05, contrast = 0.12, bloom = 1.0,  rays = 0 },
+	night     = { clock = 21.0, brightness = 0.6,  ambient = rgb(50, 58, 110),   outdoor = rgb(60, 72, 132),    tint = rgb(205, 212, 255), haze = 0.50, air = rgb(24, 34, 70),    decay = rgb(10, 12, 30),   glare = 0,   mist = 1.2, saturation = 0.1,  contrast = 0.18, bloom = 0.9,  rays = 0 },
+	predawn   = { clock = 28.8, brightness = 0.6,  ambient = rgb(50, 48, 90),    outdoor = rgb(62, 58, 110),    tint = rgb(218, 212, 245), haze = 0.45, air = rgb(62, 56, 102),   decay = rgb(30, 25, 56),   glare = 0,   mist = 1.4, saturation = 0.05, contrast = 0.12, bloom = 1.0,  rays = 0 },
 }
 local NEXT_DAWN: Look = table.clone(LOOKS.dawn)
 NEXT_DAWN.clock += 24

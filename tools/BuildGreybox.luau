@@ -80,9 +80,9 @@ local COLORS = {
 	clearing = Color3.fromRGB(92, 118, 64),
 	path = Color3.fromRGB(140, 120, 90),
 	stone = Color3.fromRGB(110, 108, 104),
-	plot = Color3.fromRGB(150, 150, 145),
-	pad = Color3.fromRGB(200, 196, 180),
-	decor = Color3.fromRGB(120, 160, 200),
+	plot = Color3.fromRGB(150, 112, 78), -- plank decks
+	pad = Color3.fromRGB(196, 188, 170), -- pale stone pads
+	decor = Color3.fromRGB(120, 170, 90), -- a mossy patch
 	wood = Color3.fromRGB(105, 75, 50),
 	trunk = Color3.fromRGB(80, 60, 45),
 	leaves = Color3.fromRGB(45, 80, 45),
@@ -92,7 +92,24 @@ local COLORS = {
 	sign = Color3.fromRGB(245, 235, 210),
 }
 
+local TERRAIN_COLORS = {
+	[Enum.Material.Grass] = Color3.fromRGB(98, 128, 62),
+	[Enum.Material.LeafyGrass] = Color3.fromRGB(66, 88, 48),
+	[Enum.Material.Ground] = Color3.fromRGB(64, 56, 42),
+	[Enum.Material.Mud] = Color3.fromRGB(40, 36, 30),
+	[Enum.Material.Sand] = Color3.fromRGB(150, 124, 88),
+}
+
+-- Glow colours for the forest's own lights (Bible §1: cyan and gold pools at night).
+local GLOW = {
+	Color3.fromRGB(80, 230, 220),
+	Color3.fromRGB(120, 200, 255),
+	Color3.fromRGB(180, 140, 255),
+}
+
 local TAU = 2 * math.pi
+local TERRAIN_OCCUPANCY = 0.4 -- of the top voxel layer (-4..0): the surface sits at about y = -0.4
+local MAX_GLOW_LIGHTS = 40 -- PointLights in the whole forest (mushrooms); keep phones fast
 local UPRIGHT = CFrame.Angles(0, 0, math.pi / 2) -- stands a cylinder's X axis up
 local ORIGIN = Vector3.zero
 local rng = Random.new(LAYOUT.seed)
@@ -142,20 +159,6 @@ local DECOR = { CanCollide = false, CanTouch = false, CanQuery = false }
 
 local function marker(parent, name, size, cframe)
 	return part(parent, name, nil, size, cframe, Color3.new(1, 0, 1), nil, GHOST)
-end
-
-local function disc(parent, name, radius, topY, color, material)
-	local thickness = 4
-	local size = Vector3.new(thickness, radius * 2, radius * 2)
-	return part(
-		parent,
-		name,
-		Enum.PartType.Cylinder,
-		size,
-		CFrame.new(0, topY - thickness / 2, 0) * UPRIGHT,
-		color,
-		material
-	)
 end
 
 local function folder(name, parent)
@@ -263,45 +266,95 @@ map:SetAttribute("ForestOuter", LAYOUT.forestOuter)
 map:SetAttribute("MapRadius", LAYOUT.mapRadius)
 map.Parent = workspace
 
--- Ground: stacked discs, each a hair above the one under it.
+-- Ground: Terrain with its top just under y = 0 (smooth terrain draws its surface a little above
+-- the fill, so a fill to 0 would hide the floors and paths) (Bible §4: soft grass clearing, darker leafy forest, a
+-- brown deepwood floor). Rebuilding clears all Terrain, so only hand-made terrain on a
+-- HandEdited map is safe (the check above refuses those). Paths are parts on top: rotated
+-- terrain fills leave half-covered voxels in the old material.
 do
-	local ground = folder("Ground")
-	disc(ground, "Outer", 600, -0.15, COLORS.outer, Enum.Material.Ground)
-	disc(ground, "Deepwood", LAYOUT.mapRadius + 20, -0.1, COLORS.deepwood, Enum.Material.Grass)
-	disc(ground, "Forest", LAYOUT.forestOuter, -0.05, COLORS.forest, Enum.Material.Grass)
-	disc(ground, "Clearing", LAYOUT.clearingRadius, 0, COLORS.clearing, Enum.Material.Grass)
-	ground.Parent = map
+	local terrain = workspace.Terrain
+	terrain:Clear()
+	for material, color in TERRAIN_COLORS do
+		terrain:SetMaterialColor(material, color)
+	end
+	pcall(function()
+		-- Grass blades poke through plot floors and hide small Glowlings and pads.
+		(terrain :: any).Decoration = false
+	end)
+	-- One column per 4-stud voxel: two full layers under a partial top layer, whose occupancy sets
+	-- the surface height. The ring edges wobble with noise so they don't read as circles.
+	local RES = 4
+	local half = 620
+	local cells = math.ceil(half * 2 / RES)
+	local seedOffset = (LAYOUT.seed % 1000) / 7
+	local function materialAt(x: number, z: number): Enum.Material
+		local r = math.sqrt(x * x + z * z)
+		local wobble = math.noise(x / 40, z / 40, seedOffset) * 10
+		if r < LAYOUT.fireFeedRadius + 3 then
+			return Enum.Material.Ground
+		elseif r + wobble < LAYOUT.clearingRadius then
+			return Enum.Material.Grass
+		elseif r + wobble < LAYOUT.forestOuter then
+			return Enum.Material.LeafyGrass
+		elseif r + wobble < LAYOUT.mapRadius + 20 then
+			return Enum.Material.Ground
+		end
+		return Enum.Material.Mud
+	end
+	local ROWS = 32
+	for x0 = 0, cells - 1, ROWS do
+		local rows = math.min(ROWS, cells - x0)
+		local materials, occupancy = {}, {}
+		for ix = 1, rows do
+			local mx, ox = {}, {}
+			for iy = 1, 3 do
+				mx[iy], ox[iy] = {}, {}
+			end
+			local x = -half + (x0 + ix - 0.5) * RES
+			for iz = 1, cells do
+				local material = materialAt(x, -half + (iz - 0.5) * RES)
+				for iy = 1, 3 do
+					mx[iy][iz] = material
+					ox[iy][iz] = if iy == 3 then TERRAIN_OCCUPANCY else 1
+				end
+			end
+			materials[ix], occupancy[ix] = mx, ox
+		end
+		local corner = Vector3.new(-half + x0 * RES, -12, -half)
+		terrain:WriteVoxels(
+			Region3.new(corner, corner + Vector3.new(rows * RES, 12, cells * RES)),
+			RES,
+			materials,
+			occupancy
+		)
+		task.wait()
+	end
 end
 task.wait()
 
 -- Paths: fire to every gate, and trails out through the gaps into the deepwood.
 do
 	local paths = folder("Paths")
+	local function strip(name: string, from: number, to: number, a: number, width: number)
+		local cf = CFrame.lookAt(polar((from + to) / 2, a, 0.05), Vector3.new(0, 0.05, 0))
+		part(paths, name, nil, Vector3.new(width, 0.1, to - from), cf, COLORS.path, Enum.Material.Ground)
+		for _, side in { -1, 1 } do -- soft darker edges
+			part(
+				paths,
+				`{name}Edge`,
+				nil,
+				Vector3.new(1, 0.08, to - from),
+				cf * CFrame.new(side * (width / 2 + 0.5), -0.01, 0),
+				COLORS.path:Lerp(COLORS.clearing, 0.5),
+				Enum.Material.Ground
+			)
+		end
+	end
 	for i, a in pathAngles do
-		local from, to = 5, gateRadius
-		local cf = CFrame.lookAt(polar((from + to) / 2, a, 0.01), Vector3.new(0, 0.01, 0))
-		part(
-			paths,
-			`PathToPlot{i}`,
-			nil,
-			Vector3.new(LAYOUT.pathWidth, 0.1, to - from),
-			cf,
-			COLORS.path,
-			Enum.Material.Ground
-		)
+		strip(`PathToPlot{i}`, 5, gateRadius, a, LAYOUT.pathWidth)
 	end
 	for k, a in trailAngles do
-		local from, to = LAYOUT.fireLightRadius, LAYOUT.mapRadius - 30
-		local cf = CFrame.lookAt(polar((from + to) / 2, a, 0.01), Vector3.new(0, 0.01, 0))
-		part(
-			paths,
-			`Trail{k}`,
-			nil,
-			Vector3.new(LAYOUT.trailWidth, 0.1, to - from),
-			cf,
-			COLORS.path,
-			Enum.Material.Ground
-		)
+		strip(`Trail{k}`, LAYOUT.fireLightRadius, LAYOUT.mapRadius - 30, a, LAYOUT.trailWidth)
 	end
 	paths.Parent = map
 end
@@ -414,7 +467,7 @@ do
 		local plot = model(`Plot{i}`, plots)
 		plot:SetAttribute("PlotId", i)
 
-		local floor = part(plot, "Floor", nil, Vector3.new(W, 0.6, D), cf, COLORS.plot, Enum.Material.Concrete)
+		local floor = part(plot, "Floor", nil, Vector3.new(W, 0.6, D), cf, COLORS.plot, Enum.Material.WoodPlanks)
 		plot.PrimaryPart = floor
 		marker(plot, "Zone", Vector3.new(W, 20, D), cf * CFrame.new(0, 10, 0))
 		local decorCF = cf * CFrame.new(0, 0.32, D / 2 - LAYOUT.decorSize / 2)
@@ -464,7 +517,8 @@ do
 				nil,
 				Vector3.new(3, 0.2, 3),
 				cf * CFrame.new(x, 0.4, z),
-				COLORS.pad
+				COLORS.pad,
+				Enum.Material.Slate
 			)
 			p:SetAttribute("Slot", n)
 		end
@@ -721,13 +775,15 @@ do
 		table.clear(batch)
 		task.wait()
 	end
+	local glowLights = 0
 	for _, spot in spots do
 		local deep = spot.deep
 		local height = if deep then rng:NextNumber(28, 42) else rng:NextNumber(20, 30)
 		local width = if deep then rng:NextNumber(4, 6) else rng:NextNumber(3, 4.5)
-		local crown = if deep then rng:NextNumber(20, 30) else rng:NextNumber(14, 22)
+		local crown = if deep then rng:NextNumber(18, 26) else rng:NextNumber(13, 19)
 		local tree = model("Tree")
 		local base = spot.pos
+		local turn = CFrame.Angles(0, rng:NextNumber(0, TAU), 0)
 		part(
 			tree,
 			"Trunk",
@@ -737,17 +793,69 @@ do
 			COLORS.trunk,
 			Enum.Material.Wood
 		)
-		local leaves = if deep then COLORS.deepLeaves else COLORS.leaves
 		part(
 			tree,
-			"Crown",
-			Enum.PartType.Ball,
-			Vector3.new(crown, crown, crown),
-			CFrame.new(base + Vector3.new(0, height, 0)),
-			leaves,
-			Enum.Material.Grass,
+			"Roots",
+			Enum.PartType.Cylinder,
+			Vector3.new(2, width * 1.6, width * 1.6),
+			CFrame.new(base + Vector3.new(0, 0.6, 0)) * UPRIGHT,
+			COLORS.trunk,
+			Enum.Material.Wood,
 			DECOR
 		)
+		local leaves = if deep then COLORS.deepLeaves else COLORS.leaves
+		local shade = leaves:Lerp(Color3.fromRGB(90, 120, 60), rng:NextNumber(0, 0.35))
+		-- A main crown and two lower lobes, so the canopy reads as a cloud, not a ball.
+		for k, lobe in { { 0, 0, 0, 1 }, { 0.32, -0.28, 0.1, 0.72 }, { -0.3, -0.22, -0.18, 0.66 } } do
+			local size = crown * lobe[4]
+			local offset = (turn * Vector3.new(lobe[1], 0, lobe[3])) * crown
+			part(
+				tree,
+				if k == 1 then "Crown" else "Lobe",
+				Enum.PartType.Ball,
+				Vector3.one * size,
+				CFrame.new(base + Vector3.new(offset.X, height + lobe[2] * crown, offset.Z)),
+				if k == 1 then shade else shade:Lerp(Color3.new(0, 0, 0), 0.12),
+				Enum.Material.LeafyGrass,
+				DECOR
+			)
+		end
+		-- Deepwood trees sometimes grow a ring of glow mushrooms at the roots.
+		if deep and rng:NextNumber() < 0.18 then
+			local glow = GLOW[rng:NextInteger(1, #GLOW)]
+			for m = 1, 3 do
+				local at = base + turn * Vector3.new(math.cos(m * 2.1), 0, math.sin(m * 2.1)) * (width * 0.8 + 1)
+				local stem = rng:NextNumber(0.8, 1.6)
+				part(
+					tree,
+					"MushroomStem",
+					Enum.PartType.Cylinder,
+					Vector3.new(stem, 0.35, 0.35),
+					CFrame.new(at + Vector3.new(0, stem / 2, 0)) * UPRIGHT,
+					Color3.fromRGB(220, 220, 205),
+					Enum.Material.SmoothPlastic,
+					DECOR
+				)
+				local cap = part(
+					tree,
+					"MushroomCap",
+					Enum.PartType.Cylinder,
+					Vector3.new(0.4, stem * 1.1, stem * 1.1),
+					CFrame.new(at + Vector3.new(0, stem, 0)) * UPRIGHT,
+					glow,
+					Enum.Material.Neon,
+					DECOR
+				)
+				if m == 1 and glowLights < MAX_GLOW_LIGHTS then
+					glowLights += 1
+					local light = Instance.new("PointLight")
+					light.Color = glow
+					light.Range = 12
+					light.Brightness = 1.2
+					light.Parent = cap
+				end
+			end
+		end
 		table.insert(batch, tree)
 		treeCount += 1
 		if #batch >= 150 then
@@ -755,6 +863,188 @@ do
 		end
 	end
 	flush()
+
+	-- Undergrowth: bushes and mossy rocks between the trees, firefly swarms in the forest ring.
+	local props = folder("Props", forest)
+	local function spotIn(rMin: number, rMax: number, gap: number): Vector3?
+		for _ = 1, 30 do
+			local r = math.sqrt(rng:NextNumber(rMin * rMin, rMax * rMax))
+			local pos = polar(r, rng:NextNumber(0, TAU))
+			if free(pos, gap) then
+				return pos
+			end
+		end
+		return nil
+	end
+	for n = 1, 220 do
+		local pos = spotIn(LAYOUT.clearingRadius - 4, LAYOUT.mapRadius - 14, 4)
+		if pos ~= nil then
+			local bush = model("Bush", props)
+			local size = rng:NextNumber(3, 6)
+			local color = COLORS.leaves:Lerp(Color3.fromRGB(100, 130, 60), rng:NextNumber(0, 0.5))
+			for k = 1, 2 do
+				local offset = Vector3.new(rng:NextNumber(-1, 1), 0, rng:NextNumber(-1, 1)) * size * 0.4
+				part(
+					bush,
+					"Leaves",
+					Enum.PartType.Ball,
+					Vector3.one * size * (if k == 1 then 1 else 0.75),
+					CFrame.new(pos + offset + Vector3.new(0, size * 0.3, 0)),
+					color,
+					Enum.Material.LeafyGrass,
+					DECOR
+				)
+			end
+		end
+		if n % 60 == 0 then
+			task.wait()
+		end
+	end
+	for _ = 1, 90 do
+		local pos = spotIn(LAYOUT.clearingRadius - 6, LAYOUT.mapRadius - 14, 5)
+		if pos ~= nil then
+			local size = Vector3.new(rng:NextNumber(3, 7), rng:NextNumber(2, 4), rng:NextNumber(3, 6))
+			local rock = part(
+				props,
+				"Rock",
+				nil,
+				size,
+				CFrame.new(pos + Vector3.new(0, size.Y * 0.3, 0))
+					* CFrame.Angles(rng:NextNumber(-0.3, 0.3), rng:NextNumber(0, TAU), rng:NextNumber(-0.3, 0.3)),
+				COLORS.stone,
+				Enum.Material.Slate
+			)
+			part(
+				props,
+				"Moss",
+				nil,
+				Vector3.new(size.X * 0.8, 0.4, size.Z * 0.8),
+				rock.CFrame * CFrame.new(0, size.Y / 2, 0),
+				Color3.fromRGB(80, 110, 55),
+				Enum.Material.Grass,
+				DECOR
+			)
+		end
+	end
+	for _ = 1, 24 do
+		local pos = spotIn(LAYOUT.clearingRadius + 6, LAYOUT.mapRadius - 20, 6)
+		if pos ~= nil then
+			local swarm = part(
+				props,
+				"Fireflies",
+				nil,
+				Vector3.new(16, 6, 16),
+				CFrame.new(pos + Vector3.new(0, 4, 0)),
+				Color3.new(),
+				nil,
+				GHOST
+			)
+			local emitter = Instance.new("ParticleEmitter")
+			emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+			emitter.Rate = 4
+			emitter.Lifetime = NumberRange.new(3, 6)
+			emitter.Speed = NumberRange.new(0.2, 0.8)
+			emitter.SpreadAngle = Vector2.new(180, 180)
+			emitter.Acceleration = Vector3.new(0, 0.1, 0)
+			emitter.Size = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0),
+				NumberSequenceKeypoint.new(0.5, 0.25),
+				NumberSequenceKeypoint.new(1, 0),
+			})
+			emitter.Color = ColorSequence.new(Color3.fromRGB(220, 255, 140))
+			emitter.LightEmission = 1
+			emitter.Parent = swarm
+		end
+	end
+end
+
+-- Clearing dressing: lantern posts along the plot paths and wildflowers in the grass.
+do
+	local dressing = folder("Dressing")
+	for i, a in pathAngles do
+		local side = if i % 2 == 0 then 1 else -1
+		local cf = CFrame.lookAt(polar(gateRadius - 6, a, 0), ORIGIN)
+			* CFrame.new(side * (LAYOUT.pathWidth / 2 + 1.5), 0, 0)
+		local post = model(`LanternPost{i}`, dressing)
+		part(
+			post,
+			"Post",
+			Enum.PartType.Cylinder,
+			Vector3.new(8, 0.6, 0.6),
+			cf * CFrame.new(0, 4, 0) * UPRIGHT,
+			COLORS.wood,
+			Enum.Material.Wood
+		)
+		part(
+			post,
+			"Arm",
+			nil,
+			Vector3.new(0.4, 0.4, 2),
+			cf * CFrame.new(0, 7.8, -0.8),
+			COLORS.wood,
+			Enum.Material.Wood,
+			DECOR
+		)
+		local lantern = part(
+			post,
+			"Lantern",
+			nil,
+			Vector3.new(1, 1.3, 1),
+			cf * CFrame.new(0, 6.9, -1.6),
+			COLORS.gold,
+			Enum.Material.Neon,
+			DECOR
+		)
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(255, 190, 110)
+		light.Range = 14
+		light.Brightness = 1.2
+		light.Parent = lantern
+	end
+	local petals = {
+		Color3.fromRGB(250, 235, 150),
+		Color3.fromRGB(240, 170, 200),
+		Color3.fromRGB(190, 200, 255),
+		Color3.fromRGB(255, 255, 240),
+	}
+	local stations = {}
+	for _, a in stationAngles do
+		table.insert(stations, polar(LAYOUT.stationRadius, a))
+	end
+	local placed = 0
+	for _ = 1, 600 do
+		if placed >= 160 then
+			break
+		end
+		local r = rng:NextNumber(LAYOUT.fireLightRadius + 4, LAYOUT.clearingRadius - 3)
+		local a = rng:NextNumber(0, TAU)
+		local pos = polar(r, a)
+		local clear = not onRadial(a, r, allPathAngles, LAYOUT.pathWidth / 2 + 1.5)
+		for _, spot in reserved do
+			clear = clear and (pos - spot.pos).Magnitude >= spot.radius
+		end
+		for _, at in stations do
+			clear = clear and (pos - at).Magnitude >= 12
+		end
+		if clear then
+			placed += 1
+			local color = petals[rng:NextInteger(1, #petals)]
+			for k = 1, 3 do
+				local at = pos + Vector3.new(rng:NextNumber(-1.2, 1.2), 0, rng:NextNumber(-1.2, 1.2))
+				part(
+					dressing,
+					"Flower",
+					Enum.PartType.Ball,
+					Vector3.one * 0.5,
+					CFrame.new(at + Vector3.new(0, 0.35 + k * 0.05, 0)),
+					color,
+					Enum.Material.SmoothPlastic,
+					DECOR
+				)
+			end
+		end
+	end
+	dressing.Parent = map
 end
 
 -- Boundary wall and the spawn.
