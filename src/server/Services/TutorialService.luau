@@ -15,11 +15,14 @@
 --   6    the base is locked (Progress "lock")
 --   7    shown at dusk; done when night falls
 --   8    fuel fed to the fire (Progress "feed")
---   9    a night catch; the first one while this step shows is at least Rare (RollService
---        reads the `FtueRareCatch` attribute)
+--   9    catch your personal Rare: a wild near the fire only you can see (ForestService.spawnFor;
+--        its id is the Player attribute `FtueWild` so the guide points at it)
 --   10   shown at the dawn after a night, for DAWN_SECONDS
 -- Steps whose moment passed are skipped (Ftue.skipPassed). Every finished or skipped step is
 -- logged with Telemetry.onboarding.
+--
+-- DEV/BETA: set the server-side workspace attribute DebugFtueReset to true (path from the
+-- phase now) or to "day" / "late" / "night" to restart every player's tutorial on that path.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -36,14 +39,16 @@ local Progress = require(script.Parent:WaitForChild("Progress"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local CycleService = require(script.Parent:WaitForChild("CycleService"))
 local InventoryService = require(script.Parent:WaitForChild("InventoryService"))
-local GlowlingService = require(script.Parent:WaitForChild("GlowlingService"))
 local RollService = require(script.Parent:WaitForChild("RollService"))
 local PlotService = require(script.Parent:WaitForChild("PlotService"))
+local ForestService = require(script.Parent:WaitForChild("ForestService"))
+local Env = require(Shared:WaitForChild("Env"))
 
 local TICK_SECONDS = 0.5
 local DAWN_SECONDS = 12
 local STASH_RANGE = 14 -- studs from the Wisp's Stash to grab
-local COMMON, UNCOMMON = 1, 2
+local COMMON, UNCOMMON, RARE = 1, 2, 3
+local WILD_RING = 16 -- studs from the fire's centre to the personal wild
 
 local TutorialService = {}
 
@@ -51,6 +56,7 @@ type Session = {
 	sawNight: boolean,
 	dawnShownAt: number?,
 	carry: { sp: string, character: Model }?,
+	wildId: string?, -- this player's personal wild (step 9)
 }
 local sessions: { [Player]: Session } = {}
 
@@ -104,7 +110,7 @@ local function publish(player: Player)
 	local data, session = active(player)
 	if data == nil or session == nil then
 		player:SetAttribute("FtueStep", nil)
-		player:SetAttribute("FtueRareCatch", nil)
+		player:SetAttribute("FtueWild", nil)
 		return
 	end
 	local path = data.ftue.path or "day"
@@ -113,12 +119,12 @@ local function publish(player: Player)
 		DataService.changed(player, "ftue")
 		clearCarry(player, session)
 		player:SetAttribute("FtueStep", nil)
-		player:SetAttribute("FtueRareCatch", nil)
+		player:SetAttribute("FtueWild", nil)
 		return
 	end
 	local step = Ftue.current(data.ftue.step, path, moment(session))
 	player:SetAttribute("FtueStep", step or 0)
-	player:SetAttribute("FtueRareCatch", if step == 9 then true else nil)
+	player:SetAttribute("FtueWild", if step == 9 then session.wildId else nil)
 	if step ~= 10 then
 		session.dawnShownAt = nil
 	end
@@ -221,6 +227,40 @@ local function stepCarry(player: Player, session: Session)
 	end
 end
 
+-- A spot on open ground near the fire for the personal wild.
+local function nearFire(): Vector3?
+	local map = workspace:FindFirstChild("Map")
+	local fire = if map ~= nil then map:FindFirstChild("Campfire") else nil
+	if fire == nil or not fire:IsA("Model") then
+		return nil
+	end
+	local centre = fire:GetPivot().Position
+	local angle = math.random() * math.pi * 2
+	local at = centre + Vector3.new(math.cos(angle), 0, math.sin(angle)) * WILD_RING
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local exclude: { Instance } = {}
+	for _, p in Players:GetPlayers() do
+		if p.Character ~= nil then
+			table.insert(exclude, p.Character)
+		end
+	end
+	params.FilterDescendantsInstances = exclude
+	local hit = workspace:Raycast(at + Vector3.new(0, 40, 0), Vector3.new(0, -80, 0), params)
+	return if hit ~= nil then hit.Position + Vector3.new(0, 1.5, 0) else at
+end
+
+-- Step 9: keeps this player's personal Rare out there.
+local function keepWild(player: Player, session: Session)
+	if session.wildId ~= nil and ForestService.exists(session.wildId) then
+		return
+	end
+	local at = nearFire()
+	local id = if at ~= nil then ForestService.spawnFor(player, at, RollService.pick("Clearing", RARE), RARE) else nil
+	session.wildId = id
+	player:SetAttribute("FtueWild", id)
+end
+
 local function tick(now: number)
 	for player, session in sessions do
 		local data = active(player)
@@ -239,6 +279,9 @@ local function tick(now: number)
 		end
 		stepCarry(player, session)
 		local step = Ftue.current(data.ftue.step, path, m)
+		if step == 9 then
+			keepWild(player, session)
+		end
 		if step == 3 and data.glow >= Economy.lureCost(economy, 1) then
 			finish(player, 3)
 		elseif step == 10 then
@@ -291,11 +334,42 @@ function TutorialService.Init()
 			finish(player, 8)
 		end
 	end)
-	GlowlingService.Added:Connect(function(player: Player, record: any)
-		if record.src == "night" then
+	ForestService.Caught:Connect(function(player: Player, wildId: string)
+		local session = sessions[player]
+		if session ~= nil and session.wildId == wildId then
+			session.wildId = nil
 			finish(player, 9)
 		end
 	end)
+	if Env.get().name ~= "PROD" then
+		workspace:GetAttributeChangedSignal("DebugFtueReset"):Connect(function()
+			local value = workspace:GetAttribute("DebugFtueReset")
+			if value == nil or value == false then
+				return
+			end
+			workspace:SetAttribute("DebugFtueReset", nil)
+			local state = CycleService.get()
+			for _, player in Players:GetPlayers() do
+				local data = DataService.get(player)
+				if data ~= nil then
+					local old = sessions[player]
+					if old ~= nil then
+						clearCarry(player, old)
+					end
+					sessions[player] = nil
+					data.ftue = {
+						step = 0,
+						done = false,
+						path = if type(value) == "string"
+							then value
+							else Ftue.pathFor(state.phase, state.phaseRemaining),
+					}
+					DataService.changed(player, "ftue")
+					onReady(player, data)
+				end
+			end
+		end)
+	end
 	CycleService.PhaseChanged:Connect(function(phase: string)
 		for player, session in sessions do
 			if phase == "Night" then

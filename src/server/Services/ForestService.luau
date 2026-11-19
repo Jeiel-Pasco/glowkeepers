@@ -12,7 +12,11 @@
 -- every wild), and the Player attribute `CatchesLeft` at night (nil by day). A player who
 -- bleeds out loses their unused catches. A Mythic-or-better catch is announced to everyone.
 --
--- Not yet: tutorial-only spawns (Phase 3 FTUE) and glow-shards (they need a spawn count).
+-- Personal wilds (the tutorial's first catch, GAME_SYSTEMS §22): ForestService.spawnFor puts a
+-- wild near the fire that only its owner is sent and can catch. It is at least `minTier` when
+-- caught and doesn't spend one of the night's catches. Caught fires for every catch.
+--
+-- Not yet: glow-shards (they need a spawn count).
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -33,15 +37,27 @@ local DownedService = require(script.Parent:WaitForChild("DownedService"))
 local GlowlingService = require(script.Parent:WaitForChild("GlowlingService"))
 local RollService = require(script.Parent:WaitForChild("RollService"))
 local LiveConfigService = require(script.Parent:WaitForChild("LiveConfigService"))
+local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
 
 local TICK_SECONDS = 0.25
 local JITTER = 3 -- studs: wilds sharing a marker stand a little apart
 local ANNOUNCE_FROM = 6 -- Mythic
 
 type Marker = { part: BasePart, area: string }
-type Wild = { id: string, sp: string, area: string, x: number, y: number, z: number, marker: number }
+type Wild = {
+	id: string,
+	sp: string,
+	area: string,
+	x: number,
+	y: number,
+	z: number,
+	marker: number, -- 0 for a personal wild
+	owner: number?, -- userId: a personal wild, sent to and catchable by this player only
+	minTier: number?,
+}
 
 local ForestService = {}
+ForestService.Caught = Signal.new() -- (player, wildId, record, personal: boolean)
 
 local markers: { Marker } = {}
 local wilds: { [string]: Wild } = {}
@@ -129,6 +145,49 @@ local function spawnWave(index: number)
 	end
 end
 
+-- Tells the clients that can see these wilds that they're gone.
+local function sendGone(gone: { Wild })
+	local shared = {}
+	for _, wild in gone do
+		local owner = if wild.owner ~= nil then Players:GetPlayerByUserId(wild.owner) else nil
+		if wild.owner == nil then
+			table.insert(shared, wild.id)
+		elseif owner ~= nil then
+			NetServer.send(owner, "WildGone", { wild.id })
+		end
+	end
+	if #shared > 0 then
+		NetServer.sendAll("WildGone", shared)
+	end
+end
+
+-- A personal wild of species `sp` at `position`, for `player` only; nil by day.
+function ForestService.spawnFor(player: Player, position: Vector3, sp: string, minTier: number): string?
+	if not night then
+		return nil
+	end
+	nextId += 1
+	local wild: Wild = {
+		id = tostring(nextId),
+		sp = sp,
+		area = "Forest",
+		x = position.X,
+		y = position.Y,
+		z = position.Z,
+		marker = 0,
+		owner = player.UserId,
+		minTier = minTier,
+	}
+	wilds[wild.id] = wild
+	NetServer.send(player, "WildSpawned", { view(wild) })
+	return wild.id
+end
+
+-- Is this wild still out there?
+function ForestService.exists(wildId: string): boolean
+	return wilds[wildId] ~= nil
+end
+
 local function rootOf(player: Player): BasePart?
 	local character = player.Character
 	local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
@@ -143,13 +202,17 @@ local REJECT_TEXT: { [string]: string } = {
 
 local function onCatch(player: Player, wildId: string)
 	local wild = wilds[wildId]
+	if wild ~= nil and wild.owner ~= nil and wild.owner ~= player.UserId then
+		wild = nil -- someone else's: they can't see it either
+	end
+	local personal = wild ~= nil and wild.owner ~= nil
 	local root = rootOf(player)
 	local data = DataService.get(player)
 	local check: Forest.Check = {
 		night = night,
 		living = DownedService.isLiving(player),
 		exists = wild ~= nil,
-		catchesLeft = catchesLeft(player),
+		catchesLeft = if personal then math.max(1, catchesLeft(player)) else catchesLeft(player),
 		hasRoom = GlowlingService.hasRoom(player),
 		distance = if wild ~= nil and root ~= nil
 			then (root.Position - Vector3.new(wild.x, wild.y, wild.z)).Magnitude
@@ -165,12 +228,14 @@ local function onCatch(player: Player, wildId: string)
 	end
 
 	wilds[wildId] = nil -- gone before anything else can ask for it
-	NetServer.sendAll("WildGone", { wildId })
-	local record = RollService.night(player, Forest.poolFor(wild.area), wild.sp)
+	sendGone({ wild })
+	local record = RollService.night(player, Forest.poolFor(wild.area), wild.sp, wild.minTier)
 	if record == nil then
 		return -- room was checked above, so only a profile that just unloaded gets here
 	end
-	used[player.UserId] = (used[player.UserId] or 0) + 1
+	if not personal then
+		used[player.UserId] = (used[player.UserId] or 0) + 1
+	end
 	data.stats.catches += 1
 	DataService.changed(player, "stats")
 	publishCatches(player)
@@ -178,6 +243,7 @@ local function onCatch(player: Player, wildId: string)
 		local rarity = economy.rarities[record.r].id
 		NetServer.sendAll("Announce", `{player.DisplayName} caught a {rarity} {speciesNames[record.sp] or record.sp}!`)
 	end
+	ForestService.Caught:Fire(player, wildId, record, personal)
 end
 
 local function startNight()
@@ -192,14 +258,12 @@ end
 
 local function dawn()
 	night = false
-	local ids = {}
-	for id in wilds do
-		table.insert(ids, id)
+	local gone = {}
+	for _, wild in wilds do
+		table.insert(gone, wild)
 	end
 	table.clear(wilds)
-	if #ids > 0 then
-		NetServer.sendAll("WildGone", ids)
-	end
+	sendGone(gone)
 	for _, player in Players:GetPlayers() do
 		publishCatches(player)
 	end
@@ -234,7 +298,9 @@ function ForestService.Init()
 	DataService.ClientReady:Connect(function(player: Player)
 		local list = {}
 		for _, wild in wilds do
-			table.insert(list, view(wild))
+			if wild.owner == nil or wild.owner == player.UserId then
+				table.insert(list, view(wild))
+			end
 		end
 		if #list > 0 then
 			NetServer.send(player, "WildSpawned", list)
