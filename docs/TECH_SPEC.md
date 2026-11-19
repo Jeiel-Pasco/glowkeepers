@@ -142,7 +142,8 @@ Client intent ──► Net (type check, rate limit) ──► Service (rules, s
 | GlowdexService | Credits new Glowlings from night, lure, event and tutorial (`Shared.Glowdex`); page tier and milestone claims, each once; claimed pages add income (IncomeService); odds tab data later | 4 |
 | TradeService | Unlock checks, sessions, escrow, atomic swap, fees, trade lock | 5 |
 | DecorService | Owned and placed decorations, placement validation, base name | 4 |
-| QuestService / DailyGiftService | Daily and weekly quests (UTC), cumulative daily gift | 4 |
+| QuestService / DailyGiftService | Daily and weekly quests (UTC); the cumulative daily gift (`Shared.Gift`: one step per UTC day claimed, never reset, loops after 28) | 4 |
+| ClaimService | Owns the `Claim` remote and hands each kind to the service that registered it | 4 |
 | NightPassService | Season XP, tiers, claims | 4 |
 | EventService | Weekend events, weekly limited species, community goals | 4 |
 | MonetizationService | Passes, products, `ProcessReceipt`, daily caps, prompt gating | 5 |
@@ -315,7 +316,7 @@ Every remote is declared once in `shared/Net.luau`, with its argument schema and
 | `UpgradeBuy` | C→S | upgradeId: `"lantern"` \| `"boots"` \| `"slots"`, all: boolean? (Buy max) | Below max; can afford the next level (Buy max buys as many as the balance covers, up to max) | 5/s |
 | `LockChargeBuy` | C→S | currency: `"glow"` \| `"embers"` | Fewer than 5 held; can afford `max(200, 120 × Glow/s)` Glow or 15 Embers | 2/s |
 | `Rebirth` | C→S | — | `glowSinceRebirth` ≥ threshold; not carrying; none of the player's Glowlings held (grabbed or in a trade); the client confirms with a 2 s hold | 1/10 s |
-| `Claim` | C→S | kind: enum (`dex_page`, `dex_milestone` for now; quests, the gift and pass tiers join later), id: string ≤ 32 | Quest, gift, pass tier or Glowdex page/milestone is complete and unclaimed | 5/s |
+| `Claim` | C→S | kind: enum (`dex_page`, `dex_milestone`, `gift` for now; quests and pass tiers join later), id: string ≤ 32 | Quest, gift, pass tier or Glowdex page/milestone is complete and unclaimed | 5/s |
 | `TradeRequest` / `TradeRespond` / `TradeOffer` / `TradeConfirm` / `TradeCancel` | C→S | Various | GAME_SYSTEMS §17 | 5/s |
 | `DecorPlace` / `DecorRemove` | C→S | itemId, x, z, rot | Owned; inside own plot bounds; on the grid; no overlap; item count under the cap | 10/s |
 | `SetBaseName` | C→S | a: number, n: number | Valid indices into the preset lists | 1/5 s |
@@ -363,7 +364,7 @@ Use Roblox's `AnalyticsService`, so funnels, economy and custom events show up i
 | `LogOnboardingFunnelStepEvent` | FTUE steps 1–10 (GAME_SYSTEMS §22) | Step name; path (Day or Night) |
 | `LogFunnelStepEvent` | `FirstRebirth` (glow 25%, 50%, 100%, rebirth), `Store` (open, view item, prompt, purchase), `Trade` (unlock, request, confirm, complete) | Funnel session id |
 | `LogEconomyEvent` | Glow sources (income, offline, release, event) and sinks (lures, upgrades, slots, locks, fire loss). Embers sources (night, quests, gift, IAP, codes) and sinks (decor, fees, pass, locks). | Transaction type, item SKU |
-| `LogCustomEvent` | `catch` (rarity, source), `steal_success`, `steal_tagged`, `steal_timeout`, `lock_used`, `downed`, `revive`, `fire_survived` (fire %), `fire_lost`, `rebirth` (stars), `dex_page` (tier), `trade_complete`, `night_modifier`, `calm_mode_on`, `theft_rage_quit`* | Up to 3 low-cardinality fields |
+| `LogCustomEvent` | `catch` (rarity, source), `steal_success`, `steal_tagged`, `steal_timeout`, `lock_used`, `downed`, `revive`, `fire_survived` (fire %), `fire_lost`, `rebirth` (stars), `dex_page` (tier), `daily_gift` (step, reward kind), `trade_complete`, `night_modifier`, `calm_mode_on`, `theft_rage_quit`* | Up to 3 low-cardinality fields |
 
 \* `theft_rage_quit` = the player leaves within 60 seconds of being stolen from. It's the live version of the theft-rage gate.
 

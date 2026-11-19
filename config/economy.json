@@ -31,6 +31,23 @@
     "boots":   { "baseCost": 150, "growth": 1.5,  "max": 25, "speedPerLevel": 0.04, "levelsPerExtraCatch": 5 },
     "slots":   { "baseCost": 250, "growth": 1.9,  "start": 8, "max": 30 }
   },
+  "gift": {
+    "dupDecorEmbers": 100,
+    "steps": [
+      { "kind": "embers", "amount": 10 }, { "kind": "lure", "floor": 1 }, { "kind": "embers", "amount": 15 },
+      { "kind": "lockCharge", "amount": 1 }, { "kind": "lure", "floor": 2 }, { "kind": "embers", "amount": 20 },
+      { "kind": "lure", "floor": 4 },
+      { "kind": "embers", "amount": 15 }, { "kind": "lure", "floor": 2 }, { "kind": "lockCharge", "amount": 1 },
+      { "kind": "embers", "amount": 20 }, { "kind": "lure", "floor": 2 }, { "kind": "embers", "amount": 25 },
+      { "kind": "lure", "floor": 3 },
+      { "kind": "embers", "amount": 20 }, { "kind": "lockCharge", "amount": 1 }, { "kind": "lure", "floor": 3 },
+      { "kind": "embers", "amount": 25 }, { "kind": "lure", "floor": 2 }, { "kind": "embers", "amount": 30 },
+      { "kind": "lure", "floor": 4 },
+      { "kind": "embers", "amount": 25 }, { "kind": "lockCharge", "amount": 2 }, { "kind": "lure", "floor": 3 },
+      { "kind": "embers", "amount": 35 }, { "kind": "lure", "floor": 3 }, { "kind": "embers", "amount": 40 },
+      { "kind": "decor", "id": "gift_lantern_arch" }
+    ]
+  },
   "glowdex": {
     "credit": ["lure", "night", "event", "tutorial"],
     "tiers": [

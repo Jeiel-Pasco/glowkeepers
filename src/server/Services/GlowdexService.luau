@@ -2,7 +2,8 @@
 -- The Glowdex (GAME_SYSTEMS §16, D10). Every new Glowling from a crediting source (night, lure,
 -- event, tutorial; not steal, trade or fuse) sets its species' rarity bit and mutation stamp
 -- in `dex`, in the same frame as the catch. Page tiers and milestones are claimed with
--- Claim("dex_page", speciesId) and Claim("dex_milestone", index): each only once, checked here.
+-- Claim("dex_page", speciesId) and Claim("dex_milestone", index) (through ClaimService): each
+-- only once, checked here.
 -- Claimed pages add income (IncomeService reads Glowdex.incomeBonus); milestones pay Embers.
 -- The rules live in Shared.Glowdex.
 --
@@ -21,6 +22,7 @@ local Glowdex = require(Shared:WaitForChild("Glowdex"))
 local economy = require(Config:WaitForChild("economy")) :: any
 local species = require(Config:WaitForChild("species")) :: any
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
+local ClaimService = require(script.Parent:WaitForChild("ClaimService"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local GlowlingService = require(script.Parent:WaitForChild("GlowlingService"))
@@ -84,24 +86,21 @@ local function claimMilestone(player: Player, data: any, index: number)
 	Telemetry.economy(player, "Source", "Embers", embers, data.embers, GAMEPLAY, "dex_milestone")
 end
 
-local function onClaim(player: Player, kind: string, id: string)
-	local data = DataService.get(player)
-	if data == nil then
-		return
-	end
-	if kind == "dex_page" then
-		claimPage(player, data, id)
-	elseif kind == "dex_milestone" then
-		local index = tonumber(id)
-		if index ~= nil and index % 1 == 0 then
-			claimMilestone(player, data, index)
-		end
-	end
-end
-
 function GlowdexService.Init()
 	GlowlingService.Added:Connect(credit)
-	NetServer.on("Claim", onClaim)
+	ClaimService.register("dex_page", function(player: Player, id: string)
+		local data = DataService.get(player)
+		if data ~= nil then
+			claimPage(player, data, id)
+		end
+	end)
+	ClaimService.register("dex_milestone", function(player: Player, id: string)
+		local data = DataService.get(player)
+		local index = tonumber(id)
+		if data ~= nil and index ~= nil and index % 1 == 0 then
+			claimMilestone(player, data, index)
+		end
+	end)
 end
 
 function GlowdexService.Start() end

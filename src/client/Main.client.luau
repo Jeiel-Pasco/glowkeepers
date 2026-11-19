@@ -26,6 +26,7 @@ local ORDER = {
 	"StorageController",
 	"RebirthController",
 	"GlowdexController",
+	"GiftController",
 	"HUDController",
 }
 

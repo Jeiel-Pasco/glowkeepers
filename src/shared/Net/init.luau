@@ -71,11 +71,11 @@ Net.remotes = {
 	GrabStart = { dir = "c2s", args = { PLOT, PAD }, rate = { perSecond = 2, burst = 4 } },
 	GrabCancel = { dir = "c2s", args = {}, rate = { perSecond = 2, burst = 4 } },
 	Rebirth = { dir = "c2s", args = {}, rate = { perSecond = 0.1, burst = 1 } }, -- +1 Star (§15); the client confirms with a hold
-	-- Claim a reward: a Glowdex page tier (id = species id) or milestone (id = its index).
-	-- Quests, the daily gift and pass tiers join the enum in their phases.
+	-- Claim a reward: a Glowdex page tier (id = species id), milestone (id = its index), or
+	-- today's daily gift (id unused). Quests and pass tiers join the enum in their phases.
 	Claim = {
 		dir = "c2s",
-		args = { { type = "enum", values = { "dex_page", "dex_milestone" } }, { type = "string", maxLen = 32 } },
+		args = { { type = "enum", values = { "dex_page", "dex_milestone", "gift" } }, { type = "string", maxLen = 32 } },
 		rate = { perSecond = 5, burst = 8 },
 	},
 	Lock = { dir = "c2s", args = {}, rate = { perSecond = 1, burst = 2 } }, -- Base Lock, or a Lock Charge to skip the recharge
