@@ -38,6 +38,7 @@ export type Profile = {
 	stars: number,
 	up: { lantern: number, boots: number, slots: number }, -- slots = levels bought beyond 8
 	lockCharges: number,
+	shop: { window: number, bought: { number } }, -- lures bought per floor in restock window `window`
 	glowlings: { [string]: Glowling }, -- every owned record, keyed by id
 	display: { [string]: string }, -- display slot "1".."n" → Glowling id (stealable)
 	vault: { [string]: string }, -- vault slot "1".."n" → id (never stealable, kept on rebirth)
