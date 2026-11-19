@@ -209,6 +209,7 @@ Net.remotes = {
 	OfflineEarnings = { dir = "s2c" }, -- (amount: number, away: number seconds): the join popup
 	Wallet = { dir = "s2c" }, -- (glow, perSec, serverTime, embers, glowSinceRebirth): the client extrapolates
 	Toast = { dir = "s2c" }, -- (text, kind?)
+	TraitPouch = { dir = "s2c" }, -- (plotId, pad, amount): a Forager pouch, for everyone to see (§31)
 	Announce = { dir = "s2c" }, -- (text)
 	PlotSnapshot = { dir = "s2c" }, -- (views: { [plotId as string]: Plots.View }), once the client is ready
 	PlotDelta = { dir = "s2c" }, -- (plotId, patch: Plots.Patch)

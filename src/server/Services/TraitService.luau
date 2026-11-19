@@ -18,6 +18,7 @@ local speciesConfig = require(Config:WaitForChild("species")) :: any
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local IncomeService = require(script.Parent:WaitForChild("IncomeService"))
 local PlotService = require(script.Parent:WaitForChild("PlotService"))
+local NetServer = require(script.Parent.Parent:WaitForChild("Net"):WaitForChild("NetServer"))
 
 local TICK = 2 -- seconds; timers run on 30–90 s periods
 
@@ -62,6 +63,10 @@ local function step(player: Player, now: number)
 	for _, pad in pouches do
 		local amount = math.floor(economy.traits.forager.pouchSeconds * IncomeService.padPerSec(player, pad))
 		IncomeService.bonus(player, amount, "forager")
+		local plotId = PlotService.plotOf(player)
+		if plotId ~= nil and amount > 0 then
+			NetServer.sendAll("TraitPouch", plotId, pad, amount)
+		end
 	end
 end
 
