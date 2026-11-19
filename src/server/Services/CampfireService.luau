@@ -27,6 +27,7 @@ local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
 local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
+local Progress = require(script.Parent:WaitForChild("Progress"))
 local CycleService = require(script.Parent:WaitForChild("CycleService"))
 local DownedService = require(script.Parent:WaitForChild("DownedService"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
@@ -168,6 +169,7 @@ local function dawn()
 		data.embers += embers
 		if survived then
 			data.stats.nightsSurvived += 1
+			Progress.add(player, "survive")
 			Telemetry.custom(player, "fire_survived", math.floor(finalLevel * 100))
 		else
 			glowLost = Economy.nightLostPenalty(economy, data.glow)
@@ -245,6 +247,7 @@ local function onFeed(player: Player)
 	local data = DataService.get(player)
 	if data ~= nil then
 		data.stats.piecesFed += 1
+		Progress.add(player, "feed")
 		DataService.changed(player, "stats")
 	end
 	publish()

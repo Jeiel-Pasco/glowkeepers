@@ -47,7 +47,7 @@ export type Profile = {
 	dexClaimed: { [string]: number }, -- page tier claimed per species
 	decor: { owned: { [string]: number }, placed: { { id: string, x: number, z: number, rot: number } } },
 	baseName: { a: number, n: number }, -- indices into preset word lists, 0 = default
-	quests: { day: number, daily: { any }, week: number, weekly: { any } },
+	quests: { day: number, daily: { any }, week: number, weekly: { any }, rerollDay: number },
 	gift: { claimed: number, lastDay: number },
 	pass: { season: number, xp: number, premium: boolean, free: { [string]: boolean }, prem: { [string]: boolean } },
 	firstJoin: number,

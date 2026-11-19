@@ -24,6 +24,7 @@ local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
+local Progress = require(script.Parent:WaitForChild("Progress"))
 local IncomeService = require(script.Parent:WaitForChild("IncomeService"))
 local RollService = require(script.Parent:WaitForChild("RollService"))
 
@@ -78,6 +79,7 @@ local function onBuy(player: Player, itemId: string)
 		return
 	end
 	DataService.changed(player, "shop")
+	Progress.add(player, "lure")
 	DataService.sendWallet(player)
 	Telemetry.economy(player, "Sink", "Glow", price, math.floor(data.glow), SHOP, itemId)
 end

@@ -31,6 +31,33 @@
     "boots":   { "baseCost": 150, "growth": 1.5,  "max": 25, "speedPerLevel": 0.04, "levelsPerExtraCatch": 5 },
     "slots":   { "baseCost": 250, "growth": 1.9,  "start": 8, "max": 30 }
   },
+  "quests": {
+    "perDay": 3,
+    "perWeek": 3,
+    "rerollsPerDay": 1,
+    "daily": { "embers": 15, "xp": 150 },
+    "weekly": { "embers": 75, "xp": 500 },
+    "earnIncomeSeconds": 1800,
+    "earnMin": 500,
+    "dailyPool": [
+      { "id": "feed4",      "event": "feed",        "target": 4,  "weight": 10 },
+      { "id": "revive1",    "event": "revive",      "target": 1,  "weight": 8 },
+      { "id": "catch3",     "event": "catch_night", "target": 3,  "weight": 10 },
+      { "id": "catchRare",  "event": "catch_rare",  "target": 1,  "weight": 8 },
+      { "id": "survive2",   "event": "survive",     "target": 2,  "weight": 8 },
+      { "id": "lures3",     "event": "lure",        "target": 3,  "weight": 10 },
+      { "id": "place10",    "event": "place",       "target": 10, "weight": 8 },
+      { "id": "earn",       "event": "glow",        "target": 0,  "weight": 10 },
+      { "id": "steal1",     "event": "steal",       "target": 1,  "weight": 3, "notShielded": true }
+    ],
+    "weeklyPool": [
+      { "id": "survive20",  "event": "survive",     "target": 20, "weight": 10 },
+      { "id": "revive10",   "event": "revive",      "target": 10, "weight": 10 },
+      { "id": "bronze2",    "event": "bronze",      "target": 2,  "weight": 10 },
+      { "id": "star1",      "event": "star",        "target": 1,  "weight": 10 },
+      { "id": "catch30",    "event": "catch_night", "target": 30, "weight": 10 }
+    ]
+  },
   "gift": {
     "dupDecorEmbers": 100,
     "steps": [

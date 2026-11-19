@@ -76,7 +76,7 @@ function Schema.template(): any
 		dexClaimed = {},
 		decor = { owned = {}, placed = {} },
 		baseName = { a = 0, n = 0 },
-		quests = { day = 0, daily = {}, week = 0, weekly = {} },
+		quests = { day = 0, daily = {}, week = 0, weekly = {}, rerollDay = 0 },
 		gift = { claimed = 0, lastDay = 0 },
 		pass = { season = 0, xp = 0, premium = false, free = {}, prem = {} },
 		firstJoin = 0,
