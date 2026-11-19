@@ -148,6 +148,7 @@ Net.remotes = {
 	DawnResult = { dir = "s2c" }, -- ({ survived, fire, embers, glowLost, piecesFed, revives })
 	WildSpawned = { dir = "s2c" }, -- ({ { id, sp, area, x, y, z } }): a wave, or every wild for a new client
 	WildGone = { dir = "s2c" }, -- ({ wildId }): caught, or dawn
+	Leaderboards = { dir = "s2c" }, -- ({ week, stars, dex, revives, nights = { { name, value } } }): top N each
 	Revived = { dir = "s2c" }, -- (byUserId): to the revived player, for the friend request prompt
 } :: { [string]: Remote }
 

@@ -122,6 +122,24 @@
       "Thorn", "Root", "Stump", "Canopy", "Crossing", "Bend", "Hill", "Hearthside", "Lookout", "Spinney",
       "Coppice", "Wold", "Fen", "Moor"]
   },
+  "leaderboards": { "writeGapSeconds": 300, "refreshSeconds": 120, "top": 10 },
+  "badges": [
+    { "key": "welcome",    "name": "Welcome",                 "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
+    { "key": "night1",     "name": "First Night Survived",    "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
+    { "key": "rare",       "name": "First Rare",              "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
+    { "key": "epic",       "name": "First Epic",              "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
+    { "key": "legendary",  "name": "First Legendary",         "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
+    { "key": "mythic",     "name": "First Mythic",            "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
+    { "key": "secret",     "name": "First Secret",            "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
+    { "key": "rebirth1",   "name": "First Rebirth",           "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
+    { "key": "star5",      "name": "Star 5",                  "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
+    { "key": "star10",     "name": "Star 10",                 "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
+    { "key": "bronze1",    "name": "First Bronze Page",       "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
+    { "key": "revives10",  "name": "10 Revives",              "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
+    { "key": "firesave",   "name": "Saved the Fire",          "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
+    { "key": "days7",      "name": "7 Play Days",             "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
+    { "key": "trade1",     "name": "First Trade",             "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } }
+  ],
   "glowdex": {
     "credit": ["lure", "night", "event", "tutorial"],
     "tiers": [
@@ -150,7 +168,7 @@
                "grabRange": 6, "speedTolerance": 0.25, "teleportStuds": 30, "carryCheckWindow": 0.5, "carrySlackStuds": 2 },
   "lock":    { "activeSeconds": 60, "rechargeSeconds": 90, "maxCharges": 5, "chargeGlowSecondsOfIncome": 120, "chargeMinGlow": 200, "chargeEmbers": 15 },
   "shield":  { "maxPlaySeconds": 2700 },
-  "fire":    { "start": 0.60, "max": 1.0, "drainBase": 0.005, "drainPerPlayer": 0.000375, "wood": 0.03, "shard": 0.06, "failGlowLoss": 0.05,
+  "fire":    { "start": 0.60, "max": 1.0, "drainBase": 0.005, "drainPerPlayer": 0.000375, "wood": 0.03, "shard": 0.06, "failGlowLoss": 0.05, "saveBelow": 0.05,
                "pileRespawnSeconds": 20, "pickupRange": 8 },
   "night":   { "baseCatches": 3, "spawnsPerPlayer": 4, "spawnWavesAt": [10, 40, 70], "catchRange": 12 },
   "stalker": { "prowlSpeed": 14, "loneRadius": 20, "stalkSeconds": 4, "telegraphSeconds": 2, "stalkSpeedMult": 0.9, "stalkDistance": 8,

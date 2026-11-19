@@ -33,6 +33,8 @@ local ORDER = {
 	"DailyGiftService",
 	"QuestService",
 	"DecorService",
+	"LeaderboardService",
+	"BadgeService",
 }
 
 local loaded: { [string]: any } = {}

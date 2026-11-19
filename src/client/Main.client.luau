@@ -30,6 +30,7 @@ local ORDER = {
 	"QuestController",
 	"GoalController",
 	"DecorController",
+	"LeaderboardController",
 	"HUDController",
 }
 

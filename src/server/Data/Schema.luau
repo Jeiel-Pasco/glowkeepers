@@ -96,12 +96,15 @@ function Schema.template(): any
 			rebirths = 0,
 			trades = 0,
 			piecesFed = 0,
+			fireSaves = 0, -- fed the fire below fire.saveBelow (a badge)
 		},
 		daily = { day = 0, buys = {} },
 		receipts = {},
 		settings = { calm = false, reducedFlash = false, music = 0.8, sfx = 1, breakReminder = true },
 		notifyOptIn = false,
 		flags = {},
+		badges = {}, -- badge key → true once awarded (BadgeService)
+		lb = { week = "", revives = 0, nights = 0 }, -- this ISO week's board counts
 	}
 end
 

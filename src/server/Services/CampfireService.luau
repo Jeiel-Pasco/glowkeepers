@@ -242,11 +242,15 @@ local function onFeed(player: Player)
 		return
 	end
 	setCarry(player, nil)
+	local saved = level < economy.fire.saveBelow -- fed while nearly out (a badge)
 	level = Fire.feed(economy, level, fuel)
 	fed[player] = (fed[player] or 0) + 1
 	local data = DataService.get(player)
 	if data ~= nil then
 		data.stats.piecesFed += 1
+		if saved then
+			data.stats.fireSaves += 1
+		end
 		Progress.add(player, "feed")
 		DataService.changed(player, "stats")
 	end
