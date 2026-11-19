@@ -12,6 +12,8 @@ local Plots = {}
 
 export type PadView = { sp: string, r: number, m: number, s: number }
 
+export type DecorView = { id: string, x: number, z: number, rot: number }
+
 export type View = {
 	id: number,
 	owner: number, -- userId, 0 when free
@@ -21,6 +23,8 @@ export type View = {
 	lock: number, -- server time the Base Lock ends; 0 (or a past time) when open
 	shield: boolean, -- the owner has the new-player shield: nobody can steal here
 	pads: { [string]: PadView }, -- pad number as a string → the Glowling on it
+	name: string, -- the preset base name ("" = none yet)
+	decor: { DecorView }, -- placed decorations (Shared.Decor)
 }
 
 -- Only the fields that changed. A pad set to `false` is now empty.
@@ -32,9 +36,11 @@ export type Patch = {
 	lock: number?,
 	shield: boolean?,
 	pads: { [string]: PadView | false }?,
+	name: string?,
+	decor: { DecorView }?, -- the whole list when anything in it changed
 }
 
-local SCALARS = { "owner", "slots", "vault", "stars", "lock", "shield" }
+local SCALARS = { "owner", "slots", "vault", "stars", "lock", "shield", "name" }
 
 -- The two plots next to `plotId` in the ring. `ids` is every plot id, in any order.
 function Plots.neighbors(ids: { number }, plotId: number): { number }
@@ -73,12 +79,39 @@ function Plots.pick(ids: { number }, taken: { [number]: any }, friendPlots: { nu
 end
 
 function Plots.empty(id: number): View
-	return { id = id, owner = 0, slots = 0, vault = 0, stars = 0, lock = 0, shield = false, pads = {} }
+	return {
+		id = id,
+		owner = 0,
+		slots = 0,
+		vault = 0,
+		stars = 0,
+		lock = 0,
+		shield = false,
+		pads = {},
+		name = "",
+		decor = {},
+	}
+end
+
+local function decorList(data: any): { DecorView }
+	local out = {}
+	local placed = if type(data.decor) == "table" then data.decor.placed else nil
+	for i, d in placed or {} do
+		out[i] = { id = d.id, x = d.x, z = d.z, rot = d.rot }
+	end
+	return out
 end
 
 -- What everyone sees of an owned plot. `layout` is Inventory's { slots, vault }; `lock` is
--- when its Base Lock ends (LockService).
-function Plots.view(id: number, owner: number, data: any, layout: { slots: number, vault: number }, lock: number?): View
+-- when its Base Lock ends (LockService); `name` the preset base name (Decor.baseName).
+function Plots.view(
+	id: number,
+	owner: number,
+	data: any,
+	layout: { slots: number, vault: number },
+	lock: number?,
+	name: string?
+): View
 	local pads: { [string]: PadView } = {}
 	for _, map in { data.vault, data.display } do
 		for key, glowlingId in map do
@@ -97,7 +130,17 @@ function Plots.view(id: number, owner: number, data: any, layout: { slots: numbe
 		lock = lock or 0,
 		shield = data.shield ~= nil and data.shield.active == true,
 		pads = pads,
+		name = name or "",
+		decor = decorList(data),
 	}
+end
+
+local function decorKey(list: { DecorView }): string
+	local parts = {}
+	for i, d in list do
+		parts[i] = `{d.id}:{d.x}:{d.z}:{d.rot}`
+	end
+	return table.concat(parts, ",")
 end
 
 local function samePad(a: PadView?, b: PadView?): boolean
@@ -136,6 +179,10 @@ function Plots.diff(old: View, new: View): Patch?
 		patch.pads = pads
 		any = true
 	end
+	if decorKey(old.decor or {}) ~= decorKey(new.decor) then
+		patch.decor = table.clone(new.decor)
+		any = true
+	end
 	return if any then patch :: Patch else nil
 end
 
@@ -146,6 +193,9 @@ function Plots.apply(view: View, patch: Patch): View
 		if source[key] ~= nil then
 			target[key] = source[key]
 		end
+	end
+	if patch.decor ~= nil then
+		view.decor = table.clone(patch.decor)
 	end
 	if patch.pads ~= nil then
 		for key, pad in patch.pads do

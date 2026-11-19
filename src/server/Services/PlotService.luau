@@ -21,6 +21,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Server = script.Parent.Parent
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Decor = require(Shared:WaitForChild("Decor"))
 local Plots = require(Shared:WaitForChild("Plots"))
 local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
 local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
@@ -126,7 +127,8 @@ local function buildView(plotId: number): Plots.View
 	if owner == nil or data == nil then
 		return Plots.empty(plotId)
 	end
-	return Plots.view(plotId, owner.UserId, data, InventoryService.layout(owner, data), locks[plotId])
+	local name = Decor.baseName(economy, data.baseName.a, data.baseName.n)
+	return Plots.view(plotId, owner.UserId, data, InventoryService.layout(owner, data), locks[plotId], name)
 end
 
 -- Rebuilds one plot's view and sends what changed to every ready client.

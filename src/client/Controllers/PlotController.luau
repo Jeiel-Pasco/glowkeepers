@@ -2,7 +2,8 @@
 -- Every plot's replicated state (TECH_SPEC §6): PlotSnapshot once, then PlotDelta patches,
 -- applied with Shared.Plots so client and server share one shape. GlowlingRenderer (GS) will
 -- build the real models from this; until then each occupied pad gets a placeholder orb,
--- coloured by rarity, the owner's plot sign shows their name, and a shielded plot gets a bubble. The place streams, so a
+-- coloured by rarity, the owner's plot sign shows the base name and their name, a shielded plot
+-- gets a bubble, and each placed decoration is a placeholder block on the DecorZone. The place streams, so a
 -- plot is drawn again when its pads or sign stream in.
 
 local CollectionService = game:GetService("CollectionService")
@@ -10,7 +11,9 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Decor = require(Shared:WaitForChild("Decor"))
 local Plots = require(Shared:WaitForChild("Plots"))
+local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
 local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
 local NetClient = require(script.Parent.Parent:WaitForChild("Net"):WaitForChild("NetClient"))
 
@@ -26,6 +29,7 @@ local RARITY_COLORS = {
 }
 
 local SHIELD_COLOR = Color3.fromRGB(150, 220, 255)
+local DECOR_COLOR = Color3.fromRGB(170, 140, 100)
 
 local PlotController = {}
 PlotController.Changed = Signal.new() -- (plotId, view)
@@ -77,7 +81,8 @@ local function render(plotId: number)
 	local label = if sign ~= nil then sign:FindFirstChildWhichIsA("TextLabel", true) else nil
 	if label ~= nil then
 		local owner = Players:GetPlayerByUserId(view.owner)
-		label.Text = if owner ~= nil then owner.DisplayName else `Plot {plotId}`
+		local who = if owner ~= nil then owner.DisplayName else `Plot {plotId}`
+		label.Text = if view.name ~= "" and owner ~= nil then `{view.name}\n{who}` else who
 	end
 
 	local slots = model:FindFirstChild("Slots")
@@ -102,6 +107,25 @@ local function render(plotId: number)
 		bubble.CanQuery = false
 		bubble.CastShadow = false
 		bubble.Parent = group
+	end
+	local zone = model:FindFirstChild("DecorZone")
+	if zone ~= nil and zone:IsA("BasePart") then
+		for i, d in view.decor do
+			local item = Decor.item(economy, d.id)
+			if item ~= nil then
+				local block = Instance.new("Part")
+				block.Name = `Decor{i}`
+				block.Size = Vector3.new(item.w - 0.2, 1, item.d - 0.2)
+				block.CFrame = zone.CFrame * CFrame.new(d.x, 0.5, d.z) * CFrame.Angles(0, d.rot * math.pi / 2, 0)
+				block.Color = DECOR_COLOR
+				block.Material = Enum.Material.SmoothPlastic
+				block.Anchored = true
+				block.CanCollide = false
+				block.CanTouch = false
+				block.CanQuery = false
+				block.Parent = group
+			end
+		end
 	end
 	for _, pad in slots:GetChildren() do
 		local n = pad:GetAttribute("Slot")
@@ -142,7 +166,8 @@ local function watchPlot(model: Instance)
 		return
 	end
 	model.DescendantAdded:Connect(function(added: Instance)
-		if (added:IsA("BasePart") and added:GetAttribute("Slot") ~= nil) or added:IsA("TextLabel") then
+		local relevant = added:IsA("BasePart") and (added:GetAttribute("Slot") ~= nil or added.Name == "DecorZone")
+		if relevant or added:IsA("TextLabel") then
 			renderSoon(id)
 		end
 	end)

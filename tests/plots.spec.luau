@@ -130,4 +130,23 @@ H.test("a Base Lock starts and ends as a lock patch", function()
 	H.eq(Plots.empty(2).lock, 0, "a free plot is open")
 end)
 
+H.test("decorations and the base name diff as a whole list and a scalar", function()
+	local layout = { slots = 8, vault = 3 }
+	local before = Plots.view(2, 42, data(), layout)
+	H.eq(before.name, "", "no name")
+	H.eq(#before.decor, 0, "no decor")
+	local d = data()
+	d.decor = { owned = { hedge = 1 }, placed = { { id = "hedge", x = 2, z = -4, rot = 1 } } }
+	local after = Plots.view(2, 42, d, layout, nil, "Mossy Hollow")
+	local patch = Plots.diff(before, after) :: any
+	H.eq(patch.name, "Mossy Hollow")
+	H.eq(#patch.decor, 1)
+	H.eq(patch.pads, nil, "pads unchanged")
+	local applied = Plots.apply(copy(before), patch)
+	H.eq(applied.decor[1].z, -4)
+	H.eq(applied.name, "Mossy Hollow")
+	H.eq(Plots.diff(after, Plots.view(2, 42, d, layout, nil, "Mossy Hollow")), nil, "same list: no patch")
+	H.eq((Plots.diff(after, before) :: any).decor ~= nil, true, "removing sends the empty list")
+end)
+
 H.finish("plots")
