@@ -30,6 +30,8 @@ local LEGENDARY = 5 -- Legendary and above need a hold
 local CONFIRM_SECONDS = 3
 local HOLD_SECONDS = 1.5
 
+local HudLayout = require(script.Parent:WaitForChild("HudLayout"))
+
 local StorageController = {}
 
 local panel: Frame? = nil
@@ -175,8 +177,6 @@ local function build()
 
 	local toggle = Instance.new("TextButton")
 	toggle.Name = "StorageButton"
-	toggle.AnchorPoint = Vector2.new(0, 0.5)
-	toggle.Position = UDim2.new(0, 12, 0.5, 96) -- under "Shop"
 	toggle.Size = UDim2.fromOffset(120, 40)
 	toggle.BackgroundColor3 = PANEL
 	toggle.BackgroundTransparency = 0.15
@@ -185,7 +185,7 @@ local function build()
 	toggle.TextColor3 = Color3.fromRGB(255, 221, 120)
 	toggle.Text = "Storage"
 	corner(toggle, 10)
-	toggle.Parent = gui
+	HudLayout.dock("left", toggle, 3)
 
 	local frame = Instance.new("Frame")
 	frame.Name = "Storage"

@@ -23,6 +23,8 @@ local UPGRADES =
 	{ { id = "lantern", name = "Lantern" }, { id = "boots", name = "Boots" }, { id = "slots", name = "Slots" } }
 local BANDS = { "Next", "Session", "Long" }
 
+local HudLayout = require(script.Parent:WaitForChild("HudLayout"))
+
 local GoalController = {}
 
 local lines: { TextLabel } = {}
@@ -74,7 +76,8 @@ local function build()
 	local frame = Instance.new("Frame")
 	frame.Name = "Goals"
 	frame.AnchorPoint = Vector2.new(1, 0)
-	frame.Position = UDim2.new(1, -12, 0, 196) -- under the shield label
+	-- Beside the right dock, level with its top.
+	frame.Position = UDim2.new(1, -(12 + HudLayout.RIGHT_WIDTH + 8), 0, HudLayout.RIGHT_TOP)
 	frame.Size = UDim2.fromOffset(300, 78)
 	frame.BackgroundColor3 = Color3.fromRGB(20, 24, 40)
 	frame.BackgroundTransparency = 0.35

@@ -15,6 +15,8 @@ local NetClient = require(script.Parent.Parent:WaitForChild("Net"):WaitForChild(
 local PANEL = Color3.fromRGB(20, 24, 40)
 local SHIELD_COLOR = Color3.fromRGB(150, 220, 255)
 
+local HudLayout = require(script.Parent:WaitForChild("HudLayout"))
+
 local ShieldController = {}
 
 local label: TextLabel? = nil
@@ -65,8 +67,6 @@ local function build()
 
 	local status = Instance.new("TextLabel")
 	status.Name = "Protected"
-	status.AnchorPoint = Vector2.new(1, 0)
-	status.Position = UDim2.new(1, -12, 0, 158) -- under the Lock button
 	status.Size = UDim2.fromOffset(170, 30)
 	status.BackgroundColor3 = PANEL
 	status.BackgroundTransparency = 0.35
@@ -75,7 +75,7 @@ local function build()
 	status.TextColor3 = SHIELD_COLOR
 	status.Visible = false
 	corner(status)
-	status.Parent = gui
+	HudLayout.dock("right", status, 2)
 	label = status
 
 	local frame = Instance.new("Frame")

@@ -19,6 +19,8 @@ local PANEL = Color3.fromRGB(20, 24, 40)
 local READY = Color3.fromRGB(90, 170, 110)
 local DIM = Color3.fromRGB(60, 60, 70)
 
+local HudLayout = require(script.Parent:WaitForChild("HudLayout"))
+
 local GiftController = {}
 
 local toggle: TextButton? = nil
@@ -76,8 +78,6 @@ local function build()
 
 	local button = Instance.new("TextButton")
 	button.Name = "GiftButton"
-	button.AnchorPoint = Vector2.new(0, 0.5)
-	button.Position = UDim2.new(0, 12, 0.5, 240) -- under "Glowdex"
 	button.Size = UDim2.fromOffset(120, 40)
 	button.BackgroundColor3 = PANEL
 	button.BackgroundTransparency = 0.15
@@ -86,7 +86,7 @@ local function build()
 	button.TextColor3 = Color3.fromRGB(255, 190, 120)
 	button.Text = "Gift"
 	corner(button, 10)
-	button.Parent = gui
+	HudLayout.dock("left", button, 6)
 	toggle = button
 
 	local frame = Instance.new("Frame")

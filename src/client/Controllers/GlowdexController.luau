@@ -27,6 +27,8 @@ local HEADER = 44
 
 type Row = { label: TextLabel, claim: TextButton }
 
+local HudLayout = require(script.Parent:WaitForChild("HudLayout"))
+
 local GlowdexController = {}
 
 local panel: Frame? = nil
@@ -123,8 +125,6 @@ local function build()
 
 	local toggle = Instance.new("TextButton")
 	toggle.Name = "GlowdexButton"
-	toggle.AnchorPoint = Vector2.new(0, 0.5)
-	toggle.Position = UDim2.new(0, 12, 0.5, 192) -- under "Rebirth"
 	toggle.Size = UDim2.fromOffset(120, 40)
 	toggle.BackgroundColor3 = PANEL
 	toggle.BackgroundTransparency = 0.15
@@ -133,7 +133,7 @@ local function build()
 	toggle.TextColor3 = Color3.fromRGB(150, 230, 160)
 	toggle.Text = "Glowdex"
 	corner(toggle, 10)
-	toggle.Parent = gui
+	HudLayout.dock("left", toggle, 5)
 
 	local frame = Instance.new("Frame")
 	frame.Name = "Glowdex"

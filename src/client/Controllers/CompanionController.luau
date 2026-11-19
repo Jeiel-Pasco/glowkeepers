@@ -27,6 +27,8 @@ local CHOSEN = Color3.fromRGB(230, 180, 70)
 local SHOULDER = CFrame.new(2.6, 1.6, 0.8)
 local POINT_SECONDS = 4
 
+local HudLayout = require(script.Parent:WaitForChild("HudLayout"))
+
 local CompanionController = {}
 
 local speciesById: { [string]: any } = {}
@@ -106,8 +108,6 @@ local function build()
 
 	local toggle = Instance.new("TextButton")
 	toggle.Name = "CompanionButton"
-	toggle.AnchorPoint = Vector2.new(1, 0)
-	toggle.Position = UDim2.new(1, -12, 0, 408) -- under "Trade"
 	toggle.Size = UDim2.fromOffset(150, 38)
 	toggle.BackgroundColor3 = PANEL
 	toggle.BackgroundTransparency = 0.15
@@ -116,7 +116,7 @@ local function build()
 	toggle.TextColor3 = CHOSEN
 	toggle.Text = "Companion"
 	corner(toggle, 10)
-	toggle.Parent = gui
+	HudLayout.dock("right", toggle, 6)
 
 	local frame = Instance.new("Frame")
 	frame.Name = "Companion"

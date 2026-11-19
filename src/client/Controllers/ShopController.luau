@@ -26,6 +26,8 @@ local HEADER = 34
 
 type Row = { label: TextLabel, buy: TextButton }
 
+local HudLayout = require(script.Parent:WaitForChild("HudLayout"))
+
 local ShopController = {}
 
 local panel: Frame? = nil
@@ -71,8 +73,6 @@ local function build()
 
 	local toggle = Instance.new("TextButton")
 	toggle.Name = "ShopButton"
-	toggle.AnchorPoint = Vector2.new(0, 0.5)
-	toggle.Position = UDim2.new(0, 12, 0.5, 48) -- under "Upgrades"
 	toggle.Size = UDim2.fromOffset(120, 40)
 	toggle.BackgroundColor3 = PANEL
 	toggle.BackgroundTransparency = 0.15
@@ -81,7 +81,7 @@ local function build()
 	toggle.TextColor3 = Color3.fromRGB(255, 221, 120)
 	toggle.Text = "Shop"
 	corner(toggle, 10)
-	toggle.Parent = gui
+	HudLayout.dock("left", toggle, 2)
 
 	local frame = Instance.new("Frame")
 	frame.Name = "Shop"

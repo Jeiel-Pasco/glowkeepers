@@ -61,6 +61,8 @@ type Parts = {
 	loading: GuiObject?,
 }
 
+local HudLayout = require(script.Parent:WaitForChild("HudLayout"))
+
 local HUDController = {}
 
 local parts: Parts = { dots = {} }
@@ -114,6 +116,7 @@ local function buildPlaceholder(playerGui: PlayerGui): ScreenGui
 	list.Padding = UDim.new(0, 10)
 	list.Parent = top
 	top.Parent = gui
+	HudLayout.fitWidth(top, 12 + 96 + 8) -- clear of the cycle ring on both sides
 	makeLabel("Glow", top, 22, Color3.fromRGB(255, 221, 120)).LayoutOrder = 1
 	makeLabel("Embers", top, 22, Color3.fromRGB(255, 150, 90)).LayoutOrder = 2
 	local fireMeter = makeLabel("FireMeter", top, 22, FIRE_OK)

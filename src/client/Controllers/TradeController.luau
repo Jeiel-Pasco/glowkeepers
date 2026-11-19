@@ -25,6 +25,8 @@ local PICKED = Color3.fromRGB(200, 150, 60)
 local DIM = Color3.fromRGB(60, 60, 70)
 local BAD = Color3.fromRGB(170, 70, 70)
 
+local HudLayout = require(script.Parent:WaitForChild("HudLayout"))
+
 local TradeController = {}
 
 local names: { [string]: string } = {}
@@ -209,12 +211,11 @@ local function build()
 
 	local toggle = button(gui, "Trade", PANEL)
 	toggle.Name = "TradeButton"
-	toggle.AnchorPoint = Vector2.new(1, 0)
-	toggle.Position = UDim2.new(1, -12, 0, 366) -- under "Store"
 	toggle.Size = UDim2.fromOffset(120, 36)
 	toggle.BackgroundTransparency = 0.15
 	toggle.TextSize = 17
 	toggle.TextColor3 = Color3.fromRGB(200, 200, 255)
+	HudLayout.dock("right", toggle, 5)
 
 	local frame = Instance.new("Frame")
 	frame.Name = "Trade"
