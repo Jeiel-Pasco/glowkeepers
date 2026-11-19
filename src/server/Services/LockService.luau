@@ -27,6 +27,7 @@ local Lock = require(Shared:WaitForChild("Lock"))
 local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
+local Progress = require(script.Parent:WaitForChild("Progress"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local CycleService = require(script.Parent:WaitForChild("CycleService"))
 local PlotService = require(script.Parent:WaitForChild("PlotService"))
@@ -116,6 +117,7 @@ local function onLock(player: Player)
 	active[plotId] = { owner = player, untilTime = lockedUntil, inside = inside, warned = {} }
 	PlotService.setLock(plotId, lockedUntil)
 	Telemetry.custom(player, "lock_used", nil, { if usesCharge then "charge" else "free" })
+	Progress.add(player, "lock")
 	toast(player, `Base locked for {economy.lock.activeSeconds} s`, "good")
 end
 

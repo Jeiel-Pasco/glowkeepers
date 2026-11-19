@@ -13,8 +13,6 @@
 -- leave that much play time on every shielded player, or to -1 to shield everyone again.
 --
 -- The first rebirth ends it (RebirthService calls drop with "rebirth").
---
--- Not yet: the tutorial stash not counting as a steal (FTUE, Phase 3).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

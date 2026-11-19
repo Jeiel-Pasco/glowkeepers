@@ -15,7 +15,7 @@ local Schema = {}
 Schema.VERSION = 1
 
 local MAX_RECEIPTS = 200
-local LAST_FTUE_STEP = 10
+local FTUE_ALL = 1023 -- ftue.step is a bitmask of the 10 finished steps (Shared.Ftue)
 
 -- Keys whose numbers may hold fractions. Every other number in the template is whole.
 local FRACTIONAL = {
@@ -316,7 +316,7 @@ function Schema.repair(data: any, cfg: any): { string }
 	clampTo(data.settings, "music", 1, "settings.music", notes)
 	clampTo(data.settings, "sfx", 1, "settings.sfx", notes)
 	clampTo(data.shield, "playSeconds", cfg.shield.maxPlaySeconds, "shield.playSeconds", notes)
-	clampTo(data.ftue, "step", LAST_FTUE_STEP, "ftue.step", notes)
+	clampTo(data.ftue, "step", FTUE_ALL, "ftue.step", notes)
 
 	repairGlowlings(data, cfg, notes)
 	local slotCount = cfg.upgrades.slots.start + data.up.slots

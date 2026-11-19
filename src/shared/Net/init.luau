@@ -57,6 +57,12 @@ Net.remotes = {
 		rate = { perSecond = 10, burst = 10 },
 	},
 	FtueStep = { dir = "c2s", args = { { type = "integer", min = 1, max = 10 } }, rate = { perSecond = 2, burst = 4 } },
+	-- The tutorial's own actions (TutorialService): open the Free Lure, grab from the Wisp's Stash.
+	FtueAction = {
+		dir = "c2s",
+		args = { { type = "enum", values = { "lure", "stash" } } },
+		rate = { perSecond = 2, burst = 4 },
+	},
 	Place = { dir = "c2s", args = { GLOWLING_ID, PAD }, rate = { perSecond = 10, burst = 10 } }, -- swaps if taken
 	Unplace = { dir = "c2s", args = { GLOWLING_ID }, rate = { perSecond = 10, burst = 10 } }, -- back to storage
 	SetCompanion = { dir = "c2s", args = { GLOWLING_ID }, rate = { perSecond = 2, burst = 4 } }, -- toggles; by day only

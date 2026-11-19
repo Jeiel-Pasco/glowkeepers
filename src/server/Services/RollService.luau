@@ -93,6 +93,8 @@ local function grant(player: Player, tier: number, poolName: string, src: string
 	return record
 end
 
+local RARE = 3
+
 -- A lure of rarity `floor` (1 Common .. lures.maxFloor). Clearing species only (§8).
 -- Returns nil if the player isn't loaded or storage is full; nothing is rolled then.
 function RollService.lure(player: Player, floor: number): Types.Glowling?
@@ -101,6 +103,20 @@ function RollService.lure(player: Player, floor: number): Types.Glowling?
 	end
 	local tier = Roll.lureRarity(economy, RollService.luck(player), floor, rng)
 	return grant(player, tier, "Clearing", "lure")
+end
+
+-- Tutorial grants (GAME_SYSTEMS §22): a set rarity, outside the odds; Glowdex credit (src
+-- "tutorial"). `species` may be picked earlier with RollService.pick (the stash shows it).
+function RollService.tutorial(player: Player, tier: number, species: string?): Types.Glowling?
+	if not GlowlingService.hasRoom(player) then
+		return nil
+	end
+	return grant(player, tier, "Clearing", "tutorial", species)
+end
+
+-- A random species of rarity `tier` from a pool.
+function RollService.pick(poolName: string, tier: number): string
+	return Roll.species(pool(poolName, tier), rng)
 end
 
 -- Picks a species from a pool: ForestService shows a wild's species before it's caught. The
@@ -121,6 +137,10 @@ function RollService.night(player: Player, poolName: string, species: string?): 
 		return nil
 	end
 	local tier, pity = Roll.nightRarity(economy, RollService.luck(player), data.pity.sinceLegendary, rng)
+	if player:GetAttribute("FtueRareCatch") == true then -- the tutorial's first catch (§22)
+		player:SetAttribute("FtueRareCatch", nil)
+		tier = math.max(tier, RARE)
+	end
 	local record = grant(player, tier, poolName, "night", species)
 	if record ~= nil then
 		data.pity.sinceLegendary = pity
