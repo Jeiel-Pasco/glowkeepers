@@ -20,7 +20,7 @@
 -- shielded thief must drop their own shield first (ShieldService, after a client confirm).
 --
 -- Not yet:
--- Boots in everyone's RunSpeed (the shop), crew-mates as taggers (Phase 4), the owner's alarm
+-- crew-mates as taggers (Phase 4), the owner's alarm
 -- arrow (GS), the Audit store for Legendary-or-better steals (Phase 5).
 
 local Players = game:GetService("Players")
@@ -144,16 +144,21 @@ local function speedOf(player: Player, now: number): number
 	return speed
 end
 
+-- Sets the character's RunSpeed (nil = the default movement.run). UpgradeService calls it
+-- through StealService.refreshSpeed after Boots are bought.
 local function updateSpeed(player: Player)
 	local character = player.Character
 	if character == nil then
 		return
 	end
 	local now = workspace:GetServerTimeNow()
-	local changed = carrying(player) ~= nil or (boostUntil[player] or 0) > now
-	-- Nobody else sets RunSpeed yet, so the default (movement.run) is left as nil.
+	local data = DataService.get(player)
+	local boots = if data ~= nil then data.up.boots else 0
+	local changed = boots > 0 or carrying(player) ~= nil or (boostUntil[player] or 0) > now
 	character:SetAttribute("RunSpeed", if changed then speedOf(player, now) else nil)
 end
+
+StealService.refreshSpeed = updateSpeed
 
 local function clearCharacter(job: Job)
 	for _, key in CARRY_KEYS do
