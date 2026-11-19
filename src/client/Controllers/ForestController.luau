@@ -111,6 +111,15 @@ local function updateContext()
 	InputController.offer("Forest", if target ~= nil then CATCH else nil, PRIORITY)
 end
 
+-- The wilds on this client, with their models (for the Wayfinder companion).
+function ForestController.wilds(): { { wild: Wild, model: Model } }
+	local list = {}
+	for _, orb in orbs do
+		table.insert(list, orb)
+	end
+	return list
+end
+
 function ForestController.Init()
 	NetClient.on("WildSpawned", function(list: { Wild })
 		for _, wild in list do

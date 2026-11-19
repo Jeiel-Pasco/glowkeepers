@@ -40,11 +40,12 @@ function Fire.step(cfg: any, level: number, drainPerSecond: number, dt: number):
 	return math.clamp(level - drainPerSecond * dt, 0, cfg.fire.max)
 end
 
-function Fire.feed(cfg: any, level: number, kind: Fuel): number
+-- `mult` scales the fuel (a Firebinder companion, §31); default 1.
+function Fire.feed(cfg: any, level: number, kind: Fuel, mult: number?): number
 	if level <= 0 then
 		return 0
 	end
-	return math.min(cfg.fire.max, level + Fire.feedAmount(cfg, kind))
+	return math.min(cfg.fire.max, level + Fire.feedAmount(cfg, kind) * (mult or 1))
 end
 
 function Fire.secondsLeft(level: number, drainPerSecond: number): number

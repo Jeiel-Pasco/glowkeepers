@@ -23,6 +23,7 @@ local Server = script.Parent.Parent
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Economy = require(Shared:WaitForChild("Economy"))
 local Fire = require(Shared:WaitForChild("Fire"))
+local Companion = require(Shared:WaitForChild("Companion"))
 local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
 local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
@@ -32,6 +33,17 @@ local CycleService = require(script.Parent:WaitForChild("CycleService"))
 local DownedService = require(script.Parent:WaitForChild("DownedService"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
 local LiveConfigService = require(script.Parent:WaitForChild("LiveConfigService"))
+
+local speciesById: { [string]: any } = {}
+for _, entry in (require(Shared:WaitForChild("Config"):WaitForChild("species")) :: any).species do
+	speciesById[entry.id] = entry
+end
+
+-- The player's Night Companion species (D23), or nil.
+local function companionOf(player: Player): any
+	local data = DataService.get(player)
+	return if data ~= nil then Companion.species(data, speciesById) else nil
+end
 
 local TICK_SECONDS = 0.25 -- 4 Hz
 local DEFAULT_FEED_RADIUS = 10
@@ -248,7 +260,7 @@ local function onFeed(player: Player)
 	end
 	setCarry(player, nil)
 	local saved = level < economy.fire.saveBelow -- fed while nearly out (a badge)
-	level = Fire.feed(economy, level, fuel)
+	level = Fire.feed(economy, level, fuel, Companion.fuelMult(economy, companionOf(player)))
 	fed[player] = (fed[player] or 0) + 1
 	local data = DataService.get(player)
 	if data ~= nil then
