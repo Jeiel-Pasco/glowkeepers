@@ -12,8 +12,9 @@
 -- DEV/BETA: set the server-side workspace attribute DebugShieldLeft to a number of seconds to
 -- leave that much play time on every shielded player, or to -1 to shield everyone again.
 --
--- Not yet: the first rebirth ends it (RebirthService, Phase 4: call ShieldService.drop with
--- "rebirth"), and the tutorial stash not counting as a steal (FTUE, Phase 3).
+-- The first rebirth ends it (RebirthService calls drop with "rebirth").
+--
+-- Not yet: the tutorial stash not counting as a steal (FTUE, Phase 3).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

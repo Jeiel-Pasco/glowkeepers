@@ -70,6 +70,7 @@ Net.remotes = {
 	-- server times the hold itself; the client's progress ring is only cosmetic.
 	GrabStart = { dir = "c2s", args = { PLOT, PAD }, rate = { perSecond = 2, burst = 4 } },
 	GrabCancel = { dir = "c2s", args = {}, rate = { perSecond = 2, burst = 4 } },
+	Rebirth = { dir = "c2s", args = {}, rate = { perSecond = 0.1, burst = 1 } }, -- +1 Star (§15); the client confirms with a hold
 	Lock = { dir = "c2s", args = {}, rate = { perSecond = 1, burst = 2 } }, -- Base Lock, or a Lock Charge to skip the recharge
 	ShopBuy = {
 		dir = "c2s",
@@ -96,7 +97,7 @@ Net.remotes = {
 	-- Server → client
 	PlayerState = { dir = "s2c" }, -- (full: boolean, data): a snapshot, then top-level patches
 	OfflineEarnings = { dir = "s2c" }, -- (amount: number, away: number seconds): the join popup
-	Wallet = { dir = "s2c" }, -- (glow, perSec, serverTime, embers): the client extrapolates
+	Wallet = { dir = "s2c" }, -- (glow, perSec, serverTime, embers, glowSinceRebirth): the client extrapolates
 	Toast = { dir = "s2c" }, -- (text, kind?)
 	Announce = { dir = "s2c" }, -- (text)
 	PlotSnapshot = { dir = "s2c" }, -- (views: { [plotId as string]: Plots.View }), once the client is ready

@@ -138,7 +138,7 @@ Client intent ──► Net (type check, rate limit) ──► Service (rules, s
 | ForestService | Wild spawn waves, catch validation, tutorial-only spawns | 2 |
 | StalkerService | Stalker NPC: the brain is `Shared.Stalker` (Dormant, Prowl, Stalk, Lunge, Retreat); 10 Hz sensing; kinematic, server-owned movement, straight on line of sight, else a PathfindingService path recomputed every 0.5 s; first-night near-miss | 2 |
 | DownedService | Downed, bleed-out, revive holds, spectating until dawn | 2 |
-| RebirthService | Threshold check, wipe rules, Star grant | 4 |
+| RebirthService | Threshold check (`glowSinceRebirth` ≥ `Economy.rebirthRequirement`), the D3 wipe and keep lists (`Shared.Rebirth`), +1 Star, Place best, ends the shield, forced save | 4 |
 | GlowdexService | Entries, page tiers, rewards, odds tab data | 4 |
 | TradeService | Unlock checks, sessions, escrow, atomic swap, fees, trade lock | 5 |
 | DecorService | Owned and placed decorations, placement validation, base name | 4 |
@@ -263,7 +263,7 @@ export type Profile = {
 | Plot state (owner, slots, vault, lock, shield, decorations, base name, Stars) | Everyone | `PlotSnapshot` on join, then `PlotDelta`; `lock` is the server time the Base Lock ends (0 = open) | On change |
 | Lock recharge | The owner | Player attribute `LockReadyAt` (server time the recharge ends); charges are `lockCharges` in `PlayerState` | On change |
 | New-player shield | The player (and everyone, through the plot view's `shield`) | Player attributes `Shielded` (true or nil) and `ShieldEndsAt` (server time it ends if they stay online); `shield` in `PlayerState` | On change |
-| Wallet | Owner only | `Wallet {glow, perSec, t, embers}`; the client extrapolates the ticking counter | On change, plus every 10 s |
+| Wallet | Owner only | `Wallet {glow, perSec, t, embers, glowSinceRebirth}`; the client extrapolates the ticking counter and the rebirth progress | On change, plus every 10 s |
 | Inventory, quests, pass, pity, stock | Owner only | `PlayerState(full = true, data)` once the client sends `ClientReady`, then `PlayerState(false, patch)` with changed top-level keys (`receipts` and `flags` are never sent) | On change |
 | Wild Glowlings | Everyone (tutorial spawns: one player only) | `WildSpawned` (a list of `{ id, sp, area, x, y, z }`; every wild to a client that becomes ready mid-night) / `WildGone` (a list of ids) | Per wave, per catch, at dawn |
 | Catches left | The player | Player attribute `CatchesLeft` (nil by day) | On change |
@@ -314,7 +314,7 @@ Every remote is declared once in `shared/Net.luau`, with its argument schema and
 | `ShopBuy` | C→S | itemId: `"lure1"`..`"lure4"` (the rarity floor) | Stock left this window; storage below 60; can afford it (no partial charge) | 5/s |
 | `UpgradeBuy` | C→S | upgradeId: `"lantern"` \| `"boots"` \| `"slots"`, all: boolean? (Buy max) | Below max; can afford the next level (Buy max buys as many as the balance covers, up to max) | 5/s |
 | `LockChargeBuy` | C→S | currency: `"glow"` \| `"embers"` | Fewer than 5 held; can afford `max(200, 120 × Glow/s)` Glow or 15 Embers | 2/s |
-| `Rebirth` | C→S | — | `glowSinceRebirth` ≥ threshold; not carrying; not mid-trade | 1/10 s |
+| `Rebirth` | C→S | — | `glowSinceRebirth` ≥ threshold; not carrying; none of the player's Glowlings held (grabbed or in a trade); the client confirms with a 2 s hold | 1/10 s |
 | `Claim` | C→S | kind: string, id: string | Quest, gift, pass tier or Glowdex page is complete and unclaimed | 5/s |
 | `TradeRequest` / `TradeRespond` / `TradeOffer` / `TradeConfirm` / `TradeCancel` | C→S | Various | GAME_SYSTEMS §17 | 5/s |
 | `DecorPlace` / `DecorRemove` | C→S | itemId, x, z, rot | Owned; inside own plot bounds; on the grid; no overlap; item count under the cap | 10/s |
