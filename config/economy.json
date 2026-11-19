@@ -31,6 +31,24 @@
     "boots":   { "baseCost": 150, "growth": 1.5,  "max": 25, "speedPerLevel": 0.04, "levelsPerExtraCatch": 5 },
     "slots":   { "baseCost": 250, "growth": 1.9,  "start": 8, "max": 30 }
   },
+  "glowdex": {
+    "credit": ["lure", "night", "event", "tutorial"],
+    "tiers": [
+      { "id": "Bronze",  "needs": 4, "income": 0.005 },
+      { "id": "Silver",  "needs": 5, "income": 0.005 },
+      { "id": "Gold",    "needs": 6, "income": 0.01 },
+      { "id": "Radiant", "needs": 7, "income": 0 }
+    ],
+    "milestones": [
+      { "entries": 10,  "embers": 25 },
+      { "entries": 25,  "embers": 50 },
+      { "entries": 50,  "embers": 100 },
+      { "entries": 100, "embers": 200 },
+      { "entries": 150, "embers": 300 },
+      { "entries": 200, "embers": 500 },
+      { "entries": 280, "embers": 1000 }
+    ]
+  },
   "income":  { "starBonus": 0.35, "offlineEfficiency": 0.10, "offlineCapHours": 6 },
   "rebirth": { "baseRequirement": 250000, "growth": 3.2, "stepAfterStar": 8, "growthAfterStep": 2.0, "stepEnabled": true, "keepVault": true },
   "vault":   { "start": 3, "perStar": 1 },
