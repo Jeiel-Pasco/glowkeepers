@@ -9,11 +9,13 @@
 -- Pure data, so the Lune tests can check it.
 
 export type ArgSchema = {
-	type: "any" | "boolean" | "number" | "integer" | "string" | "enum",
+	type: "any" | "boolean" | "number" | "integer" | "string" | "enum" | "list",
 	min: number?,
 	max: number?,
 	maxLen: number?,
 	values: { string }?,
+	of: ArgSchema?, -- "list": the schema of each item
+	maxCount: number?, -- "list": at most this many items
 	optional: boolean?,
 }
 
@@ -57,6 +59,11 @@ Net.remotes = {
 	Place = { dir = "c2s", args = { GLOWLING_ID, PAD }, rate = { perSecond = 10, burst = 10 } }, -- swaps if taken
 	Unplace = { dir = "c2s", args = { GLOWLING_ID }, rate = { perSecond = 10, burst = 10 } }, -- back to storage
 	PlaceBest = { dir = "c2s", args = {}, rate = { perSecond = 2, burst = 2 } },
+	Release = {
+		dir = "c2s",
+		args = { { type = "list", of = GLOWLING_ID, maxCount = 20 } },
+		rate = { perSecond = 2, burst = 4 },
+	}, -- storage Glowlings → Glow (§7)
 	PickupFuel = { dir = "c2s", args = { { type = "string", maxLen = 16 } }, rate = { perSecond = 4, burst = 4 } }, -- PileId
 	FeedFire = { dir = "c2s", args = {}, rate = { perSecond = 4, burst = 4 } },
 	-- Hold to steal: GrabStart when the hold begins, GrabCancel when it is let go early. The

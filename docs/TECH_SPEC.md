@@ -125,7 +125,8 @@ Client intent ──► Net (type check, rate limit) ──► Service (rules, s
 | PolicyGate | Caches `PolicyService:GetPolicyInfoForPlayerAsync` for each player; answers "can this player see X?" | 5 |
 | CycleService | Server epoch, phase signals (Dawn, DuskWarning, Night), the night-modifier pick | 1 |
 | PlotService | Assigns the 8 plots, slots, vault, plot zones, the shield bubble, plot snapshots and deltas | 2 |
-| GlowlingService / InventoryService | Create, move, release and transfer Glowling records; storage cap; auto-place | 2 |
+| GlowlingService / InventoryService | Create, move and transfer Glowling records; storage cap; auto-place | 2 |
+| ReleaseService | Release storage Glowlings for 60 s of their income each (Star bonus included); all or nothing; refuses placed or held ones | 3 |
 | RollService | Wraps `Roll` with a per-server `Random`; pity; tutorial overrides | 2 |
 | IncomeService | Recomputes Glow/s when inventory changes; 1 Hz accrual; offline payout on join (at the saved `lastIncomePerSec`, before the join recompute), shown by `OfflineEarnings (amount, away)` once the client is ready | 2 |
 | ShopService | Lures for Glow from each player's own stock per restock window (`os.time() // 300`, saved in `shop` so a rejoin doesn't refill it); check and spend with no yield between, refund if the roll can't be granted | 3 |
@@ -309,7 +310,7 @@ Every remote is declared once in `shared/Net.luau`, with its argument schema and
 | `DropShield` | C→S | — | Ends the sender's new-player shield, after the client's confirm | 1/s |
 | `Place` / `Unplace` | C→S | id: string, pad: number (Place only) | Owns the id; pad unlocked (pads 1…vault are vault pads, so Place to one of them is the move to the vault; a taken pad swaps); Unplace only while storage has room; not mid-trade | 10/s |
 | `PlaceBest` | C→S | — | Best earners to the vault pads, the next best to display pads (GAME_SYSTEMS §7) | 2/s |
-| `Release` | C→S | ids: {string} (≤ 20) | Owns all of them; none in display slots, the vault or a trade; confirmed by the client UI | 2/s |
+| `Release` | C→S | ids: list of 1–20 Glowling ids (schema type `list`) | Owns all of them, no repeats; all in storage (none on a pad, held by a steal, or in a trade); Epic+ confirmed twice and Legendary+ held in the client UI | 2/s, burst 4 |
 | `ShopBuy` | C→S | itemId: `"lure1"`..`"lure4"` (the rarity floor) | Stock left this window; storage below 60; can afford it (no partial charge) | 5/s |
 | `UpgradeBuy` | C→S | upgradeId: `"lantern"` \| `"boots"` \| `"slots"`, all: boolean? (Buy max) | Below max; can afford the next level (Buy max buys as many as the balance covers, up to max) | 5/s |
 | `LockChargeBuy` | C→S | currency: `"glow"` \| `"embers"` | Fewer than 5 held; can afford `max(200, 120 × Glow/s)` Glow or 15 Embers | 2/s |

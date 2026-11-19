@@ -95,6 +95,24 @@ H.test("argument lists", function()
 	H.ok(not Validate.args(Net.remotes.ClientReady.args, table.pack(nil, 1)), "trailing junk")
 end)
 
+H.test("Release: a list of 1..20 Glowling ids", function()
+	local args = Net.remotes.Release.args
+	local ids = {}
+	for i = 1, 20 do
+		ids[i] = `id{i}`
+	end
+	H.ok(Validate.args(args, table.pack({ "a" })), "one id")
+	H.ok(Validate.args(args, table.pack(ids)), "twenty ids")
+	table.insert(ids, "id21")
+	H.ok(not Validate.args(args, table.pack(ids)), "21 ids")
+	H.ok(not Validate.args(args, table.pack({})), "empty")
+	H.ok(not Validate.args(args, table.pack("a")), "not a table")
+	H.ok(not Validate.args(args, table.pack({ "a", nil, "c" })), "a hole")
+	H.ok(not Validate.args(args, table.pack({ "a", x = "b" })), "an extra key")
+	H.ok(not Validate.args(args, table.pack({ string.rep("x", 37) })), "an id too long")
+	H.ok(not Validate.args(args, table.pack({ 5 })), "a number id")
+end)
+
 H.test("token bucket: burst, refill, and a clock that goes backwards", function()
 	local bucket = TokenBucket.new(2, 3, 100)
 	H.ok(TokenBucket.take(bucket, 100), "1")
