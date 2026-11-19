@@ -218,6 +218,53 @@ function DataService.erase(userId: number): (boolean, string?)
 	return ok, if ok then nil else tostring(err)
 end
 
+-- Saved versions of a profile at or before `beforeUnix`, newest first, at most `max`.
+-- Each: { at = unix seconds, data = the saved data }. Live ProfileStore only (not mock). Yields.
+function DataService.versions(userId: number, beforeUnix: number, max: number): { any }
+	local out = {}
+	if store == nil or store.VersionQuery == nil then
+		return out
+	end
+	local ok, err = pcall(function()
+		local query = store:VersionQuery(
+			`Player_{userId}`,
+			Enum.SortDirection.Descending,
+			nil,
+			DateTime.fromUnixTimestamp(beforeUnix)
+		)
+		while #out < max do
+			local profile = query:NextAsync()
+			if profile == nil then
+				break
+			end
+			local at = if profile.KeyInfo then profile.KeyInfo.UpdatedTime / 1000 else 0
+			table.insert(out, { at = math.floor(at), data = profile.Data, profile = profile })
+		end
+	end)
+	if not ok then
+		warn(`[DataService] version query failed: {err}`)
+	end
+	return out
+end
+
+-- Restores the newest saved version at or before `beforeUnix` as the current save. The
+-- player must not be playing anywhere (a live session would save over it). Yields.
+-- Returns the restored version's time, or nil and why.
+function DataService.rollback(userId: number, beforeUnix: number): (number?, string?)
+	local found = DataService.versions(userId, beforeUnix, 1)[1]
+	if found == nil then
+		return nil,
+			if storeMode == "profilestore" then "no saved version at or before that time" else `not on {storeMode}`
+	end
+	local ok, err = pcall(function()
+		found.profile:SetAsync()
+	end)
+	if not ok then
+		return nil, tostring(err)
+	end
+	return found.at, nil
+end
+
 function DataService.storeMode(): string
 	return storeMode
 end

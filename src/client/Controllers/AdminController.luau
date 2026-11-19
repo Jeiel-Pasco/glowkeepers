@@ -21,6 +21,8 @@ local COMMANDS = {
 	{ "ban", "<days | -1 | next> <reason>" },
 	{ "unban", "" },
 	{ "erase", "<request id>" },
+	{ "versions", "[unix time]" },
+	{ "rollback", "<unix time> <reason>" },
 	{ "live_get", "" },
 	{ "live_set", "<json>" },
 	{ "live_confirm", "" },
@@ -78,8 +80,8 @@ local function build()
 
 	local chosen = COMMANDS[1][1]
 	local buttons: { [string]: TextButton } = {}
-	local arg = box(frame, "Arg", "", UDim2.fromOffset(150, 100), UDim2.fromOffset(298, 26))
-	local target = box(frame, "Target", "target user id", UDim2.fromOffset(8, 100), UDim2.fromOffset(136, 26))
+	local arg = box(frame, "Arg", "", UDim2.fromOffset(150, 120), UDim2.fromOffset(298, 26))
+	local target = box(frame, "Target", "target user id", UDim2.fromOffset(8, 120), UDim2.fromOffset(136, 26))
 	local function pick(name: string, hint: string)
 		chosen = name
 		arg.PlaceholderText = hint
@@ -112,7 +114,7 @@ local function build()
 	run.TextSize = 14
 	run.TextColor3 = Color3.new(1, 1, 1)
 	run.BackgroundColor3 = Color3.fromRGB(60, 140, 90)
-	run.Position = UDim2.fromOffset(8, 132)
+	run.Position = UDim2.fromOffset(8, 152)
 	run.Size = UDim2.fromOffset(80, 26)
 	run.Parent = frame
 	run.Activated:Connect(function()
@@ -121,8 +123,8 @@ local function build()
 
 	local out = Instance.new("TextLabel")
 	out.Name = "Output"
-	out.Position = UDim2.fromOffset(8, 166)
-	out.Size = UDim2.new(1, -16, 1, -174)
+	out.Position = UDim2.fromOffset(8, 186)
+	out.Size = UDim2.new(1, -16, 1, -194)
 	out.BackgroundTransparency = 1
 	out.Font = Enum.Font.Code
 	out.TextSize = 12
