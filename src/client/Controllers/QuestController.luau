@@ -196,6 +196,11 @@ local function build()
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 end
 
+-- The quest text for an event id (the goal tracker uses it).
+function QuestController.name(event: string): string
+	return TEXT[event] or event
+end
+
 function QuestController.Init() end
 
 function QuestController.Start()
