@@ -20,6 +20,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Store = require(Shared:WaitForChild("Store"))
 local Economy = require(Shared:WaitForChild("Economy"))
 local EconomyMath = require(Shared:WaitForChild("EconomyMath"))
 local Glowdex = require(Shared:WaitForChild("Glowdex"))
@@ -30,6 +31,7 @@ local Progress = require(script.Parent:WaitForChild("Progress"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
 local InventoryService = require(script.Parent:WaitForChild("InventoryService"))
 local LiveConfigService = require(script.Parent:WaitForChild("LiveConfigService"))
+local GamePassService = require(script.Parent:WaitForChild("GamePassService"))
 local NetServer = require(script.Parent.Parent:WaitForChild("Net"):WaitForChild("NetServer"))
 
 local TICK_SECONDS = 1
@@ -122,7 +124,8 @@ function IncomeService.recompute(player: Player)
 	accrue(player, now())
 	local rate = Inventory.placedValue(data, InventoryService.valueOf)
 		* Economy.incomeMultiplier(economy, data.stars, 1 + Glowdex.incomeBonus(economy, data.dexClaimed))
-		* LiveConfigService.mult("glowMult") -- an event's Glow boost (§21); EventService recomputes at its edges
+		* LiveConfigService.mult("glowMult")
+		* (if GamePassService.owns(player, "vip") then (Store.pass(economy, "vip") :: any).incomeMult else 1) -- an event's Glow boost (§21); EventService recomputes at its edges
 	if rate ~= rates[player] then
 		rates[player] = rate
 		DataService.setIncomeRate(player, rate)
@@ -130,6 +133,11 @@ function IncomeService.recompute(player: Player)
 end
 
 function IncomeService.Init()
+	GamePassService.Changed:Connect(function(player: Player, key: string)
+		if key == "vip" then
+			IncomeService.recompute(player)
+		end
+	end)
 	DataService.PlayerReady:Connect(function(player: Player, data: any, info: any)
 		payOffline(player, data, info.away)
 		paidUntil[player] = now()

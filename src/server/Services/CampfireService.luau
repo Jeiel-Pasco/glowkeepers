@@ -179,6 +179,7 @@ local function dawn()
 			data.glow -= glowLost
 			data.stats.firesLost += 1
 			Progress.add(player, "lost")
+			player:SetAttribute("LostNightAt", workspace:GetServerTimeNow()) -- no store prompts on the lost-night screen
 			Telemetry.custom(player, "fire_lost")
 			Telemetry.economy(player, "Sink", "Glow", glowLost, math.floor(data.glow), gameplay, "night_lost")
 		end

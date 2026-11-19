@@ -11,6 +11,8 @@ local ORDER = {
 	"Progress",
 	"LiveConfigService",
 	"DataService",
+	"GamePassService",
+	"PolicyGate",
 	"SettingsService",
 	"CycleService",
 	"DownedService",
@@ -38,6 +40,7 @@ local ORDER = {
 	"LeaderboardService",
 	"BadgeService",
 	"EventService",
+	"MonetizationService",
 }
 
 local loaded: { [string]: any } = {}

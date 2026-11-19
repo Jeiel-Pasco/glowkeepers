@@ -142,6 +142,27 @@
     { "key": "days7",      "name": "7 Play Days",             "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
     { "key": "trade1",     "name": "First Trade",             "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } }
   ],
+  "store": {
+    "passes": [
+      { "key": "vip",        "name": "VIP Lantern",   "robux": 299, "incomeMult": 1.5 },
+      { "key": "vault2",     "name": "+2 Vault Slots", "robux": 199, "vault": 2 },
+      { "key": "swiftBoots", "name": "Swift Boots",   "robux": 149 },
+      { "key": "autoPlace",  "name": "Auto-Place",    "robux": 99 }
+    ],
+    "products": [
+      { "key": "embers120",   "name": "120 Embers",    "robux": 49,  "kind": "embers", "amount": 120,  "capGroup": "embers" },
+      { "key": "embers550",   "name": "550 Embers",    "robux": 199, "kind": "embers", "amount": 550,  "capGroup": "embers" },
+      { "key": "embers2400",  "name": "2,400 Embers",  "robux": 799, "kind": "embers", "amount": 2400, "capGroup": "embers" },
+      { "key": "lockCharge3", "name": "Lock Charge ×3", "robux": 25,  "kind": "lockCharges", "amount": 3, "capGroup": "lockCharges" },
+      { "key": "serverLuck",  "name": "Server Luck",   "robux": 99,  "kind": "serverLuck", "capGroup": "serverLuck", "paidRandom": true },
+      { "key": "passPremium", "name": "Night Pass Premium", "robux": 399, "kind": "passPremium" }
+    ],
+    "dailyCaps": { "embers": 3, "lockCharges": 5, "serverLuck": 2 },
+    "serverLuck": { "mult": 1.5, "minutes": 15, "maxMinutes": 60 },
+    "lostGlowlingQuietSeconds": 30,
+    "lostNightQuietSeconds": 20,
+    "keepReceipts": 200
+  },
   "events": { "featuredWeight": 2 },
   "live": {
     "pollSeconds": 300,
