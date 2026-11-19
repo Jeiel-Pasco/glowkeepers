@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Server = script.Parent.Parent
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Store = require(Shared:WaitForChild("Store"))
 local Economy = require(Shared:WaitForChild("Economy"))
 local Inventory = require(Shared:WaitForChild("Inventory"))
 local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
@@ -19,15 +20,16 @@ local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
+local GamePassService = require(script.Parent:WaitForChild("GamePassService"))
 
 local InventoryService = {}
 InventoryService.Changed = Signal.new() -- (player): pads changed; Glow/s and the plot view may differ
 
 local held: { [Player]: { [string]: boolean } } = {}
 
--- Vault pads from passes (+2 with the pass, §7). Passes arrive in Phase 5.
-local function passVaultBonus(_player: Player): number
-	return 0
+-- Vault pads from passes (+2 with the pass, §7).
+local function passVaultBonus(player: Player): number
+	return if GamePassService.owns(player, "vault2") then (Store.pass(economy, "vault2") :: any).vault else 0
 end
 
 function InventoryService.layout(player: Player, data: any): Inventory.Layout
@@ -109,6 +111,12 @@ function InventoryService.unplace(player: Player, id: string): (boolean, string?
 	return ok, reason
 end
 
+-- Whether any of this player's Glowlings is held (grabbed or carried by a thief).
+function InventoryService.anyHeld(player: Player): boolean
+	local ids = held[player]
+	return ids ~= nil and next(ids) ~= nil
+end
+
 function InventoryService.placeBest(player: Player): boolean
 	local data = DataService.get(player)
 	if data == nil then
@@ -123,6 +131,13 @@ function InventoryService.placeBest(player: Player): boolean
 end
 
 function InventoryService.Init()
+	GamePassService.Changed:Connect(function(player: Player, key: string)
+		local data = DataService.get(player)
+		if key == "vault2" and data ~= nil then
+			Inventory.normalize(data, InventoryService.layout(player, data))
+			InventoryService.notify(player)
+		end
+	end)
 	-- The vault may have grown since the last session (a Star, a pass): fit the pads to it.
 	DataService.PlayerReady:Connect(function(player: Player, data: any)
 		if Inventory.normalize(data, InventoryService.layout(player, data)) then

@@ -87,6 +87,29 @@ Net.remotes = {
 		args = { { type = "integer", min = 1, max = 3 } },
 		rate = { perSecond = 1, burst = 2 },
 	}, -- the day's free reroll of daily quest N
+	-- Ask the server to prompt a purchase (§23): a pass or developer product key from
+	-- economy.store (tests/store.spec.luau checks this list against it).
+	PromptProduct = {
+		dir = "c2s",
+		args = {
+			{
+				type = "enum",
+				values = {
+					"vip",
+					"vault2",
+					"swiftBoots",
+					"autoPlace",
+					"embers120",
+					"embers550",
+					"embers2400",
+					"lockCharge3",
+					"serverLuck",
+					"passPremium",
+				},
+			},
+		},
+		rate = { perSecond = 1, burst = 2 },
+	},
 	PassPremium = { dir = "c2s", args = {}, rate = { perSecond = 0.2, burst = 1 } }, -- this season's premium for Embers
 	Lock = { dir = "c2s", args = {}, rate = { perSecond = 1, burst = 2 } }, -- Base Lock, or a Lock Charge to skip the recharge
 	ShopBuy = {

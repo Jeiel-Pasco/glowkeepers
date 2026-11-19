@@ -18,6 +18,7 @@ local Config = Shared:WaitForChild("Config")
 local Economy = require(Shared:WaitForChild("Economy"))
 local Env = require(Shared:WaitForChild("Env"))
 local Events = require(Shared:WaitForChild("Events"))
+local Store = require(Shared:WaitForChild("Store"))
 local Roll = require(Shared:WaitForChild("Roll"))
 local Types = require(Shared:WaitForChild("Types"))
 local economy = require(Config:WaitForChild("economy")) :: any
@@ -56,7 +57,15 @@ function RollService.luck(player: Player): number
 	end
 	local luck =
 		Economy.luck(economy, data.up.lantern, data.stars, { fireSurvived = CampfireService.survivedLastNight() })
-	return luck * LiveConfigService.mult("luckMult") -- an event's luck boost (§21)
+	-- An event's luck boost (§21), and Server Luck (§23) unless live config switched it off.
+	local serverLuck = if LiveConfigService.killed("serverLuck")
+		then 1
+		else Store.serverLuckMult(
+			economy,
+			tonumber(workspace:GetAttribute("ServerLuckEnds")) or 0,
+			workspace:GetServerTimeNow()
+		)
+	return luck * LiveConfigService.mult("luckMult") * serverLuck
 end
 
 local function grant(player: Player, tier: number, poolName: string, src: string, species: string?): Types.Glowling?

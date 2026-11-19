@@ -1,7 +1,8 @@
 --!strict
 -- The event strip (GAME_SYSTEMS §21): under the top bar, the running event and its time left
 -- (workspace LiveEventId / LiveEventEnds) and today's featured Deepwood species
--- (workspace FeaturedSpecies). Refreshed once a second.
+-- (workspace FeaturedSpecies), plus Server Luck while it runs (workspace ServerLuckEnds).
+-- Refreshed once a second.
 --
 -- Placeholder for UI (GS replaces it in Phase 4).
 
@@ -62,6 +63,10 @@ function EventController.Start()
 			local ends = workspace:GetAttribute("LiveEventEnds")
 			if type(id) == "string" and type(ends) == "number" then
 				table.insert(parts, `{title(id)} · {clock(ends - workspace:GetServerTimeNow())} left`)
+			end
+			local luckEnds = workspace:GetAttribute("ServerLuckEnds")
+			if type(luckEnds) == "number" and luckEnds > workspace:GetServerTimeNow() then
+				table.insert(parts, `Lucky Lantern · {clock(luckEnds - workspace:GetServerTimeNow())}`)
 			end
 			local featured = workspace:GetAttribute("FeaturedSpecies")
 			if type(featured) == "string" then

@@ -103,6 +103,22 @@ local function roll(player: Player)
 	DataService.changed(player, "pass")
 end
 
+-- Premium for the current season from a purchase (MonetizationService). Returns false when
+-- there is no season or it was already premium (the caller refunds in Embers).
+function NightPassService.grantPremium(player: Player): boolean
+	local data = DataService.get(player)
+	if data == nil then
+		return false
+	end
+	roll(player)
+	if data.pass.season == 0 or data.pass.premium then
+		return false
+	end
+	data.pass.premium = true
+	DataService.changed(player, "pass")
+	return true
+end
+
 -- Adds pass XP (with the catch-up bonus); returns the XP actually added.
 function NightPassService.addXp(player: Player, amount: number): number
 	local data = DataService.get(player)

@@ -44,6 +44,7 @@ local InventoryService = require(script.Parent:WaitForChild("InventoryService"))
 local GlowlingService = require(script.Parent:WaitForChild("GlowlingService"))
 local PlotService = require(script.Parent:WaitForChild("PlotService"))
 local LiveConfigService = require(script.Parent:WaitForChild("LiveConfigService"))
+local GamePassService = require(script.Parent:WaitForChild("GamePassService"))
 
 local TICK_SECONDS = 0.1 -- 10 Hz: tags, delivery and the carry check (TECH_SPEC §8)
 local GRAB_SLACK = 2 -- studs past grabRange before a hold in progress cancels (latency)
@@ -139,7 +140,8 @@ end
 -- Run speed from Boots, ×0.85 while carrying, ×1.2 during a chase boost.
 local function speedOf(player: Player, now: number): number
 	local data = DataService.get(player)
-	local speed = Economy.runSpeed(economy, if data then data.up.boots else 0, false, carrying(player) ~= nil)
+	local swift = GamePassService.owns(player, "swiftBoots")
+	local speed = Economy.runSpeed(economy, if data then data.up.boots else 0, swift, carrying(player) ~= nil)
 	if (boostUntil[player] or 0) > now then
 		speed *= economy.steal.chaseBoostMult
 	end
@@ -156,7 +158,10 @@ local function updateSpeed(player: Player)
 	local now = workspace:GetServerTimeNow()
 	local data = DataService.get(player)
 	local boots = if data ~= nil then data.up.boots else 0
-	local changed = boots > 0 or carrying(player) ~= nil or (boostUntil[player] or 0) > now
+	local changed = boots > 0
+		or GamePassService.owns(player, "swiftBoots")
+		or carrying(player) ~= nil
+		or (boostUntil[player] or 0) > now
 	character:SetAttribute("RunSpeed", if changed then speedOf(player, now) else nil)
 end
 
@@ -379,6 +384,7 @@ local function deliver(job: Job, now: number)
 	if victimData ~= nil then
 		victimData.stats.stolenFrom += 1
 		DataService.changed(victim, "stats")
+		victim:SetAttribute("LostGlowlingAt", now) -- no store prompts right after a loss (§23)
 	end
 	safeUntil[victim.UserId] = now + economy.steal.victimCooldown
 	local index = CycleService.get().index
@@ -463,6 +469,11 @@ local function onReleased(player: Player)
 end
 
 function StealService.Init()
+	GamePassService.Changed:Connect(function(player: Player, key: string)
+		if key == "swiftBoots" then
+			updateSpeed(player)
+		end
+	end)
 	NetServer.on("GrabStart", grabStart)
 	NetServer.on("GrabCancel", function(thief: Player)
 		local job = jobs[thief]

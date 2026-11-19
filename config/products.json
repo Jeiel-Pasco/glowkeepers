@@ -1,0 +1,8 @@
+{
+  "DEV":  { "passes": { "vip": 0, "vault2": 0, "swiftBoots": 0, "autoPlace": 0 },
+            "products": { "embers120": 0, "embers550": 0, "embers2400": 0, "lockCharge3": 0, "serverLuck": 0, "passPremium": 0 } },
+  "BETA": { "passes": { "vip": 0, "vault2": 0, "swiftBoots": 0, "autoPlace": 0 },
+            "products": { "embers120": 0, "embers550": 0, "embers2400": 0, "lockCharge3": 0, "serverLuck": 0, "passPremium": 0 } },
+  "PROD": { "passes": { "vip": 0, "vault2": 0, "swiftBoots": 0, "autoPlace": 0 },
+            "products": { "embers120": 0, "embers550": 0, "embers2400": 0, "lockCharge3": 0, "serverLuck": 0, "passPremium": 0 } }
+}
