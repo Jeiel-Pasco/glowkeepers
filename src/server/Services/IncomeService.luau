@@ -25,7 +25,9 @@ local Economy = require(Shared:WaitForChild("Economy"))
 local EconomyMath = require(Shared:WaitForChild("EconomyMath"))
 local Glowdex = require(Shared:WaitForChild("Glowdex"))
 local Inventory = require(Shared:WaitForChild("Inventory"))
+local Traits = require(Shared:WaitForChild("Traits"))
 local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
+local speciesConfig = require(Shared:WaitForChild("Config"):WaitForChild("species")) :: any
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local Progress = require(script.Parent:WaitForChild("Progress"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
@@ -45,6 +47,32 @@ local paidUntil: { [Player]: number } = {} -- server time income was last paid u
 local unlogged: { [Player]: number } = {} -- income not yet sent to Telemetry
 local offline: { [Player]: { amount: number, away: number } } = {} -- popup waiting for the client
 local clientReady: { [Player]: boolean } = {}
+
+local speciesById: { [string]: any } = {}
+for _, entry in speciesConfig.species do
+	speciesById[entry.id] = entry
+end
+
+-- Glow/s of the placed Glowlings, each × its trait multiplier (GAME_SYSTEMS §31).
+local function placedValue(data: any): number
+	local pads = Inventory.placedPads(data)
+	local placed: Traits.Placed = {}
+	for pad, id in pads do
+		local record = data.glowlings[id]
+		if record ~= nil then
+			placed[pad] = record.sp
+		end
+	end
+	local mults = Traits.multipliers(economy, speciesById, placed)
+	local sum = 0
+	for pad, id in pads do
+		local record = data.glowlings[id]
+		if record ~= nil then
+			sum += InventoryService.valueOf(record) * (mults[pad] or 1)
+		end
+	end
+	return sum
+end
 
 local function now(): number
 	return workspace:GetServerTimeNow()
@@ -122,7 +150,7 @@ function IncomeService.recompute(player: Player)
 		return -- not joined yet: the join computes it
 	end
 	accrue(player, now())
-	local rate = Inventory.placedValue(data, InventoryService.valueOf)
+	local rate = placedValue(data)
 		* Economy.incomeMultiplier(economy, data.stars, 1 + Glowdex.incomeBonus(economy, data.dexClaimed))
 		* LiveConfigService.mult("glowMult")
 		* (if GamePassService.owns(player, "vip") then (Store.pass(economy, "vip") :: any).incomeMult else 1) -- an event's Glow boost (§21); EventService recomputes at its edges

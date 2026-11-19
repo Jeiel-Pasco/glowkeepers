@@ -164,6 +164,23 @@ H.test("species pools come from config/species.json", function()
 	H.eq(clearing[1], "glimmermouse", "config order")
 end)
 
+H.test("floors: a rarity only picks species whose minRarity is at or below it (D18)", function()
+	local speciesCfg = H.json("config/species.json")
+	local common = Roll.eligible(cfg, speciesCfg, "Deepwood", 1)
+	H.eq(#common, 14, "Deepwood at Common: 24 minus 5 Rare, 4 Epic, 1 Legendary floors")
+	H.eq(#Roll.eligible(cfg, speciesCfg, "Deepwood", 3), 19)
+	H.eq(#Roll.eligible(cfg, speciesCfg, "Deepwood", 4), 23)
+	H.eq(#Roll.eligible(cfg, speciesCfg, "Deepwood", 7), 24)
+	H.ok(table.find(common, "lunadrake") == nil, "no Common Lunadrake")
+	H.eq(#Roll.eligible(cfg, speciesCfg, "Clearing", 1), 16, "the Clearing has no floors")
+	local byId = {}
+	for _, entry in speciesCfg.species do
+		byId[entry.id] = entry
+	end
+	H.eq(Roll.speciesFloor(cfg, byId.lunadrake), 5)
+	H.eq(Roll.speciesFloor(cfg, byId.glimmermouse), 1)
+end)
+
 H.test("species pick is uniform and stays inside the pool", function()
 	local ids = { "a", "b", "c", "d" }
 	H.eq(Roll.species(ids, H.constant(0)), "a", "lowest draw")

@@ -60,6 +60,20 @@ function Inventory.storageCount(data: any): number
 	return count(data.glowlings) - count(data.vault) - count(data.display)
 end
 
+-- Pad number → id of every placed Glowling (vault and display).
+function Inventory.placedPads(data: any): { [number]: string }
+	local pads = {}
+	for _, map in { data.vault, data.display } do
+		for key, id in map do
+			local pad = tonumber(key)
+			if pad ~= nil then
+				pads[pad] = id
+			end
+		end
+	end
+	return pads
+end
+
 -- Ids of every placed Glowling (vault and display). Every placed Glowling earns.
 function Inventory.placedIds(data: any): { string }
 	local ids = {}

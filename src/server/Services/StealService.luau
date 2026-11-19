@@ -33,6 +33,7 @@ local Config = Shared:WaitForChild("Config")
 local Economy = require(Shared:WaitForChild("Economy"))
 local Inventory = require(Shared:WaitForChild("Inventory"))
 local Steal = require(Shared:WaitForChild("Steal"))
+local Traits = require(Shared:WaitForChild("Traits"))
 local economy = require(Config:WaitForChild("economy")) :: any
 local speciesConfig = require(Config:WaitForChild("species")) :: any
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
@@ -72,8 +73,23 @@ local boostUntil: { [Player]: number } = {} -- the owner's chase boost
 local friends: { [Player]: { [Player]: boolean } } = {}
 
 local speciesNames: { [string]: string } = {}
+local speciesById: { [string]: any } = {}
 for _, species in speciesConfig.species do
 	speciesNames[species.id] = species.name
+	speciesById[species.id] = species
+end
+
+-- Extra grab seconds on the victim's pad from their Guardians (GAME_SYSTEMS §31). Thieves only
+-- grab display pads.
+local function guardBonus(victimData: any, pad: number): number
+	local placed: Traits.Placed = {}
+	for at, id in Inventory.placedPads(victimData) do
+		local record = victimData.glowlings[id]
+		if record ~= nil then
+			placed[at] = record.sp
+		end
+	end
+	return Traits.grabBonus(economy, speciesById, placed, pad, true)
 end
 
 local function nameOf(record: any): string
@@ -331,7 +347,7 @@ local function grabStart(thief: Player, plotId: number, pad: number)
 		id = id,
 		record = record,
 		stage = "grab",
-		ends = now + Steal.holdSeconds(economy, record.r),
+		ends = now + Steal.holdSeconds(economy, record.r) + guardBonus(victimData, pad),
 		samples = {},
 	}
 	jobs[thief] = job

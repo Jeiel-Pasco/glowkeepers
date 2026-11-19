@@ -39,13 +39,19 @@ local function rng(): number
 end
 
 local pools: { [string]: { string } } = {}
+local speciesById: { [string]: any } = {}
+for _, entry in speciesConfig.species do
+	speciesById[entry.id] = entry
+end
 
-local function pool(name: string): { string }
-	local ids = pools[name]
+-- The pool's species that can appear at rarity `r` (D18): their floor is at most r.
+local function pool(name: string, r: number): { string }
+	local key = `{name}{r}`
+	local ids = pools[key]
 	if ids == nil then
-		ids = Roll.pool(speciesConfig, name)
-		assert(#ids > 0, `species pool {name} is empty`)
-		pools[name] = ids
+		ids = Roll.eligible(economy, speciesConfig, name, r)
+		assert(#ids > 0, `species pool {name} has nothing at rarity {r}`)
+		pools[key] = ids
 	end
 	return ids
 end
@@ -69,9 +75,13 @@ function RollService.luck(player: Player): number
 end
 
 local function grant(player: Player, tier: number, poolName: string, src: string, species: string?): Types.Glowling?
+	if species ~= nil then
+		-- A wild's species was picked at spawn; the catch is never below its floor (D25).
+		tier = math.max(tier, Roll.speciesFloor(economy, speciesById[species]))
+	end
 	local result = Roll.finish(economy, tier, rng, Events.mutationFlags(LiveConfigService.event()))
 	local record = GlowlingService.create(player, {
-		sp = species or Roll.species(pool(poolName), rng),
+		sp = species or Roll.species(pool(poolName, result.r), rng),
 		r = result.r,
 		m = result.m,
 		s = result.s,
@@ -93,11 +103,14 @@ function RollService.lure(player: Player, floor: number): Types.Glowling?
 	return grant(player, tier, "Clearing", "lure")
 end
 
--- Picks a species from a pool: ForestService shows a wild's species before it's caught.
+-- Picks a species from a pool: ForestService shows a wild's species before it's caught. The
+-- species comes from a base-luck rarity roll, so floor species spawn about as often as their
+-- rarity (D25); the catch itself rolls again with the catcher's luck.
 function RollService.species(poolName: string): string
 	-- Today's featured Deepwood species has 2× weight (§21).
 	local featured = Events.featured(speciesConfig, os.time())
-	return Events.pickSpecies(pool(poolName), featured, economy.events.featuredWeight, rng)
+	local ids = pool(poolName, Roll.rarity(economy, 1, nil, rng))
+	return Events.pickSpecies(ids, featured, economy.events.featuredWeight, rng)
 end
 
 -- A night catch from `poolName` ("Clearing" in the forest, "Deepwood" past it), with pity (§5).
@@ -117,8 +130,8 @@ function RollService.night(player: Player, poolName: string, species: string?): 
 end
 
 function RollService.Init()
-	pool("Clearing") -- fail at boot, not mid-game, if the config lost a pool
-	pool("Deepwood")
+	pool("Clearing", 1) -- fail at boot, not mid-game, if the config lost a pool
+	pool("Deepwood", 1)
 
 	if Env.get().name ~= "PROD" then
 		workspace:GetAttributeChangedSignal("DebugRoll"):Connect(function()

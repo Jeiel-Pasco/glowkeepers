@@ -198,7 +198,7 @@
       { "entries": 100, "embers": 200 },
       { "entries": 150, "embers": 300 },
       { "entries": 200, "embers": 500 },
-      { "entries": 280, "embers": 1000 }
+      { "entries": 254, "embers": 1000 }
     ]
   },
   "income":  { "starBonus": 0.35, "offlineEfficiency": 0.10, "offlineCapHours": 6 },
@@ -217,6 +217,9 @@
   "stalker": { "prowlSpeed": 14, "loneRadius": 20, "stalkSeconds": 4, "telegraphSeconds": 2, "stalkSpeedMult": 0.9, "stalkDistance": 8,
                "lungeSpeedMult": 1.25, "lungeSeconds": 1.5, "touchRange": 3.5, "retreatSeconds": 10, "repelGroupSize": 3, "repelGroupRadius": 12,
                "repathSeconds": 0.5, "nearMissShove": 12 },
+  "traits":  { "familyLinkPer": 0.05, "familyLinkMax": 0.10, "harmonizer": 0.15, "cap": 1.6,
+               "guardian": 0.5, "guardianHigh": 1.0, "guardianMax": 1.5,
+               "apex": { "skywhalecalf": { "plotGlow": 0.15 }, "lunadrake": { "plotGlow": 0.25 }, "eldersapling": { "plotGrab": 1.0 } } },
   "revive":  { "holdSeconds": 3, "range": 8, "bleedOutSeconds": 30, "safeSeconds": 3 },
   "embers":  { "surviveBase": 10, "perFireTenPct": 1, "perRevive": 5, "reviveCap": 4, "perPiece": 1, "pieceCap": 6, "failConsolation": 3, "friendBonusPer": 0.10, "friendBonusCap": 0.30 },
   "trade":   { "minStars": 3, "minPlayDays": 3, "minAccountAgeDays": 7, "maxPerSide": 4, "confirmDelay": 5, "escrowSeconds": 120,

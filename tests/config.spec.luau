@@ -154,4 +154,33 @@ H.test("species: every Glowling has a family and a rig", function()
 	H.eq(families.Shadow, 3)
 end)
 
+H.test("species: traits and floors (CONTENT §A3, D18, D20)", function()
+	local traits = { Harmonizer = 0, Guardian = 0, Infuser = 0, Forager = 0, Firebinder = 0, Wayfinder = 0, Savior = 0 }
+	local floors = {}
+	for _, entry in species.species do
+		H.ok(traits[entry.trait] ~= nil, `{entry.id}: unknown trait {tostring(entry.trait)}`)
+		traits[entry.trait] += 1
+		local known = false
+		for _, rarity in cfg.rarities do
+			known = known or rarity.id == entry.minRarity
+		end
+		H.ok(known, `{entry.id}: unknown minRarity {tostring(entry.minRarity)}`)
+		floors[entry.minRarity] = (floors[entry.minRarity] or 0) + 1
+		if entry.minRarity ~= "Common" then
+			H.eq(entry.pool, "Deepwood", `{entry.id}: floors only in the Deepwood`)
+		end
+	end
+	H.eq(floors.Common, 30)
+	H.eq(floors.Rare, 5)
+	H.eq(floors.Epic, 4)
+	H.eq(floors.Legendary, 1)
+	for id in cfg.traits.apex do
+		local found = false
+		for _, entry in species.species do
+			found = found or entry.id == id
+		end
+		H.ok(found, `apex {id} is a species`)
+	end
+end)
+
 H.finish("config")
