@@ -141,3 +141,12 @@ Comprehensive summary of all world, combat, Grimoire, economy, gear, storyline, 
 
 > [!NOTE]
 > Solo playtest verified War Mode toggle and the combo finisher (4th bolt r 2.4, 19 dmg vs 13, Fire burn ticks), with 0 Lua errors. 2-player test (Clients and Servers) verified: arena duel hits without War Mode, the kill gives a "won the duel" toast and drops no satchel; a War Mode kill gives bounty +1 and 25 coins (20 base + War Mode 25%); with only one player in War Mode, hits deal no damage. 0 Lua errors.
+>
+> Spell pass (2-player, via `DebugGrimoire`):
+> - 3 Frost hits Freeze the target (root set).
+> - Water V: ground line at 0.05 s, beam and hit at 0.55 s, then slow and knockback.
+> - Light X cleanse clears root and slow.
+> - Gravity X Repulse shoves 23.6 studs.
+> - Lightning X blink-landing hit: 17 dmg.
+> - A duel death carrying 25 coins dropped nothing; the coins banked on respawn.
+> - Mist Veil's speed boost is not on any fixed Z/X/C/V slot, so players can't reach it.
