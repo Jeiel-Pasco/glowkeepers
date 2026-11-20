@@ -249,7 +249,7 @@ local function hintTarget(): Vector3?
 		if hint == "boss" then
 			return nearest(zone.boss) or Zones.toWorld(zone, Zones.BOSS_D, 0)
 		end
-		return Zones.toWorld(zone, 320, 0)
+		return Zones.entry(zone)
 	end
 	return nil
 end
@@ -264,7 +264,8 @@ local function updateGuide()
 	if guideFrom.Parent ~= me then
 		guideFrom.Parent = me
 	end
-	guidePart.Position = target + Vector3.new(0, 1, 0)
+	-- through the camp gate and up the cliff ledges, not straight at it
+	guidePart.Position = Zones.guide(me.Position, target) + Vector3.new(0, 1, 0)
 	guideBeam.Enabled = true
 end
 

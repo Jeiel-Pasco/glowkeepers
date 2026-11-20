@@ -164,4 +164,26 @@ H.test("raider camp sites sit in the lowland, apart and off the routes", functio
 	end
 end)
 
+H.test("the quest guide goes through a gate and up the ledges", function()
+	local ember = Zones.list[1]
+	local entry = Zones.entry(ember)
+	H.ok(entry.Y > Zones.PLATEAU_Y - 5, "zone entry on the plateau")
+	-- In camp: out through the nearest gate.
+	local out = Zones.guide(Vector3.new(0, 3, 0), entry)
+	H.ok((out - Zones.polar(ember.angle, Zones.GATE_D + 16)).Magnitude < 1, `gate first {out}`)
+	-- In the lowland: to the first ledge of the closest route.
+	local route = Zones.routes()[1]
+	local low = Zones.guide(Zones.polar(ember.angle, 400) + Vector3.new(0, 3, 0), entry)
+	H.ok(low == route.ledges[1] or low == Zones.routes()[2].ledges[1], `first ledge {low}`)
+	-- On ledge 5: the next one up.
+	local on5 = route.ledges[5] + Vector3.new(0, 3, 0)
+	H.ok(Zones.guide(on5, entry) == route.ledges[6], "next ledge")
+	-- On the last ledge, and on the plateau: straight there.
+	H.ok(Zones.guide(route.ledges[#route.ledges] + Vector3.new(0, 3, 0), entry) == entry, "top")
+	H.ok(Zones.guide(Zones.polar(ember.angle, 600) + Vector3.new(0, 3, 0), entry) == entry, "plateau")
+	-- Back to camp from the lowland: in through the nearest gate.
+	local back = Zones.guide(Zones.polar(math.rad(100), 400) + Vector3.new(0, 3, 0), Vector3.new(0, 0, 0))
+	H.ok((back - Zones.polar(math.rad(120), Zones.GATE_D - 16)).Magnitude < 1, `gate back {back}`)
+end)
+
 H.finish("balance")
