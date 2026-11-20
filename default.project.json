@@ -8,22 +8,34 @@
         "$path": "src/shared",
         "Config": {
           "$className": "Folder",
-          "economy": { "$path": "config/economy.json" },
-          "environments": { "$path": "config/environments.json" },
-          "products": { "$path": "config/products.json" },
-          "species": { "$path": "config/species.json" }
+          "economy": {
+            "$path": "config/economy.json"
+          },
+          "environments": {
+            "$path": "config/environments.json"
+          }
         }
       }
     },
     "ServerScriptService": {
       "$className": "ServerScriptService",
-      "Server": { "$path": "src/server" }
+      "Server": {
+        "$path": "src/server"
+      }
     },
     "StarterPlayer": {
       "$className": "StarterPlayer",
       "StarterPlayerScripts": {
         "$className": "StarterPlayerScripts",
-        "Client": { "$path": "src/client" }
+        "Client": {
+          "$path": "src/client"
+        }
+      },
+      "StarterCharacterScripts": {
+        "$className": "StarterCharacterScripts",
+        "Health": {
+          "$path": "src/character/Health.server.luau"
+        }
       }
     }
   }

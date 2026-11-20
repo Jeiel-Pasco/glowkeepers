@@ -29,13 +29,9 @@ export type Remote = {
 
 local SETTING_KEYS = { "calm", "reducedFlash", "music", "sfx", "breakReminder" }
 
--- HttpService:GenerateGUID(false) is 36 characters.
-local GLOWLING_ID: ArgSchema = { type = "string", maxLen = 36 }
--- A pad number (the map's `Slot` attribute). 30 = upgrades.slots.max; the server checks the
--- player's unlocked pads, and tests/net.spec.luau checks this bound against the config.
-local PAD: ArgSchema = { type = "integer", min = 1, max = 30 }
--- A plot id (the map's `PlotId` attribute): one plot per player, server.maxPlayers of them.
-local PLOT: ArgSchema = { type = "integer", min = 1, max = 8 }
+-- A world coordinate the client aims at; the server clamps every spell to its range anyway.
+local COORD: ArgSchema = { type = "number", min = -5000, max = 5000 }
+local BOOK: ArgSchema = { type = "integer", min = 1, max = 30 } -- index into data.books
 
 local Net = {}
 
@@ -56,178 +52,54 @@ Net.remotes = {
 		args = { { type = "enum", values = SETTING_KEYS }, { type = "any" } },
 		rate = { perSecond = 10, burst = 10 },
 	},
-	FtueStep = { dir = "c2s", args = { { type = "integer", min = 1, max = 10 } }, rate = { perSecond = 2, burst = 4 } },
-	-- The tutorial's own actions (TutorialService): open the Free Lure, grab from the Wisp's Stash.
-	FtueAction = {
+	-- Combat: the click attack and the equipped book's spells, aimed at a point.
+	Basic = { dir = "c2s", args = { COORD, COORD, COORD }, rate = { perSecond = 6, burst = 6 } },
+	Cast = {
 		dir = "c2s",
-		args = { { type = "enum", values = { "lure", "stash" } } },
-		rate = { perSecond = 2, burst = 4 },
+		args = { { type = "integer", min = 1, max = 4 }, COORD, COORD, COORD },
+		rate = { perSecond = 6, burst = 8 },
 	},
-	Place = { dir = "c2s", args = { GLOWLING_ID, PAD }, rate = { perSecond = 10, burst = 10 } }, -- swaps if taken
-	Unplace = { dir = "c2s", args = { GLOWLING_ID }, rate = { perSecond = 10, burst = 10 } }, -- back to storage
-	SetCompanion = { dir = "c2s", args = { GLOWLING_ID }, rate = { perSecond = 2, burst = 4 } }, -- toggles; by day only
-	PlaceBest = { dir = "c2s", args = {}, rate = { perSecond = 2, burst = 2 } },
-	Release = {
+	Dash = { dir = "c2s", args = {}, rate = { perSecond = 2, burst = 3 } },
+	SwapBook = { dir = "c2s", args = { { type = "integer", min = 1, max = 4 } }, rate = { perSecond = 4, burst = 4 } },
+	Recall = { dir = "c2s", args = {}, rate = { perSecond = 1, burst = 2 } },
+	-- Grimoires (at your camp desk).
+	Write = { dir = "c2s", args = { BOOK, { type = "boolean" } }, rate = { perSecond = 3, burst = 4 } },
+	WriteResolve = {
 		dir = "c2s",
-		args = { { type = "list", of = GLOWLING_ID, maxCount = 20 } },
-		rate = { perSecond = 2, burst = 4 },
-	}, -- storage Glowlings → Glow (§7)
-	PickupFuel = { dir = "c2s", args = { { type = "string", maxLen = 16 } }, rate = { perSecond = 4, burst = 4 } }, -- PileId
-	FeedFire = { dir = "c2s", args = {}, rate = { perSecond = 4, burst = 4 } },
-	-- Hold to steal: GrabStart when the hold begins, GrabCancel when it is let go early. The
-	-- server times the hold itself; the client's progress ring is only cosmetic.
-	GrabStart = { dir = "c2s", args = { PLOT, PAD }, rate = { perSecond = 2, burst = 4 } },
-	GrabCancel = { dir = "c2s", args = {}, rate = { perSecond = 2, burst = 4 } },
-	Rebirth = { dir = "c2s", args = {}, rate = { perSecond = 0.1, burst = 1 } }, -- +1 Star (§15); the client confirms with a hold
-	-- Claim a reward: a Glowdex page tier (id = species id), milestone (id = its index), or
-	-- today's daily gift (id unused), or a quest (id "d1".."d3" daily, "w1".."w3" weekly).
-	-- Night Pass tiers: "pass_free" / "pass_prem" with id = the tier ("1".."50").
-	Claim = {
-		dir = "c2s",
-		args = {
-			{ type = "enum", values = { "dex_page", "dex_milestone", "gift", "quest", "pass_free", "pass_prem" } },
-			{ type = "string", maxLen = 32 },
-		},
-		rate = { perSecond = 5, burst = 8 },
+		args = { { type = "integer", min = 0, max = 4 } },
+		rate = { perSecond = 3, burst = 4 },
 	},
-	QuestReroll = {
+	EquipBook = {
 		dir = "c2s",
-		args = { { type = "integer", min = 1, max = 3 } },
-		rate = { perSecond = 1, burst = 2 },
-	}, -- the day's free reroll of daily quest N
-	-- Ask the server to prompt a purchase (§23): a pass or developer product key from
-	-- economy.store (tests/store.spec.luau checks this list against it).
-	PromptProduct = {
+		args = { { type = "integer", min = 1, max = 4 }, BOOK },
+		rate = { perSecond = 4, burst = 6 },
+	},
+	PickElement = {
 		dir = "c2s",
-		args = {
-			{
-				type = "enum",
-				values = {
-					"vip",
-					"vault2",
-					"swiftBoots",
-					"autoPlace",
-					"embers120",
-					"embers550",
-					"embers2400",
-					"lockCharge3",
-					"serverLuck",
-					"passPremium",
-				},
-			},
-		},
+		args = { { type = "enum", values = { "Fire", "Water", "Leaf" } } },
 		rate = { perSecond = 1, burst = 2 },
 	},
-	-- Trading (§17): request a player by userId, answer a request, set your offer (storage ids),
-	-- confirm (after the 5 s delay), cancel. The server runs the session (TradeService).
-	TradeRequest = { dir = "c2s", args = { { type = "integer" } }, rate = { perSecond = 5, burst = 5 } },
-	TradeRespond = {
+	AllocateStat = {
 		dir = "c2s",
-		args = { { type = "integer" }, { type = "boolean" } },
-		rate = { perSecond = 5, burst = 5 },
-	},
-	TradeOffer = {
-		dir = "c2s",
-		args = { { type = "list", of = GLOWLING_ID, minCount = 0, maxCount = 4 } }, -- {} clears it
-		rate = { perSecond = 5, burst = 5 },
-	},
-	-- Admins only (AdminService checks the group rank); src/server/Admin/Commands.luau.
-	AdminCommand = {
-		dir = "c2s",
-		args = {
-			{
-				type = "enum",
-				values = {
-					"lookup",
-					"flags",
-					"embers",
-					"glowling",
-					"kick",
-					"ban",
-					"unban",
-					"erase",
-					"versions",
-					"rollback",
-					"live_get",
-					"live_set",
-					"live_confirm",
-				},
-			},
-			{ type = "integer", min = 0 },
-			{ type = "string", maxLen = 2000 },
-		},
-		rate = { perSecond = 2, burst = 4 },
-	},
-	TradeConfirm = { dir = "c2s", args = {}, rate = { perSecond = 5, burst = 5 } },
-	TradeCancel = { dir = "c2s", args = {}, rate = { perSecond = 5, burst = 5 } },
-	PassPremium = { dir = "c2s", args = {}, rate = { perSecond = 0.2, burst = 1 } }, -- this season's premium for Embers
-	Lock = { dir = "c2s", args = {}, rate = { perSecond = 1, burst = 2 } }, -- Base Lock, or a Lock Charge to skip the recharge
-	ShopBuy = {
-		dir = "c2s",
-		args = { { type = "enum", values = { "lure1", "lure2", "lure3", "lure4" } } },
+		args = { { type = "enum", values = { "health", "power", "defense" } }, { type = "integer", min = 1, max = 99 } },
 		rate = { perSecond = 5, burst = 8 },
-	}, -- a lure of rarity floor 1..4 (§8)
-	UpgradeBuy = {
-		dir = "c2s",
-		args = { { type = "enum", values = { "lantern", "boots", "slots" } }, { type = "boolean", optional = true } },
-		rate = { perSecond = 5, burst = 8 },
-	}, -- (upgradeId, all): one level, or Buy max
-	LockChargeBuy = {
-		dir = "c2s",
-		args = { { type = "enum", values = { "glow", "embers" } } },
-		rate = { perSecond = 2, burst = 4 },
 	},
-	-- Decorations (§18): x and z are studs from the DecorZone centre; the server checks the rest.
-	DecorBuy = { dir = "c2s", args = { { type = "string", maxLen = 32 } }, rate = { perSecond = 5, burst = 8 } },
-	DecorPlace = {
+	Buy = {
 		dir = "c2s",
-		args = {
-			{ type = "string", maxLen = 32 },
-			{ type = "integer", min = -12, max = 12 },
-			{ type = "integer", min = -12, max = 12 },
-			{ type = "integer", min = 0, max = 3 },
-		},
-		rate = { perSecond = 10, burst = 10 },
+		args = { { type = "enum", values = { "ink_Neutral", "ink_Fire" } } },
+		rate = { perSecond = 3, burst = 5 },
 	},
-	DecorRemove = {
-		dir = "c2s",
-		args = {
-			{ type = "string", maxLen = 32 },
-			{ type = "integer", min = -12, max = 12 },
-			{ type = "integer", min = -12, max = 12 },
-		},
-		rate = { perSecond = 10, burst = 10 },
-	},
-	SetBaseName = {
-		dir = "c2s",
-		args = { { type = "integer", min = 1, max = 64 }, { type = "integer", min = 1, max = 64 } },
-		rate = { perSecond = 0.2, burst = 1 },
-	}, -- preset adjective and noun indices
-	DropShield = { dir = "c2s", args = {}, rate = { perSecond = 1, burst = 2 } }, -- ends the sender's new-player shield (they said yes to stealing)
-	Catch = { dir = "c2s", args = { { type = "string", maxLen = 16 } }, rate = { perSecond = 4, burst = 4 } }, -- wildId
-	-- Hold to revive a downed player (by userId; Studio test players have negative ids).
-	-- The server times the hold; ReviveCancel lets go.
-	ReviveStart = { dir = "c2s", args = { { type = "integer" } }, rate = { perSecond = 2, burst = 4 } },
-	ReviveCancel = { dir = "c2s", args = {}, rate = { perSecond = 2, burst = 4 } },
+	ResetStats = { dir = "c2s", args = {}, rate = { perSecond = 0.5, burst = 1 } },
 
 	-- Server → client
 	PlayerState = { dir = "s2c" }, -- (full: boolean, data): a snapshot, then top-level patches
-	OfflineEarnings = { dir = "s2c" }, -- (amount: number, away: number seconds): the join popup
-	Wallet = { dir = "s2c" }, -- (glow, perSec, serverTime, embers, glowSinceRebirth): the client extrapolates
 	Toast = { dir = "s2c" }, -- (text, kind?)
-	TraitPouch = { dir = "s2c" }, -- (plotId, pad, amount): a Forager pouch, for everyone to see (§31)
 	Announce = { dir = "s2c" }, -- (text)
-	PlotSnapshot = { dir = "s2c" }, -- (views: { [plotId as string]: Plots.View }), once the client is ready
-	PlotDelta = { dir = "s2c" }, -- (plotId, patch: Plots.Patch)
-	RollResult = { dir = "s2c" }, -- (record: Types.Glowling, source: "lure" | "night" | ...)
-	DawnResult = { dir = "s2c" }, -- ({ survived, fire, embers, glowLost, piecesFed, revives })
-	WildSpawned = { dir = "s2c" }, -- ({ { id, sp, area, x, y, z } }): a wave, or every wild for a new client
-	WildGone = { dir = "s2c" }, -- ({ wildId }): caught, or dawn
-	TradeRequested = { dir = "s2c" }, -- (fromUserId, fromName): someone asked to trade
-	AdminResult = { dir = "s2c" }, -- (text): an admin command's answer
-	TradeState = { dir = "s2c" }, -- (view | nil): the trade session from this side, nil = ended
-	Leaderboards = { dir = "s2c" }, -- ({ week, stars, dex, revives, nights = { { name, value } } }): top N each
-	Revived = { dir = "s2c" }, -- (byUserId): to the revived player, for the friend request prompt
+	Fx = { dir = "s2c", unreliable = true }, -- (kind, a, b, c, ...): a spell or attack to draw (CombatFx)
+	Hit = { dir = "s2c", unreliable = true }, -- (target: Instance, amount, mult, kind?): a damage number
+	RecallState = { dir = "s2c" }, -- (endsAt: number | nil): the channel started, or stopped
+	WriteResult = { dir = "s2c" }, -- (outcome, spellId, bookIndex, page?): the desk's reveal
+	Quest = { dir = "s2c" }, -- (view | nil): the tracked quest
 } :: { [string]: Remote }
 
 return Net

@@ -20,12 +20,11 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local Env = require(Shared:WaitForChild("Env"))
 local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
-local economy = require(Shared:WaitForChild("Config"):WaitForChild("economy")) :: any
 local Schema = require(Server:WaitForChild("Data"):WaitForChild("Schema"))
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local Telemetry = require(script.Parent:WaitForChild("Telemetry"))
 
-local STORE_NAME = "PlayerData"
+local STORE_NAME = "PlayerDataV2" -- GDD v2: a fresh store; v1 Glowling saves stay untouched
 local LAST_SEEN_EVERY = 30 -- seconds; keeps offline time right even if a server crashes
 
 export type JoinInfo = { away: number, firstSession: boolean }
@@ -40,7 +39,6 @@ local storeMode = "none" -- "profilestore" | "mock" | "memory" | "none"
 local profiles: { [Player]: any } = {}
 local clientReady: { [Player]: boolean } = {}
 local stateSent: { [Player]: boolean } = {}
-local incomeRate: { [Player]: number } = {}
 
 -- The subset of ProfileStore's API used below. DEV only; saves nothing.
 local function newMemoryStore(): any
@@ -97,23 +95,6 @@ local function openStore()
 	end
 end
 
-local function sendWallet(player: Player)
-	local profile = profiles[player]
-	if profile == nil or not stateSent[player] then
-		return
-	end
-	local data = profile.Data
-	NetServer.send(
-		player,
-		"Wallet",
-		data.glow,
-		incomeRate[player] or 0,
-		workspace:GetServerTimeNow(),
-		data.embers,
-		data.glowSinceRebirth
-	)
-end
-
 -- The full snapshot goes out once both the profile and the client are ready.
 local function sendState(player: Player)
 	local profile = profiles[player]
@@ -122,7 +103,6 @@ local function sendState(player: Player)
 	end
 	stateSent[player] = true
 	NetServer.send(player, "PlayerState", true, Schema.clientView(profile.Data))
-	sendWallet(player)
 end
 
 local function loadProfile(player: Player)
@@ -146,7 +126,7 @@ local function loadProfile(player: Player)
 	profile:AddUserId(player.UserId) -- lets a data-erasure request find this profile
 	local notes = Schema.migrate(profile.Data)
 	profile:Reconcile()
-	for _, note in Schema.repair(profile.Data, economy) do
+	for _, note in Schema.repair(profile.Data) do
 		table.insert(notes, note)
 	end
 	if #notes > 0 then
@@ -182,7 +162,6 @@ local function releaseProfile(player: Player)
 	profiles[player] = nil
 	clientReady[player] = nil
 	stateSent[player] = nil
-	incomeRate[player] = nil
 end
 
 -- The live profile data, or nil if the player's profile isn't loaded (yet).
@@ -283,18 +262,6 @@ function DataService.changed(player: Player, ...: string)
 	end
 	NetServer.send(player, "PlayerState", false, patch)
 end
-
--- IncomeService (Phase 2) calls this whenever Glow/s changes; it also resends the wallet.
-function DataService.setIncomeRate(player: Player, perSec: number)
-	incomeRate[player] = perSec
-	local data = DataService.get(player)
-	if data ~= nil then
-		data.lastIncomePerSec = perSec
-	end
-	sendWallet(player)
-end
-
-DataService.sendWallet = sendWallet
 
 -- Forced save: after every Robux purchase, completed trade and rebirth (TECH_SPEC §5).
 function DataService.save(player: Player)

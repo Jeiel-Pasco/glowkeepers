@@ -1,0 +1,2 @@
+--!strict
+-- Replaces the default Health script: no passive regen. CombatService heals out of combat.

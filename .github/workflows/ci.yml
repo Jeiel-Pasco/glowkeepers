@@ -35,9 +35,6 @@ jobs:
           done
           exit $fail
 
-      - name: Golden values match config and sim
-        run: python3 sim/golden_odds.py --check
-
       - name: Build the place
         run: |
           mkdir -p build # gitignored, so missing on a fresh checkout; rojo won't create it

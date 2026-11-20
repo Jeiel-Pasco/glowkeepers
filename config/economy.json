@@ -1,235 +1,69 @@
 {
-  "cycle":   { "daySeconds": 240, "nightSeconds": 120, "duskWarningAt": 210, "stalkerGraceSeconds": 30, "modifierChance": 0.25,
-               "nightModifiers": [
-                 { "id": "Fog",          "spawnMult": 1.25 },
-                 { "id": "FireflyBloom", "spawnMult": 1.5, "extraCatches": 1 },
-                 { "id": "Gusty",        "fireDrainMult": 1.25, "shardSpawnMult": 2 },
-                 { "id": "Starfall",     "fireStart": 0.70 }
-               ] },
-  "server":  { "maxPlayers": 8 },
-  "rarities": [
-    { "id": "Common",    "oneIn": 2,      "glowPerSec": 1 },
-    { "id": "Uncommon",  "oneIn": 5,      "glowPerSec": 4 },
-    { "id": "Rare",      "oneIn": 20,     "glowPerSec": 20 },
-    { "id": "Epic",      "oneIn": 100,    "glowPerSec": 120 },
-    { "id": "Legendary", "oneIn": 1000,   "glowPerSec": 1000 },
-    { "id": "Mythic",    "oneIn": 10000,  "glowPerSec": 10000 },
-    { "id": "Secret",    "oneIn": 100000, "glowPerSec": 150000 }
-  ],
-  "luck":      { "perLanternLevel": 0.12, "perStar": 0.06, "fireSurvivedMult": 1.25, "tierCap": 0.5, "appliesFromRarity": 3, "serverLuckMult": 1.5 },
-  "mutations": [
-    { "id": "Golden",  "mult": 2,  "oneIn": 20 },
-    { "id": "Rainbow", "mult": 5,  "oneIn": 200 },
-    { "id": "Moonlit", "mult": 10, "oneIn": 100, "eventOnly": true }
-  ],
-  "size":    { "min": 0.8, "max": 1.3 },
-  "pity":    { "legendaryAfterNightCatches": 150 },
-  "lures":   { "baseCost": 40, "growth": 14, "maxFloor": 4, "resultCap": null, "stockPerRestock": [16, 8, 4, 2] },
-  "shop":    { "restockSeconds": 300 },
-  "upgrades": {
-    "lantern": { "baseCost": 150, "growth": 1.55, "max": 60 },
-    "boots":   { "baseCost": 150, "growth": 1.5,  "max": 25, "speedPerLevel": 0.04, "levelsPerExtraCatch": 5 },
-    "slots":   { "baseCost": 250, "growth": 1.9,  "start": 8, "max": 30 }
-  },
-  "quests": {
-    "perDay": 3,
-    "perWeek": 3,
-    "rerollsPerDay": 1,
-    "daily": { "embers": 15, "xp": 150 },
-    "weekly": { "embers": 75, "xp": 500 },
-    "earnIncomeSeconds": 1800,
-    "earnMin": 500,
-    "dailyPool": [
-      { "id": "feed4",      "event": "feed",        "target": 4,  "weight": 10 },
-      { "id": "revive1",    "event": "revive",      "target": 1,  "weight": 8 },
-      { "id": "catch3",     "event": "catch_night", "target": 3,  "weight": 10 },
-      { "id": "catchRare",  "event": "catch_rare",  "target": 1,  "weight": 8 },
-      { "id": "survive2",   "event": "survive",     "target": 2,  "weight": 8 },
-      { "id": "lures3",     "event": "lure",        "target": 3,  "weight": 10 },
-      { "id": "place10",    "event": "place",       "target": 10, "weight": 8 },
-      { "id": "earn",       "event": "glow",        "target": 0,  "weight": 10 },
-      { "id": "steal1",     "event": "steal",       "target": 1,  "weight": 3, "notShielded": true }
-    ],
-    "weeklyPool": [
-      { "id": "survive20",  "event": "survive",     "target": 20, "weight": 10 },
-      { "id": "revive10",   "event": "revive",      "target": 10, "weight": 10 },
-      { "id": "bronze2",    "event": "bronze",      "target": 2,  "weight": 10 },
-      { "id": "star1",      "event": "star",        "target": 1,  "weight": 10 },
-      { "id": "catch30",    "event": "catch_night", "target": 30, "weight": 10 }
+  "cycle": {
+    "daySeconds": 240,
+    "nightSeconds": 120,
+    "duskWarningAt": 210,
+    "stalkerGraceSeconds": 30,
+    "modifierChance": 0.25,
+    "nightModifiers": [
+      {
+        "id": "Fog",
+        "spawnMult": 1.25
+      },
+      {
+        "id": "FireflyBloom",
+        "spawnMult": 1.5,
+        "extraCatches": 1
+      },
+      {
+        "id": "Gusty",
+        "fireDrainMult": 1.25,
+        "shardSpawnMult": 2
+      },
+      {
+        "id": "Starfall",
+        "fireStart": 0.7
+      }
     ]
   },
-  "gift": {
-    "dupDecorEmbers": 100,
-    "steps": [
-      { "kind": "embers", "amount": 10 }, { "kind": "lure", "floor": 1 }, { "kind": "embers", "amount": 15 },
-      { "kind": "lockCharge", "amount": 1 }, { "kind": "lure", "floor": 2 }, { "kind": "embers", "amount": 20 },
-      { "kind": "lure", "floor": 4 },
-      { "kind": "embers", "amount": 15 }, { "kind": "lure", "floor": 2 }, { "kind": "lockCharge", "amount": 1 },
-      { "kind": "embers", "amount": 20 }, { "kind": "lure", "floor": 2 }, { "kind": "embers", "amount": 25 },
-      { "kind": "lure", "floor": 3 },
-      { "kind": "embers", "amount": 20 }, { "kind": "lockCharge", "amount": 1 }, { "kind": "lure", "floor": 3 },
-      { "kind": "embers", "amount": 25 }, { "kind": "lure", "floor": 2 }, { "kind": "embers", "amount": 30 },
-      { "kind": "lure", "floor": 4 },
-      { "kind": "embers", "amount": 25 }, { "kind": "lockCharge", "amount": 2 }, { "kind": "lure", "floor": 3 },
-      { "kind": "embers", "amount": 35 }, { "kind": "lure", "floor": 3 }, { "kind": "embers", "amount": 40 },
-      { "kind": "decor", "id": "gift_lantern_arch" }
-    ]
+  "server": {
+    "maxPlayers": 8
   },
-  "decor": {
-    "grid": 2,
-    "zoneSize": 24,
-    "maxPlaced": 100,
-    "maxPerItem": 20,
-    "items": [
-      { "id": "string_lights",    "name": "String Lights",    "price": 40,  "w": 4, "d": 2 },
-      { "id": "paper_lanterns",   "name": "Paper Lanterns",   "price": 50,  "w": 2, "d": 2 },
-      { "id": "glow_mushrooms",   "name": "Glow Mushrooms",   "price": 30,  "w": 2, "d": 2 },
-      { "id": "crystal_lamp",     "name": "Crystal Lamp",     "price": 150, "w": 2, "d": 2 },
-      { "id": "banner_moss",      "name": "Moss Banner",      "price": 60,  "w": 2, "d": 2 },
-      { "id": "banner_ember",     "name": "Ember Banner",     "price": 60,  "w": 2, "d": 2 },
-      { "id": "banner_star",      "name": "Star Banner",      "price": 80,  "w": 2, "d": 2 },
-      { "id": "stepping_stones",  "name": "Stepping Stones",  "price": 20,  "w": 2, "d": 2 },
-      { "id": "moss_path",        "name": "Moss Path",        "price": 20,  "w": 2, "d": 4 },
-      { "id": "plank_path",       "name": "Plank Path",       "price": 25,  "w": 2, "d": 4 },
-      { "id": "fence_wood",       "name": "Wood Fence",       "price": 30,  "w": 4, "d": 2 },
-      { "id": "fence_stone",      "name": "Stone Fence",      "price": 45,  "w": 4, "d": 2 },
-      { "id": "hedge",            "name": "Hedge",            "price": 40,  "w": 4, "d": 2 },
-      { "id": "flower_bed",       "name": "Flower Bed",       "price": 50,  "w": 4, "d": 2 },
-      { "id": "stump_seat",       "name": "Stump Seat",       "price": 30,  "w": 2, "d": 2 },
-      { "id": "log_bench",        "name": "Log Bench",        "price": 60,  "w": 4, "d": 2 },
-      { "id": "pond",             "name": "Pond",             "price": 200, "w": 6, "d": 4 },
-      { "id": "little_bridge",    "name": "Little Bridge",    "price": 120, "w": 4, "d": 2 },
-      { "id": "glowling_statue",  "name": "Glowling Statue",  "price": 400, "w": 2, "d": 2 },
-      { "id": "owl_totem",        "name": "Owl Totem",        "price": 180, "w": 2, "d": 2 },
-      { "id": "firefly_jar",      "name": "Firefly Jar",      "price": 70,  "w": 2, "d": 2 },
-      { "id": "star_arch",        "name": "Star Arch",        "price": 300, "w": 4, "d": 2 },
-      { "id": "welcome_sign",     "name": "Welcome Sign",     "price": 35,  "w": 2, "d": 2 },
-      { "id": "fire_bowl",        "name": "Fire Bowl",        "price": 90,  "w": 2, "d": 2 },
-      { "id": "gift_lantern_arch", "name": "Lantern Arch",    "price": 0,   "w": 4, "d": 2, "exclusive": true },
-      { "id": "pass_moth_banner", "name": "Moth Banner",      "price": 0,   "w": 2, "d": 2, "exclusive": true },
-      { "id": "pass_star_lamp",   "name": "Star Lamp",        "price": 0,   "w": 2, "d": 2, "exclusive": true }
-    ],
-    "nameAdjectives": ["Mossy", "Glowing", "Quiet", "Hidden", "Starry", "Misty", "Golden", "Silver", "Cozy", "Bright",
-      "Gentle", "Wild", "Amber", "Velvet", "Dewy", "Ember", "Moonlit", "Sunny", "Hollow", "Whispering",
-      "Twinkling", "Mellow", "Drowsy", "Brave", "Lucky", "Rustling", "Fern", "Crystal", "Willow", "Breezy",
-      "Snug", "Shady", "Sparkling", "Dusky", "Rosy", "Frosty", "Humble", "Merry", "Sleepy", "Ancient",
-      "Little", "Grand", "Secret", "Shimmering", "Warm", "Calm", "Clover", "Honey", "Maple", "Pine",
-      "Cedar", "Briar", "Bramble", "Thistle", "Lantern", "Firefly", "Pebble", "Feather", "Cobalt", "Copper",
-      "Jade", "Lilac", "Saffron", "Opal"],
-    "nameNouns": ["Hollow", "Glade", "Grove", "Nook", "Den", "Haven", "Meadow", "Burrow", "Thicket", "Dell",
-      "Clearing", "Rest", "Retreat", "Camp", "Roost", "Nest", "Garden", "Hearth", "Lodge", "Cove",
-      "Brook", "Glen", "Knoll", "Ridge", "Vale", "Copse", "Wood", "Patch", "Corner", "Perch",
-      "Hideaway", "Lantern", "Grotto", "Bower", "Spring", "Pond", "Field", "Path", "Arbor", "Harbor",
-      "Cottage", "Cabin", "Shelter", "Outpost", "Watch", "Keep", "Refuge", "Sanctum", "Terrace", "Orchard",
-      "Thorn", "Root", "Stump", "Canopy", "Crossing", "Bend", "Hill", "Hearthside", "Lookout", "Spinney",
-      "Coppice", "Wold", "Fen", "Moor"]
+  "movement": {
+    "walk": 16,
+    "run": 22,
+    "swiftBootsMult": 1.15,
+    "autoSprintAfter": 0.5
   },
-  "leaderboards": { "writeGapSeconds": 300, "refreshSeconds": 120, "top": 10 },
-  "badges": [
-    { "key": "welcome",    "name": "Welcome",                 "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
-    { "key": "night1",     "name": "First Night Survived",    "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
-    { "key": "rare",       "name": "First Rare",              "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
-    { "key": "epic",       "name": "First Epic",              "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
-    { "key": "legendary",  "name": "First Legendary",         "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
-    { "key": "mythic",     "name": "First Mythic",            "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
-    { "key": "secret",     "name": "First Secret",            "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
-    { "key": "rebirth1",   "name": "First Rebirth",           "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
-    { "key": "star5",      "name": "Star 5",                  "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
-    { "key": "star10",     "name": "Star 10",                 "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
-    { "key": "bronze1",    "name": "First Bronze Page",       "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
-    { "key": "revives10",  "name": "10 Revives",              "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
-    { "key": "firesave",   "name": "Saved the Fire",          "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
-    { "key": "days7",      "name": "7 Play Days",             "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } },
-    { "key": "trade1",     "name": "First Trade",             "ids": { "DEV": 0, "BETA": 0, "PROD": 0 } }
-  ],
-  "store": {
-    "passes": [
-      { "key": "vip",        "name": "VIP Lantern",   "robux": 299, "incomeMult": 1.5 },
-      { "key": "vault2",     "name": "+2 Vault Slots", "robux": 199, "vault": 2 },
-      { "key": "swiftBoots", "name": "Swift Boots",   "robux": 149 },
-      { "key": "autoPlace",  "name": "Auto-Place",    "robux": 99 }
-    ],
-    "products": [
-      { "key": "embers120",   "name": "120 Embers",    "robux": 49,  "kind": "embers", "amount": 120,  "capGroup": "embers" },
-      { "key": "embers550",   "name": "550 Embers",    "robux": 199, "kind": "embers", "amount": 550,  "capGroup": "embers" },
-      { "key": "embers2400",  "name": "2,400 Embers",  "robux": 799, "kind": "embers", "amount": 2400, "capGroup": "embers" },
-      { "key": "lockCharge3", "name": "Lock Charge ×3", "robux": 25,  "kind": "lockCharges", "amount": 3, "capGroup": "lockCharges" },
-      { "key": "serverLuck",  "name": "Server Luck",   "robux": 99,  "kind": "serverLuck", "capGroup": "serverLuck", "paidRandom": true },
-      { "key": "passPremium", "name": "Night Pass Premium", "robux": 399, "kind": "passPremium" }
-    ],
-    "dailyCaps": { "embers": 3, "lockCharges": 5, "serverLuck": 2 },
-    "serverLuck": { "mult": 1.5, "minutes": 15, "maxMinutes": 60 },
-    "lostGlowlingQuietSeconds": 30,
-    "lostNightQuietSeconds": 20,
-    "keepReceipts": 200
-  },
-  "events": { "featuredWeight": 2 },
   "live": {
     "pollSeconds": 300,
     "maxMult": 5,
-    "multKeys": ["luckMult", "embersMult", "spawnMult", "glowMult", "passXpMult"],
-    "defaults": { "killSwitches": { "trading": false, "stealing": false, "serverLuck": false, "products": {} }, "codes": {} }
-  },
-  "pass": {
-    "s1Start": 1794787200,
-    "seasonWeeks": 8,
-    "tiers": 50,
-    "xpPerTier": 1000,
-    "catchUpWeeks": 2,
-    "catchUpMult": 1.5,
-    "xp": { "survive": 100, "lost": 40, "revive": 25 },
-    "premiumEmbers": 3500,
-    "lureFallbackEmbers": 25,
-    "free": { "embers": 25, "lureEvery": 3, "lureFloor": 2, "decor": { "20": "pass_moth_banner", "50": "pass_star_lamp" } },
-    "premium": { "embers": 38, "cosmeticEvery": 5, "cosmetics": ["lantern_skin", "base_banner", "aura", "trail"] }
-  },
-  "glowdex": {
-    "credit": ["lure", "night", "event", "tutorial"],
-    "tiers": [
-      { "id": "Bronze",  "needs": 4, "income": 0.005 },
-      { "id": "Silver",  "needs": 5, "income": 0.005 },
-      { "id": "Gold",    "needs": 6, "income": 0.01 },
-      { "id": "Radiant", "needs": 7, "income": 0 }
+    "multKeys": [
+      "luckMult",
+      "embersMult",
+      "spawnMult",
+      "glowMult",
+      "passXpMult"
     ],
-    "milestones": [
-      { "entries": 10,  "embers": 25 },
-      { "entries": 25,  "embers": 50 },
-      { "entries": 50,  "embers": 100 },
-      { "entries": 100, "embers": 200 },
-      { "entries": 150, "embers": 300 },
-      { "entries": 200, "embers": 500 },
-      { "entries": 254, "embers": 1000 }
-    ]
+    "defaults": {
+      "killSwitches": {
+        "trading": false,
+        "stealing": false,
+        "serverLuck": false,
+        "products": {}
+      },
+      "codes": {}
+    }
   },
-  "income":  { "starBonus": 0.35, "offlineEfficiency": 0.10, "offlineCapHours": 6 },
-  "rebirth": { "baseRequirement": 250000, "growth": 3.2, "stepAfterStar": 8, "growthAfterStep": 2.0, "stepEnabled": true, "keepVault": true },
-  "vault":   { "start": 3, "perStar": 1 },
-  "storage": { "size": 60, "overflow": 10, "releaseIncomeSeconds": 60 },
-  "movement": { "walk": 16, "run": 22, "swiftBootsMult": 1.15, "autoSprintAfter": 0.5 },
-  "steal":   { "grabSeconds": [1, 1, 1, 2, 2, 3, 3], "carrySpeedMult": 0.85, "carryTimeout": 60, "tagRadius": 6,
-               "victimCooldown": 45, "chaseBoostMult": 1.2, "chaseBoostSeconds": 10, "perThiefPerVictimPerDay": 1,
-               "grabRange": 6, "speedTolerance": 0.25, "teleportStuds": 30, "carryCheckWindow": 0.5, "carrySlackStuds": 2 },
-  "lock":    { "activeSeconds": 60, "rechargeSeconds": 90, "maxCharges": 5, "chargeGlowSecondsOfIncome": 120, "chargeMinGlow": 200, "chargeEmbers": 15 },
-  "shield":  { "maxPlaySeconds": 2700 },
-  "fire":    { "start": 0.60, "max": 1.0, "drainBase": 0.005, "drainPerPlayer": 0.000375, "wood": 0.03, "shard": 0.06, "failGlowLoss": 0.05, "saveBelow": 0.05,
-               "pileRespawnSeconds": 20, "pickupRange": 8 },
-  "night":   { "baseCatches": 3, "spawnsPerPlayer": 4, "spawnWavesAt": [10, 40, 70], "catchRange": 12 },
-  "stalker": { "prowlSpeed": 14, "loneRadius": 20, "stalkSeconds": 4, "telegraphSeconds": 2, "stalkSpeedMult": 0.9, "stalkDistance": 8,
-               "lungeSpeedMult": 1.25, "lungeSeconds": 1.5, "touchRange": 3.5, "retreatSeconds": 10, "repelGroupSize": 3, "repelGroupRadius": 12,
-               "repathSeconds": 0.5, "nearMissShove": 12 },
-  "traits":  { "familyLinkPer": 0.05, "familyLinkMax": 0.10, "harmonizer": 0.15, "cap": 1.6,
-               "guardian": 0.5, "guardianHigh": 1.0, "guardianMax": 1.5,
-               "infuser": { "everySeconds": 60, "seconds": 30, "mult": 1.5 },
-               "forager": { "everySeconds": 90, "pouchSeconds": 30 },
-               "companion": { "firebinder": 0.15, "firebinderHigh": 0.30, "saviorCut": 0.6, "saviorMin": 1.8,
-                              "wayfinderRange": 60, "wayfinderEvery": 10, "wayfinderMinFloor": "Rare" },
-               "apex": { "skywhalecalf": { "plotGlow": 0.15 }, "lunadrake": { "plotGlow": 0.25 }, "eldersapling": { "plotGrab": 1.0 },
-                         "auroralynx": { "infuseEvery": 45, "infuseTargets": 6 }, "emberwing": { "fuelBoost": 0.5 } } },
-  "revive":  { "holdSeconds": 3, "range": 8, "bleedOutSeconds": 30, "safeSeconds": 3 },
-  "embers":  { "surviveBase": 10, "perFireTenPct": 1, "perRevive": 5, "reviveCap": 4, "perPiece": 1, "pieceCap": 6, "failConsolation": 3, "friendBonusPer": 0.10, "friendBonusCap": 0.30 },
-  "trade":   { "minStars": 3, "minPlayDays": 3, "minAccountAgeDays": 7, "maxPerSide": 4, "confirmDelay": 5, "escrowSeconds": 120,
-               "feeByRarity": [1, 2, 5, 10, 25, 50, 100], "tradeLockHours": 24, "maxPerDay": 10 },
-  "moderation": { "windowSeconds": 600, "kickAt": 10, "logKeep": 50,
-                  "points": { "flood": 3, "invalid": 2, "rejected": 1, "Carry": 4 } },
-  "admin": { "groupId": 0, "minRank": 200, "maxEmbers": 100000, "banLadderDays": [1, 7, -1] }
+  "moderation": {
+    "windowSeconds": 600,
+    "kickAt": 10,
+    "logKeep": 50,
+    "points": {
+      "flood": 3,
+      "invalid": 2,
+      "rejected": 1,
+      "Carry": 4
+    }
+  }
 }
