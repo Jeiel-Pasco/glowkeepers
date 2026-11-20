@@ -12,6 +12,7 @@
 --
 -- Other controllers read CycleFXController.state() and listen to PhaseChanged.
 
+local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -193,7 +194,41 @@ function CycleFXController.cycleConfig(): any
 	return cycleConfig.cycle
 end
 
+-- Map parts tagged NightGlow (lanterns, some forest mushrooms; tools/BuildZones.luau) turn Neon
+-- and switch their lights on from dusk to dawn. Streamed-in parts pick up the current state.
+local glowing = false
+local function applyGlow(p: Instance)
+	if not p:IsA("BasePart") then
+		return
+	end
+	local day = p:GetAttribute("DayMaterial")
+	if glowing then
+		p.Material = Enum.Material.Neon
+	elseif type(day) == "string" then
+		p.Material = (Enum.Material :: any)[day]
+	end
+	for _, light in p:GetChildren() do
+		if light:IsA("Light") then
+			light.Enabled = glowing
+		end
+	end
+end
+
+local function setGlow(on: boolean)
+	if on == glowing then
+		return
+	end
+	glowing = on
+	for _, p in CollectionService:GetTagged("NightGlow") do
+		applyGlow(p)
+	end
+end
+
 function CycleFXController.Start()
+	CollectionService:GetInstanceAddedSignal("NightGlow"):Connect(applyGlow)
+	CycleFXController.PhaseChanged:Connect(function(phase)
+		setGlow(phase ~= "Day")
+	end)
 	ensureEffects()
 	readAttributes()
 	for _, name in { "CycleEpoch", "DayLen", "NightLen" } do

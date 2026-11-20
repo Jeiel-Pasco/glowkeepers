@@ -264,7 +264,7 @@ local function updateGuide()
 	if guideFrom.Parent ~= me then
 		guideFrom.Parent = me
 	end
-	-- through the camp gate and up the cliff ledges, not straight at it
+	-- through the camp gate and along the trail up the ramp, not straight at it
 	guidePart.Position = Zones.guide(me.Position, target) + Vector3.new(0, 1, 0)
 	guideBeam.Enabled = true
 end

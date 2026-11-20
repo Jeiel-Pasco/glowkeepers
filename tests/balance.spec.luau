@@ -109,24 +109,38 @@ local function angleGap(a: number, b: number): number
 	return math.abs((a - b + math.pi) % (2 * math.pi) - math.pi)
 end
 
-H.test("parkour ledges are hard but reachable (JumpHeight 7.2)", function()
-	local routes = Zones.routes()
-	H.ok(#routes == 2 * #Zones.list, `{#routes} routes`)
-	local half = Zones.LEDGE_SIZE.X / 2
-	for n, route in routes do
-		local ledges = route.ledges
-		H.ok(ledges[1].Y - Zones.FLOOR_Y <= 5.5, `route {n} first ledge`)
-		H.ok(Zones.PLATEAU_Y - ledges[#ledges].Y <= 5.5, `route {n} last ledge to the top`)
-		for i = 2, #ledges do
-			local a, b = ledges[i - 1], ledges[i]
-			local rise = b.Y - a.Y
-			local flat = Vector3.new(b.X - a.X, 0, b.Z - a.Z).Magnitude - 2 * half
-			H.ok(rise > 0 and rise <= 5.5, `route {n} ledge {i} rise {rise}`)
-			H.ok(flat >= 1 and flat <= 4, `route {n} ledge {i} gap {flat}`)
+H.test("each zone has a walkable ramp up the cliff", function()
+	for _, zone in Zones.list do
+		local bottom, top = Zones.rampAt(zone, 0), Zones.rampAt(zone, 1)
+		H.ok(Vector3.new(bottom.X, 0, bottom.Z).Magnitude <= Zones.CLIFF_IN, `{zone.id} ramp starts in the lowland`)
+		H.ok(math.abs(bottom.Y - Zones.FLOOR_Y) < 0.01, `{zone.id} ramp starts on the floor`)
+		H.ok(Vector3.new(top.X, 0, top.Z).Magnitude >= Zones.CLIFF_OUT, `{zone.id} ramp ends on the plateau`)
+		H.ok(math.abs(top.Y - Zones.PLATEAU_Y) < 0.01, `{zone.id} ramp ends at plateau height`)
+		for i = 1, 40 do
+			local a, b = Zones.rampAt(zone, (i - 1) / 40), Zones.rampAt(zone, i / 40)
+			local run = Vector3.new(b.X - a.X, 0, b.Z - a.Z).Magnitude
+			local slope = math.deg(math.atan2(b.Y - a.Y, run))
+			H.ok(slope > 0 and slope <= 25, `{zone.id} ramp slope {slope}`)
 		end
-		for _, ledge in ledges do
-			local r = Vector3.new(ledge.X, 0, ledge.Z).Magnitude
-			H.ok(r >= Zones.CLIFF_IN - 5 and r <= Zones.CLIFF_OUT, `route {n} ledge on the cliff at r{r}`)
+		local p = Zones.rampAt(zone, 0.3)
+		local t, off = Zones.rampFrame(zone, p.X, p.Z)
+		H.ok(math.abs(t - 0.3) < 0.001 and math.abs(off) < 0.001, "rampFrame inverts rampAt")
+	end
+end)
+
+H.test("lantern trails wind from each gate to its zone", function()
+	for _, zone in Zones.list do
+		local trail = Zones.trail(zone)
+		H.ok(#trail >= 15, `{zone.id} {#trail} points`)
+		H.ok((trail[#trail] - Zones.entry(zone)).Magnitude < 0.01, `{zone.id} trail ends at the entry`)
+		for i = 2, #trail do
+			local d = (trail[i] - trail[i - 1]).Magnitude
+			H.ok(d >= 8 and d <= 45, `{zone.id} trail step {i} {d}`)
+		end
+		for _, p in trail do
+			for j, site in Zones.campSites() do
+				H.ok((p - site).Magnitude >= Zones.CAMP_SITE_R + 10, `{zone.id} trail clear of site {j}`)
+			end
 		end
 	end
 end)
@@ -134,19 +148,13 @@ end)
 H.test("raider camp sites sit in the lowland, apart and off the routes", function()
 	local sites = Zones.campSites()
 	H.ok(#sites >= 8, `{#sites} camp sites`)
-	local ledges = #Zones.routes()[1].ledges
-	local spread = (ledges - 1) * Zones.LEDGE_STEP / Zones.CLIFF_IN -- a route's sideways span
-	H.ok(spread < Zones.ROUTE_OFFSET, "routes stay their side of the zone angle")
 	for i, site in Zones.CAMP_SITES do
 		H.ok(site.r - Zones.CAMP_SITE_R >= Zones.GATE_D + 30, `site {i} outside the camp ring`)
 		H.ok(site.r + Zones.CAMP_SITE_R <= Zones.CLIFF_IN - 20, `site {i} before the cliff`)
 		local width = math.asin(Zones.CAMP_SITE_R / site.r)
 		for _, zone in Zones.list do
-			for _, side in { -1, 1 } do
-				local route = zone.angle + side * Zones.ROUTE_OFFSET
-				local gap = angleGap(site.angle, route) - width
-				H.ok(gap >= math.rad(15), `site {i} clear of {zone.id} route ({math.deg(gap)}°)`)
-			end
+			local gap = angleGap(site.angle, zone.angle) - Zones.RAMP_SPAN / 2 - width
+			H.ok(gap >= math.rad(15), `site {i} clear of the {zone.id} ramp ({math.deg(gap)})`)
 		end
 		for j, other in sites do
 			if j > i then
@@ -164,22 +172,24 @@ H.test("raider camp sites sit in the lowland, apart and off the routes", functio
 	end
 end)
 
-H.test("the quest guide goes through a gate and up the ledges", function()
+H.test("the quest guide goes through a gate and along the trail", function()
 	local ember = Zones.list[1]
 	local entry = Zones.entry(ember)
+	local trail = Zones.trail(ember)
 	H.ok(entry.Y > Zones.PLATEAU_Y - 5, "zone entry on the plateau")
 	-- In camp: out through the nearest gate.
 	local out = Zones.guide(Vector3.new(0, 3, 0), entry)
 	H.ok((out - Zones.polar(ember.angle, Zones.GATE_D + 16)).Magnitude < 1, `gate first {out}`)
-	-- In the lowland: to the first ledge of the closest route.
-	local route = Zones.routes()[1]
-	local low = Zones.guide(Zones.polar(ember.angle, 400) + Vector3.new(0, 3, 0), entry)
-	H.ok(low == route.ledges[1] or low == Zones.routes()[2].ledges[1], `first ledge {low}`)
-	-- On ledge 5: the next one up.
-	local on5 = route.ledges[5] + Vector3.new(0, 3, 0)
-	H.ok(Zones.guide(on5, entry) == route.ledges[6], "next ledge")
-	-- On the last ledge, and on the plateau: straight there.
-	H.ok(Zones.guide(route.ledges[#route.ledges] + Vector3.new(0, 3, 0), entry) == entry, "top")
+	-- On the trail in the lowland: a couple of points further along it.
+	local on = trail[4] + Vector3.new(0, 3, 0)
+	H.ok(Zones.guide(on, entry) == trail[6], "along the trail")
+	-- Off the trail in the lowland: to the ramp's foot.
+	local off = Zones.guide(Zones.polar(math.rad(-30), 450) + Vector3.new(0, 3, 0), entry)
+	H.ok(math.abs(Vector3.new(off.X, 0, off.Z).Magnitude - Zones.RAMP_R0) < 1, `ramp foot {off}`)
+	-- Halfway up the ramp: further up it.
+	local mid = Zones.rampAt(ember, 0.5)
+	H.ok(Zones.guide(mid + Vector3.new(0, 3, 0), entry).Y > mid.Y + 5, "up the ramp")
+	-- On the plateau: straight there.
 	H.ok(Zones.guide(Zones.polar(ember.angle, 600) + Vector3.new(0, 3, 0), entry) == entry, "plateau")
 	-- Back to camp from the lowland: in through the nearest gate.
 	local back = Zones.guide(Zones.polar(math.rad(100), 400) + Vector3.new(0, 3, 0), Vector3.new(0, 0, 0))

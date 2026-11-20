@@ -2,7 +2,7 @@
 -- The world layout (Layer One, docs/LAYER_ONE.md). Rings out from the campfire:
 --   r 0–260      the camp clearing, forest ring and ring wall (gates at GATE_D)
 --   r 260–510    the LOWLAND: forest at FLOOR_Y, raider camps, roaming raiders
---   r 510–530    the CLIFF up to the plateau, climbed by parkour ledge routes
+--   r 510–530    the CLIFF up to the plateau, climbed by a ramp cut into it toward each zone
 --   r 530–1150   the PLATEAU at PLATEAU_Y: forest and the three circle zones
 --   r 1150       the sheer outer cliff and invisible wall (WORLD_R; layer two later)
 -- Pure geometry plus the spawn table, shared by the map builder (tools/BuildZones.luau),
@@ -44,15 +44,15 @@ Zones.ZONE_D = 820 -- zone circle centre
 Zones.ZONE_R = 180
 Zones.BOSS_D = Zones.ZONE_D
 
--- Parkour: two ledge routes per zone, at its angle ±ROUTE_OFFSET. Each route is a staircase of
--- rock ledges along the cliff face, LEDGE_RISE up and LEDGE_STEP sideways each (JumpHeight 7.2).
-Zones.ROUTE_OFFSET = math.rad(20)
-Zones.LEDGE_RISE = 5
-Zones.LEDGE_STEP = 7
-Zones.LEDGE_SIZE = Vector3.new(4, 1, 4)
+-- One ramp per zone, cut diagonally across the cliff face: it climbs from the lowland at
+-- zone.angle - RAMP_SPAN/2 to the plateau at zone.angle + RAMP_SPAN/2 (about 20 degrees steep).
+Zones.RAMP_SPAN = math.rad(18)
+Zones.RAMP_WIDTH = 12
+Zones.RAMP_R0 = Zones.CLIFF_IN - 4 -- the ramp's centre line, bottom to top
+Zones.RAMP_R1 = Zones.CLIFF_OUT + 4
 
 -- Raider camps: a few of these sites are used per server (step 4). All in the lowland, between
--- the zones and clear of the ledge routes.
+-- the zones and clear of the ramps and trails.
 Zones.CAMP_SITE_R = 30
 Zones.CAMP_SITES = {} :: { { angle: number, r: number } }
 for _, gap in { 60, 180, 300 } do
@@ -162,29 +162,48 @@ function Zones.forElement(element: string): Zone
 	return Zones.byType(element) or Zones.list[1]
 end
 
-export type Route = { zone: Zone, angle: number, ledges: { Vector3 } }
+-- A point on a zone's ramp centre line, `t` from 0 (bottom) to 1 (top).
+function Zones.rampAt(zone: Zone, t: number): Vector3
+	local a = zone.angle + (t - 0.5) * Zones.RAMP_SPAN
+	local r = Zones.RAMP_R0 + (Zones.RAMP_R1 - Zones.RAMP_R0) * t
+	return Vector3.new(math.cos(a) * r, Zones.FLOOR_Y + Zones.CLIFF_HEIGHT * t, math.sin(a) * r)
+end
 
--- The parkour routes up the cliff. Each ledge is the centre of its TOP face (the builder puts a
--- LEDGE_SIZE rock just below it), sticking out of the face where the cliff is that high.
-function Zones.routes(): { Route }
-	local out: { Route } = {}
-	local count = math.ceil(Zones.CLIFF_HEIGHT / Zones.LEDGE_RISE) - 1
-	for _, zone in Zones.list do
-		for _, side in { -1, 1 } do
-			local angle = zone.angle + side * Zones.ROUTE_OFFSET
-			local ledges = {}
-			for i = 1, count do
-				local h = i * Zones.LEDGE_RISE
-				local face = Zones.CLIFF_IN + (Zones.CLIFF_OUT - Zones.CLIFF_IN) * h / Zones.CLIFF_HEIGHT
-				local r = face - Zones.LEDGE_SIZE.Z / 2
-				-- climb toward the zone's angle, away from the raider camps
-				local along = -side * (i - 1) * Zones.LEDGE_STEP
-				local a = angle + along / r
-				table.insert(ledges, Vector3.new(math.cos(a) * r, Zones.FLOOR_Y + h, math.sin(a) * r))
-			end
-			table.insert(out, { zone = zone, angle = angle, ledges = ledges })
+-- Where (x, z) is relative to a zone's ramp: `t` along it (outside 0..1 past its ends) and the
+-- signed sideways distance from its centre line (+ toward the plateau).
+function Zones.rampFrame(zone: Zone, x: number, z: number): (number, number)
+	local gap = (math.atan2(z, x) - zone.angle + math.pi) % (2 * math.pi) - math.pi
+	local t = gap / Zones.RAMP_SPAN + 0.5
+	local r = math.sqrt(x * x + z * z)
+	return t, r - (Zones.RAMP_R0 + (Zones.RAMP_R1 - Zones.RAMP_R0) * math.clamp(t, 0, 1))
+end
+
+local function wiggle(from: Vector3, to: Vector3, steps: number, amp: number, phase: number, out: { Vector3 })
+	local side = Vector3.new(-(to.Z - from.Z), 0, to.X - from.X).Unit
+	for i = 1, steps do
+		local p = from:Lerp(to, i / steps)
+		if i < steps then
+			p += side * math.sin(i * 1.9 + phase) * amp
 		end
+		table.insert(out, Vector3.new(p.X, Zones.groundY(math.sqrt(p.X * p.X + p.Z * p.Z)), p.Z))
 	end
+end
+
+-- A zone's lantern trail: from its camp gate, winding through the lowland forest, up its ramp and
+-- through the plateau forest to the zone's entry. Points about 25-40 studs apart.
+function Zones.trail(zone: Zone): { Vector3 }
+	local phase = zone.angle * 3
+	local out = { Zones.polar(zone.angle, Zones.GATE_D + 6) }
+	local bottom = Zones.rampAt(zone, 0)
+	local foot = Vector3.new(bottom.X, 0, bottom.Z).Unit * (Zones.RAMP_R0 - 10)
+	wiggle(out[1], foot, 7, 12, phase, out)
+	for i = 0, 6 do
+		table.insert(out, Zones.rampAt(zone, i / 6))
+	end
+	local top = Zones.rampAt(zone, 1)
+	local rim = Vector3.new(top.X, 0, top.Z).Unit * (Zones.RAMP_R1 + 10)
+	table.insert(out, Zones.polar(math.atan2(rim.Z, rim.X), rim.Magnitude))
+	wiggle(out[#out], Zones.entry(zone), 5, 14, phase + 1, out)
 	return out
 end
 
@@ -219,31 +238,38 @@ local function gateToward(angle: number, outside: boolean): Vector3
 end
 
 -- The next point for the quest guide on the way from `from` (a HumanoidRootPart position) to
--- `target`: through a camp ring gate, then up the nearest ledge route to reach the plateau.
-local guideRoutes: { Route }? = nil -- built once; the guide runs every frame
+-- `target`: through a camp ring gate, then along the nearest zone trail and up its ramp.
+local guideTrails: { { Vector3 } }? = nil -- built once; the guide runs every frame
 function Zones.guide(from: Vector3, target: Vector3): Vector3
 	local fromR, targetR = flatR(from), flatR(target)
 	local point = target
-	local feet = from.Y - 3
-	if targetR > Zones.CLIFF_OUT and feet < Zones.PLATEAU_Y - 4 and fromR < Zones.CLIFF_OUT + 10 then
-		local best, bestCost = nil, math.huge
-		guideRoutes = guideRoutes or Zones.routes()
-		for _, route in guideRoutes :: { Route } do
-			local first, last = route.ledges[1], route.ledges[#route.ledges]
-			local cost = (Vector3.new(from.X, 0, from.Z) - Vector3.new(first.X, 0, first.Z)).Magnitude
-				+ (target - last).Magnitude
-			if cost < bestCost then
-				best, bestCost = route, cost
+	if targetR > Zones.CLIFF_OUT and from.Y - 3 < Zones.PLATEAU_Y - 4 and fromR < Zones.CLIFF_OUT + 10 then
+		if guideTrails == nil then
+			local trails = {}
+			for _, zone in Zones.list do
+				table.insert(trails, Zones.trail(zone))
+			end
+			guideTrails = trails
+		end
+		local best, bestEnd = nil, math.huge
+		for _, trail in guideTrails :: { { Vector3 } } do
+			local d = (trail[#trail] - target).Magnitude
+			if d < bestEnd then
+				best, bestEnd = trail, d
 			end
 		end
-		assert(best, "no routes")
-		point = target
-		for _, ledge in best.ledges do
-			if ledge.Y > feet + 1 then
-				point = ledge
-				break
+		assert(best, "no trails")
+		local near, nearD, rampFoot = 1, math.huge, 1
+		for i, p in best do
+			local d = (p - from).Magnitude
+			if d < nearD then
+				near, nearD = i, d
+			end
+			if rampFoot == 1 and flatR(p) >= Zones.RAMP_R0 - 0.5 then
+				rampFoot = i
 			end
 		end
+		point = if nearD > 40 then best[rampFoot] else best[math.min(near + 2, #best)]
 	end
 	local pointR = flatR(point)
 	if fromR < Zones.GATE_D and pointR > Zones.GATE_D then
