@@ -46,7 +46,7 @@ r ~1150      sheer outer cliff + invisible wall (future layer 2; unclimbable for
 | # | Step | Status |
 |---|------|--------|
 | 1 | Zones v3 geometry in `Zones.luau`: radii, cliff, ledges, circle zones, pack rings, raider camp candidate sites. Update `tests/balance.spec.luau` limits. | DONE |
-| 2 | Builder v2 (`tools/BuildZones.luau` rewrite): heightmap by WriteVoxels in chunks (camp r<255 preserved), noisy cliffs, parkour ledges, single ground tiling, tall forest from `WorldAssets.Forest` (jitter grid, clearings for zones, camps and routes), remove the old r700 edge, tree wall and `Map.Zones`. Run it async with a progress attribute. | TODO |
+| 2 | Builder v2 (`tools/BuildZones.luau` rewrite): heightmap by WriteVoxels in chunks (camp r<255 preserved), noisy cliffs, parkour ledges, single ground tiling, tall forest from `WorldAssets.Forest` (jitter grid, clearings for zones, camps and routes), remove the old r700 edge, tree wall and `Map.Zones`. Run it async with a progress attribute. | DONE |
 | 3 | Fix-ups for the new map: `EnemyService.groundAt` raycast start height, HUD guide hints and quest guide positions, spawn heights on the plateau. | TODO |
 | 4 | Raider camps: 3 random sites from ~8 candidates, built at runtime (palisade, tents, fire, chest). New guards `raider_brute` (melee) and `raider_archer` (bolt) that attack anyone inside and drop XP and coins. The chest stays locked while guards live; on clear it has a low chance of random-type ink (otherwise coins) into carried, once per player per clear. Guards respawn after ~90 s. | TODO |
 | 5 | Player status effects: slow/root via character attributes that `MovementController` respects; knockback/pull via an Fx applied by the owning client (LinearVelocity); poison reuses `burnPlayer`; a new "line" telegraph Fx. | TODO |
@@ -70,7 +70,24 @@ r ~1150      sheer outer cliff + invisible wall (future layer 2; unclimbable for
 - The HUD "zone" hint still points at `toWorld(zone, 320, 0)`, which is now in the lowland toward the
   zone. Step 3 should point it at the nearest ledge route.
 
+### Step 2 notes (builder v2)
+
+- The builder ran in DEV and the place was saved (version 116). Output: `Map.Layer` with `Forest` (4,438 trees),
+  `Ledges` (66), `Edge` (96 invisible wall segments at r1150) and `Zones` (decor). `Map.Zones` and `Map.WorldEdge`
+  are gone, along with every tree and prop outside r255. `CharacterMaxSlopeAngle` is now 50.
+- Trees are `Tree_Oak_Tall` (×3.2–4.2) and `Tree_Oak_Round` (×1.4–1.9). Canopies start about 28 studs up and
+  have CanCollide, CanQuery and CanTouch off, so they never pop the camera. Trunks collide.
+- The heightmap is notched under each ledge, because smoothed voxels otherwise bulge over the ledge tops.
+- Playtest check: a scripted climb of one route landed on all 11 ledges and reached the top. Walking
+  straight up the bare cliff fails (slope 50).
+- Zone decor is the old set, moved into the circles. Mistfall pools sit between the pack rings.
+- `EnemyService.groundAt` still starts its ray at y=120, which is enough for the plateau (about 60). Step 3 still
+  needs to check spawns on the plateau.
+
 ## Open questions (UNSURE)
+
+- Trunks are thick (Oak_Tall scaled ×4 is about 17 wide). Is the forest too hard to walk through, or about right?
+- The forest has about 16.5k instances. Check client FPS and streaming on a low-end device in step 7.
 
 - The ledge gaps are about 3.2 studs edge to edge with a 5-stud rise, and each route has 11 jumps. Is that "a little parkour" or too long? Tune in step 7.
 - Is the walk from camp to a zone too long now? It is about 260 studs of lowland, the climb, then about 110 studs of plateau forest before the circle edge.
@@ -85,7 +102,7 @@ r ~1150      sheer outer cliff + invisible wall (future layer 2; unclimbable for
 ## Running the builder
 
 Copy the tool to `src/server/_tmp/` (Rojo syncs it). Then in Studio **Edit**, run
-`loadstring(game.ServerScriptService.Server._tmp.BuildZones.Source)()`. Delete `_tmp` afterwards and save the place.
+`task.spawn(loadstring(game.ServerScriptService.Server._tmp.BuildZones.Source))` (watch workspace's `BuildProgress` attribute until `done`). Delete `_tmp` afterwards and save the place.
 Stop any playtest first.
 
 ## Checks (every step)
