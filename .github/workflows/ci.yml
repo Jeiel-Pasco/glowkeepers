@@ -15,6 +15,9 @@ jobs:
         run: |
           curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | bash
           echo "$HOME/.rokit/bin" >> "$GITHUB_PATH"
+        env:
+          # Authenticated release lookup; anonymous API calls get rate-limited (403) on shared runners.
+          GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install pinned tools
         run: rokit install --no-trust-check
