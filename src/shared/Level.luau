@@ -3,7 +3,7 @@
 
 local Level = {}
 
-Level.CAP = 15 -- the slice's cap; the full game is 60
+Level.CAP = 50 -- Lv 1–15 Whispering Woods, 15–30 Raider Wilds, 30–50 Highland Ruins
 Level.POINTS_PER_LEVEL = 3
 Level.STATS = { "health", "power", "defense" }
 Level.BASE_HEALTH = 100

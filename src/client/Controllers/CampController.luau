@@ -1,10 +1,11 @@
 --!strict
--- Your camp's screens, opened from its prompts (CampService builds them):
---   desk   write spells into a grimoire (and pick your element after the tutorial)
---   shelf  choose the 3 equipped grimoires, and spend stat points
---   bank   what's safely banked
---   shop   the Ink Merchant (shared, by the campfire)
--- Prompts on other players' plots are hidden.
+-- Camp Courtyard & Area Quest Giver screens:
+--   desk   6-Tier Black Clover Grimoire Gacha (5★ Stars per roll, with Pity) & Fixed Z/X/C/V
+--          skill unlocking/upgrading with Universal Ink
+--   shelf  Equip up to 3 Grimoires (1/2/3) & allocate Stat Points
+--   bank   Banked Coins, Universal Ink, ★ Stars, and PvP Bounty
+--   shop   Gear & Ink Shop: buy the 4 Visible Gear Categories (Backpack, Robe, Hat, Boots) with Coins!
+--   quest  Black Clover Storyline Area Quest Board (Elder Orsi, Scout Captain, Knight Envoy)
 
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
@@ -14,8 +15,12 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Client = script.Parent.Parent
 local Spells = require(Shared:WaitForChild("Spells")) :: any
 local Element = require(Shared:WaitForChild("Element")) :: any
+local Gears = require(Shared:WaitForChild("Gears")) :: any
 local Level = require(Shared:WaitForChild("Level")) :: any
+local Loot = require(Shared:WaitForChild("Loot")) :: any
+local Quests = require(Shared:WaitForChild("Quests")) :: any
 local Writing = require(Shared:WaitForChild("Writing")) :: any
+local Zones = require(Shared:WaitForChild("Zones")) :: any
 local NetClient = require(Client:WaitForChild("Net"):WaitForChild("NetClient"))
 local Kit = require(Client:WaitForChild("Ui"):WaitForChild("Kit"))
 local StateController = require(script.Parent:WaitForChild("StateController"))
@@ -27,16 +32,13 @@ local gui: ScreenGui
 local open: string? = nil
 local panel: Frame? = nil
 local body: Frame
-local quest: any = nil
-local boosted = false
-local reveal: any = nil -- the last WriteResult, shown on the desk
+local reveal: any = nil
+local questArea: string = "area1"
+
+local KEYS = { "Z", "X", "C", "V" }
 
 local function typeColor(kind: string): Color3
 	return Kit.rgb(Element.COLOR[kind] or Element.COLOR.Neutral)
-end
-
-local function rarityColor(rarity: string): Color3
-	return Kit.rgb(Spells.RARITY_COLOR[rarity] or Spells.RARITY_COLOR.Common)
 end
 
 local function close()
@@ -58,168 +60,134 @@ local function show(name: string, title: string, size: Vector2)
 	render(name)
 end
 
-local function spellLine(page: any): string
-	local spell = Spells.get(page.sp)
-	if spell == nil then
-		return "?"
-	end
-	local c = rarityColor(spell.rarity)
-	return `<font color="#{c:ToHex()}"><b>{spell.name}</b></font> Lv {page.lv}`
-end
-
--- Desk ----------------------------------------------------------------------------------------
-
-local function renderReveal(data: any)
-	local spell = reveal and Spells.get(reveal.spell)
-	if spell == nil then
-		return
-	end
-	local card =
-		Kit.frame(body, UDim2.new(1, 0, 0, 128), UDim2.fromOffset(0, 0), rarityColor(spell.rarity):Lerp(Kit.PANEL, 0.6))
-	local outcome = reveal.outcome
-	local headline = ({
-		added = "New spell written!",
-		level = "Spell levelled up!",
-		maxed = "Already at max level: ink refunded",
-		choose = "Your book is full. Replace a page, or tear this one out",
-		replaced = "Page replaced",
-		torn = `Torn out (+15 coins)`,
-	} :: any)[outcome] or ""
-	Kit.label(
-		card,
-		`<b>{spell.rarity}</b> · {spell.type}`,
-		UDim2.new(1, -16, 0, 20),
-		UDim2.fromOffset(8, 6),
-		14,
-		rarityColor(spell.rarity)
-	)
-	Kit.label(card, `<b>{spell.name}</b>`, UDim2.new(1, -16, 0, 30), UDim2.fromOffset(8, 26), 26)
-	Kit.label(card, spell.blurb, UDim2.new(1, -16, 0, 20), UDim2.fromOffset(8, 58), 14, Kit.MUTED)
-	Kit.label(card, headline, UDim2.new(1, -16, 0, 20), UDim2.fromOffset(8, 80), 15, Kit.GOLD)
-	if outcome == "choose" then
-		local book = data.books[reveal.book]
-		local row = Instance.new("Frame")
-		row.BackgroundTransparency = 1
-		row.Size = UDim2.new(1, -16, 0, 26)
-		row.Position = UDim2.fromOffset(8, 100)
-		row.Parent = card
-		Kit.list(row, 4, true)
-		for i, page in book.pages do
-			local s = Spells.get(page.sp)
-			Kit.button(
-				row,
-				`Replace {s and s.name or "?"}`,
-				UDim2.fromOffset(104, 24),
-				UDim2.new(),
-				Kit.PANEL,
-				function()
-					NetClient.send("WriteResolve", i)
-				end
-			).TextSize =
-				11
-		end
-		Kit.button(row, "Tear out", UDim2.fromOffset(70, 24), UDim2.new(), Kit.BAD, function()
-			NetClient.send("WriteResolve", 0)
-		end).TextSize =
-			12
-	end
-end
+-- Desk (Grimoire Gacha + Fixed Z/X/C/V Skill Unlocks & Upgrades) ------------------------------
 
 local function renderDesk()
 	local data = StateController.get()
 	if data == nil then
 		return
 	end
-	local y = 0
+	local totalInk = Loot.totalInk(data.bank)
+	local stars = data.stars or 0
+	local pity = data.pity or 0
+
+	local gachaCard = Kit.frame(body, UDim2.new(1, 0, 0, 96), UDim2.fromOffset(0, 0), Kit.PANEL_LIGHT)
+	Kit.label(
+		gachaCard,
+		`<b>★ Black Clover Grimoire Gacha</b>   ·   You have <b>{stars}★ Stars</b>   (Pity: {pity}/40)`,
+		UDim2.new(1, -160, 0, 22),
+		UDim2.fromOffset(10, 6),
+		15,
+		Kit.GOLD
+	).TextXAlignment =
+		Enum.TextXAlignment.Left
+	Kit.label(
+		gachaCard,
+		"Common 48% (Fire/Water/Leaf) · Uncommon 26% (Wind/Earth) · Rare 14% (Frost)\nEpic 8% (Lightning) · Legendary 3% (Gravity) · Mythic 1% (4-Leaf Light / 5-Leaf Dark)",
+		UDim2.new(1, -160, 0, 38),
+		UDim2.fromOffset(10, 28),
+		12,
+		Kit.MUTED
+	).TextXAlignment =
+		Enum.TextXAlignment.Left
+
 	if reveal then
-		renderReveal(data)
-		y = 136
+		local book = data.books[reveal.book]
+		local bType = if book then book.type else "Neutral"
+		local clovers = Element.clovers(bType)
+		local rTier = Element.RARITY[bType] or "Common"
+		local spell = Spells.get(reveal.spell)
+		local msg = if reveal.outcome == "rolled"
+			then `NEW! [{rTier}] {clovers}-Leaf {bType} Grimoire!`
+			elseif reveal.outcome == "dupe_book" then `Duplicate {bType} Grimoire → +3 Universal Ink!`
+			else `{if spell then spell.name else ""}: {reveal.outcome}!`
+		Kit.label(gachaCard, `<b>{msg}</b>`, UDim2.new(1, -160, 0, 20), UDim2.fromOffset(10, 70), 14, typeColor(bType)).TextXAlignment =
+			Enum.TextXAlignment.Left
 	end
-	-- The element pick, once the tutorial reaches it.
-	if data.element == "" and quest and quest.index == 6 then
-		Kit.label(
-			body,
-			"<b>Pick your element grimoire</b> (it comes with its first spell)",
-			UDim2.new(1, 0, 0, 22),
-			UDim2.fromOffset(0, y),
-			16,
-			Kit.GOLD
-		)
-		for i, kind in { "Fire", "Water", "Leaf" } do
-			local ready = true
-			local b = Kit.button(
-				body,
-				if ready then `<b>{kind}</b>` else `{kind}\n<font size="11">coming soon</font>`,
-				UDim2.fromOffset(150, 48),
-				UDim2.fromOffset((i - 1) * 160, y + 26),
-				if ready then typeColor(kind) else Kit.PANEL_LIGHT,
-				function()
-					NetClient.send("PickElement", kind)
-				end
-			)
-			if ready then
-				b.TextColor3 = Color3.fromRGB(30, 22, 20)
-			end
-		end
-		y += 84
-	end
-	local boost = Kit.button(
-		body,
-		if boosted
-			then `★ Boosted odds ON ({Writing.STAR_COST}★ per write)`
-			else `Boosted odds off  (you have {data.stars}★)`,
-		UDim2.fromOffset(330, 28),
-		UDim2.fromOffset(0, y),
-		if boosted then Kit.GOLD else Kit.PANEL_LIGHT,
+
+	Kit.button(
+		gachaCard,
+		`<b>Roll Grimoire</b>\n<font size="12">{Element.STAR_ROLL_COST}★ Stars</font>`,
+		UDim2.fromOffset(136, 72),
+		UDim2.new(1, -146, 0, 12),
+		if stars >= Element.STAR_ROLL_COST then Kit.GOLD else Kit.PANEL,
 		function()
-			boosted = not boosted
-			render("desk")
+			NetClient.send("RollGrimoire")
 		end
 	)
-	boost.TextSize = 13
-	y += 36
+
+	Kit.label(
+		body,
+		`<b>Your Grimoires</b> — Spend <b>Universal Ink ({totalInk} banked)</b> to unlock X → C → V & upgrade Lv 1–5`,
+		UDim2.new(1, 0, 0, 22),
+		UDim2.fromOffset(0, 102),
+		14,
+		Kit.TEXT
+	).TextXAlignment =
+		Enum.TextXAlignment.Left
+
 	local scroll = Instance.new("ScrollingFrame")
 	scroll.BackgroundTransparency = 1
-	scroll.Size = UDim2.new(1, 0, 1, -y)
-	scroll.Position = UDim2.fromOffset(0, y)
+	scroll.Size = UDim2.new(1, 0, 1, -128)
+	scroll.Position = UDim2.fromOffset(0, 128)
 	scroll.ScrollBarThickness = 6
 	scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	scroll.CanvasSize = UDim2.new()
 	scroll.Parent = body
-	Kit.list(scroll, 6)
+	Kit.list(scroll, 8)
+
 	for index, book in data.books do
-		local row = Kit.frame(scroll, UDim2.new(1, -10, 0, 74), UDim2.new(), Kit.PANEL_LIGHT)
+		local bType = book.type
+		local clovers = Element.clovers(bType)
+		local rTier = Element.RARITY[bType] or "Common"
+		local passive = Element.PASSIVE[bType]
+		local fixed = Spells.fixedFor(bType)
+		local row = Kit.frame(scroll, UDim2.new(1, -10, 0, 104), UDim2.new(), Kit.PANEL_LIGHT)
 		row.LayoutOrder = index
-		local ink = data.bank.ink[book.type] or 0
+
 		Kit.label(
 			row,
-			`<b>{book.type} grimoire</b>  ·  {ink} ink banked`,
-			UDim2.new(1, -150, 0, 20),
+			`<b>{clovers}-Leaf {bType} Grimoire</b>  <font size="12">[{rTier}]</font>   ·   <font size="12">{if passive
+				then passive.name .. ": " .. passive.blurb
+				else ""}</font>`,
+			UDim2.new(1, -16, 0, 22),
 			UDim2.fromOffset(10, 4),
-			15,
-			typeColor(book.type)
+			14,
+			typeColor(bType)
 		).TextXAlignment =
 			Enum.TextXAlignment.Left
-		local pages = {}
-		for _, page in book.pages do
-			table.insert(pages, spellLine(page))
+
+		for slot = 1, 4 do
+			local spellId = fixed[slot]
+			local spell = spellId and Spells.get(spellId)
+			local page = book.pages[slot]
+			local cost, action = Writing.slotCost(book, slot)
+			local btnTitle = if page and spell
+				then `<b>[{KEYS[slot]}] {spell.name}</b>\n<font size="11">Lv {page.lv}/5 · {if cost
+					then `Upgrade ({cost} Ink)`
+					else "MAX"}</font>`
+				elseif spell then `<b>[{KEYS[slot]}] {spell.name}</b>\n<font size="11">{if action == "unlock"
+						and cost
+					then `Unlock ({cost} Ink)`
+					else "Unlock prev page"}</font>`
+				else `[{KEYS[slot]}]`
+			local canAfford = cost ~= nil and totalInk >= cost
+			local btn = Kit.button(
+				row,
+				btnTitle,
+				UDim2.fromOffset(124, 66),
+				UDim2.fromOffset(8 + (slot - 1) * 130, 30),
+				if page and page.lv >= 5
+					then Kit.GOLD
+					elseif canAfford then Kit.GOOD
+					elseif page then Kit.PANEL
+					else Color3.fromRGB(32, 28, 38),
+				function()
+					NetClient.send("UpgradeSkill", index, slot)
+				end
+			)
+			btn.TextSize = 12
 		end
-		for _ = #book.pages + 1, Writing.PAGES do
-			table.insert(pages, '<font color="#7a7288">blank</font>')
-		end
-		local list = Kit.label(row, table.concat(pages, "   "), UDim2.new(1, -150, 0, 44), UDim2.fromOffset(10, 26), 13)
-		list.TextXAlignment = Enum.TextXAlignment.Left
-		list.TextYAlignment = Enum.TextYAlignment.Top
-		Kit.button(
-			row,
-			if ink > 0 then 'Write\n<font size="11">1 ink</font>' else "No ink",
-			UDim2.fromOffset(120, 54),
-			UDim2.new(1, -130, 0, 10),
-			if ink > 0 then Kit.GOOD else Kit.PANEL,
-			function()
-				NetClient.send("Write", index, boosted)
-			end
-		)
 	end
 end
 
@@ -230,7 +198,6 @@ local function renderShelf()
 	if data == nil then
 		return
 	end
-	-- Stats.
 	local spent = data.stats.health + data.stats.power + data.stats.defense
 	local free = Level.pointsEarned(data.level) - spent
 	Kit.label(body, `<b>Stat points</b>: {free} free`, UDim2.new(1, 0, 0, 22), UDim2.fromOffset(0, 0), 16, Kit.GOLD).TextXAlignment =
@@ -273,10 +240,9 @@ local function renderShelf()
 	end).TextSize =
 		13
 
-	-- Grimoires.
 	Kit.label(
 		body,
-		"<b>Grimoires</b>: equip up to 3 (keys 1 2 3 swap between them)",
+		"<b>Grimoires</b>: equip up to 3 (keys 1 2 3 swap active book & defensive element)",
 		UDim2.new(1, 0, 0, 22),
 		UDim2.fromOffset(0, 106),
 		15,
@@ -293,12 +259,16 @@ local function renderShelf()
 	scroll.Parent = body
 	Kit.list(scroll, 6)
 	for index, book in data.books do
-		local row = Kit.frame(scroll, UDim2.new(1, -10, 0, 50), UDim2.new(), Kit.PANEL_LIGHT)
+		local row = Kit.frame(scroll, UDim2.new(1, -10, 0, 52), UDim2.new(), Kit.PANEL_LIGHT)
 		row.LayoutOrder = index
 		local slot = table.find(data.equipped, index)
+		local clovers = Element.clovers(book.type)
+		local rTier = Element.RARITY[book.type] or "Common"
 		Kit.label(
 			row,
-			`<b>{book.type}</b>  {#book.pages}/4 pages{if slot then `  ·  slot {slot}` else ""}`,
+			`<b>{clovers}-Leaf {book.type}</b> [{rTier}]  ·  {#book.pages}/4 skills{if slot
+				then `  ·  Slot {slot}`
+				else ""}`,
 			UDim2.new(1, -200, 1, 0),
 			UDim2.fromOffset(10, 0),
 			15,
@@ -310,7 +280,7 @@ local function renderShelf()
 				row,
 				`Slot {s}`,
 				UDim2.fromOffset(58, 30),
-				UDim2.new(1, -190 + (s - 1) * 62, 0, 10),
+				UDim2.new(1, -190 + (s - 1) * 62, 0, 11),
 				if slot == s then Kit.GOLD else Kit.PANEL,
 				function()
 					NetClient.send("EquipBook", s, index)
@@ -321,71 +291,167 @@ local function renderShelf()
 	end
 end
 
--- Bank and shop ---------------------------------------------------------------------------------
+-- Bank ---------------------------------------------------------------------------------------
 
 local function renderBank()
 	local data = StateController.get()
 	if data == nil then
 		return
 	end
-	local lines = { `Coins <b>{data.bank.coins}</b> coins`, `★ <b>{data.stars}</b> stars` }
-	for kind, n in data.bank.ink do
-		if n > 0 then
-			table.insert(lines, `<b>{n}</b> {kind} ink`)
-		end
-	end
-	for kind, n in data.bank.frag do
-		if n > 0 then
-			table.insert(
-				lines,
-				`<b>{n}</b> {kind} binding fragment{if n == 1 then "" else "s"} (binding arrives later)`
-			)
-		end
-	end
+	local gStats = Gears.stats(data.gears)
+	local lines = {
+		`Coins: <b>{data.bank.coins}</b> Banked Coins  (for buying Gears)`,
+		`Universal Ink: <b>{Loot.totalInk(data.bank)}</b> Banked Ink  (for unlocking/upgrading Z/X/C/V skills)`,
+		`Stars: <b>{data.stars}★</b> Stars  (for rolling Grimoires at the Desk)`,
+		`PvP Bounty: <b>{data.bounty or 0}</b>`,
+		`Backpack Capacity: <b>{Loot.weight(data.carried)} / {gStats.capacity}</b>`,
+	}
 	Kit.label(body, table.concat(lines, "\n"), UDim2.new(1, 0, 1, -40), UDim2.new(), 16).TextYAlignment =
 		Enum.TextYAlignment.Top
 	Kit.label(
 		body,
-		"Banked loot is safe. Carried loot can be dropped or stolen.",
+		"Walk a 100% Full Backpack through the Camp Gate for a +15% Coin Bonus!",
 		UDim2.new(1, 0, 0, 30),
 		UDim2.new(0, 0, 1, -30),
 		13,
-		Kit.MUTED
+		Kit.GOLD
 	)
 end
+
+-- Shop (4 Visible Gear Categories + Universal Ink) ------------------------------------------
 
 local function renderShop()
 	local data = StateController.get()
 	if data == nil then
 		return
 	end
-	Kit.label(body, `You have Coins <b>{data.bank.coins}</b> banked coins`, UDim2.new(1, 0, 0, 22), UDim2.new(), 16)
-	local items = {
-		{ "ink_Neutral", "Neutral ink", 40, true },
-		{ "ink_Fire", "Fire ink", 80, data.element == "Fire" },
-		{ "ink_Water", "Water ink", 80, data.element == "Water" },
-		{ "ink_Leaf", "Leaf ink", 80, data.element == "Leaf" },
-	}
-	for i, item in items do
-		local row = Kit.frame(body, UDim2.new(1, 0, 0, 50), UDim2.fromOffset(0, 30 + (i - 1) * 58), Kit.PANEL_LIGHT)
+	local gears = data.gears or { backpack = 1, robe = 0, hat = 0, boots = 0 }
+	Kit.label(
+		body,
+		`You have <b>{data.bank.coins} Banked Coins</b> — Upgrade your 4 Visible Wizard Gears!`,
+		UDim2.new(1, 0, 0, 22),
+		UDim2.new(),
+		15,
+		Kit.GOLD
+	).TextXAlignment =
+		Enum.TextXAlignment.Left
+
+	for i, category in Gears.CATEGORIES do
+		local curTier = gears[category] or 0
+		local curItem = Gears.get(category, curTier)
+		local nextItem = Gears.nextTier(category, curTier)
+		local row = Kit.frame(body, UDim2.new(1, 0, 0, 64), UDim2.fromOffset(0, 28 + (i - 1) * 70), Kit.PANEL_LIGHT)
+
+		local title =
+			`<b>{Gears.LABELS[category]}</b>: {if curItem then `{curItem.name} (Tier {curTier})` else "None equipped"}`
+		local sub = if nextItem
+			then `Next: <b>{nextItem.name}</b> — {nextItem.blurb}`
+			else `MAX TIER: {if curItem then curItem.blurb else ""}`
+		Kit.label(row, title, UDim2.new(1, -150, 0, 22), UDim2.fromOffset(10, 6), 15).TextXAlignment =
+			Enum.TextXAlignment.Left
+		Kit.label(row, sub, UDim2.new(1, -150, 0, 30), UDim2.fromOffset(10, 28), 12, Kit.MUTED).TextXAlignment =
+			Enum.TextXAlignment.Left
+
+		Kit.button(
+			row,
+			if nextItem then `Buy\n<b>{nextItem.price} Coins</b>` else "MAXED",
+			UDim2.fromOffset(124, 46),
+			UDim2.new(1, -134, 0, 9),
+			if nextItem and data.bank.coins >= nextItem.price
+				then Kit.GOOD
+				elseif nextItem == nil then Kit.GOLD
+				else Kit.PANEL,
+			function()
+				if nextItem then
+					NetClient.send("BuyGear", category)
+				end
+			end
+		).TextSize =
+			13
+	end
+
+	local inkRow = Kit.frame(body, UDim2.new(1, 0, 0, 48), UDim2.fromOffset(0, 310), Kit.PANEL_LIGHT)
+	Kit.label(
+		inkRow,
+		"<b>Universal Magic Ink</b>  (Unlocks & upgrades Z/X/C/V skills on any Grimoire)",
+		UDim2.new(1, -150, 1, 0),
+		UDim2.fromOffset(10, 0),
+		14
+	).TextXAlignment =
+		Enum.TextXAlignment.Left
+	Kit.button(
+		inkRow,
+		"Buy 1 Ink\n<b>40 Coins</b>",
+		UDim2.fromOffset(124, 36),
+		UDim2.new(1, -134, 0, 6),
+		if data.bank.coins >= 40 then Kit.GOOD else Kit.PANEL,
+		function()
+			NetClient.send("Buy", "ink_Neutral")
+		end
+	).TextSize =
+		12
+end
+
+-- Quest Giver Board (Black Clover Storyline Arcs) ------------------------------------------
+
+local function renderQuestBoard()
+	local data = StateController.get()
+	if data == nil then
+		return
+	end
+	local npc = Quests.NPCS[questArea] or Quests.NPCS.area1
+	local list = Quests.forArea(questArea)
+	local activeId = data.activeQuest and data.activeQuest.id or ""
+
+	Kit.label(
+		body,
+		`<b>{npc.name}</b>  ·  {npc.arc}  (Your Level: {data.level})`,
+		UDim2.new(1, 0, 0, 22),
+		UDim2.new(),
+		15,
+		Kit.GOLD
+	).TextXAlignment =
+		Enum.TextXAlignment.Left
+
+	for i, q in list do
+		local row = Kit.frame(body, UDim2.new(1, 0, 0, 96), UDim2.fromOffset(0, 30 + (i - 1) * 104), Kit.PANEL_LIGHT)
+		local unlocked = data.level >= q.minLevel
+		local isActive = activeId == q.id
 		Kit.label(
 			row,
-			`<b>{item[2]}</b>{if item[4] then "" else "  (your element only)"}`,
-			UDim2.new(1, -140, 1, 0),
-			UDim2.fromOffset(10, 0),
-			15
+			`<b>{q.title}</b>  <font size="12">(Lv {q.minLevel}+)</font>  ·  {q.text}`,
+			UDim2.new(1, -140, 0, 22),
+			UDim2.fromOffset(10, 6),
+			14,
+			if unlocked then Kit.TEXT else Kit.MUTED
+		).TextXAlignment =
+			Enum.TextXAlignment.Left
+		Kit.label(row, q.story, UDim2.new(1, -140, 0, 32), UDim2.fromOffset(10, 28), 12, Kit.MUTED).TextXAlignment =
+			Enum.TextXAlignment.Left
+		Kit.label(
+			row,
+			`Reward: <b>{q.reward.xp} XP</b> · <b>{q.reward.coins} Coins</b> · <b>+{q.reward.stars}★ Stars</b>{if q.reward.ink
+				then ` · +{q.reward.ink} Ink`
+				else ""}`,
+			UDim2.new(1, -140, 0, 20),
+			UDim2.fromOffset(10, 66),
+			12,
+			Kit.GOLD
 		).TextXAlignment =
 			Enum.TextXAlignment.Left
 		Kit.button(
 			row,
-			`Coins {item[3]}`,
-			UDim2.fromOffset(110, 34),
-			UDim2.new(1, -120, 0, 8),
-			if item[4] and data.bank.coins >= item[3] then Kit.GOOD else Kit.PANEL,
+			if isActive then "ACTIVE" elseif unlocked then "Accept" else `Lv {q.minLevel}`,
+			UDim2.fromOffset(114, 48),
+			UDim2.new(1, -124, 0, 24),
+			if isActive then Kit.GOLD elseif unlocked then Kit.GOOD else Kit.PANEL,
 			function()
-				NetClient.send("Buy", item[1])
+				if unlocked and not isActive then
+					NetClient.send("AcceptQuest", q.id)
+				end
 			end
-		)
+		).TextSize =
+			14
 	end
 end
 
@@ -402,29 +468,18 @@ render = function(name: string)
 		renderBank()
 	elseif name == "shop" then
 		renderShop()
+	elseif name == "quest" then
+		renderQuestBoard()
 	end
 end
 
 local TITLES = {
-	desk = { "Writing desk", Vector2.new(520, 470) },
-	shelf = { "Shelf: grimoires & stats", Vector2.new(520, 420) },
-	bank = { "Bank", Vector2.new(400, 300) },
-	shop = { "Ink Merchant", Vector2.new(400, 320) },
+	desk = { "Scriptorium Desk: Grimoire Gacha & Skills", Vector2.new(560, 500) },
+	shelf = { "Grimoire Shelf & Wizard Stats", Vector2.new(540, 430) },
+	bank = { "Camp Bank Vault", Vector2.new(440, 310) },
+	shop = { "Wizard Gear & Ink Merchant", Vector2.new(520, 410) },
+	quest = { "Magic Knight Quest Board", Vector2.new(540, 400) },
 } :: { [string]: { any } }
-
--- Prompts on plots that aren't yours stay hidden.
-local function gate(prompt: Instance)
-	if not prompt:IsA("ProximityPrompt") then
-		return
-	end
-	local plot: Instance? = prompt.Parent
-	while plot and plot:GetAttribute("PlotId") == nil do
-		plot = plot.Parent
-	end
-	if plot then
-		prompt.Enabled = plot:GetAttribute("OwnerId") == player.UserId
-	end
-end
 
 function CampController.Init()
 	gui = Kit.screen("Camp", 5)
@@ -434,6 +489,8 @@ function CampController.Init()
 		if title then
 			if action == "desk" then
 				reveal = nil
+			elseif action == "quest" then
+				questArea = tostring(prompt:GetAttribute("AreaId") or "area1")
 			end
 			show(action :: string, title[1], title[2])
 		end
@@ -441,12 +498,6 @@ function CampController.Init()
 	StateController.Changed:Connect(function()
 		if open then
 			render(open)
-		end
-	end)
-	NetClient.on("Quest", function(view: any)
-		quest = view
-		if open == "desk" then
-			render("desk")
 		end
 	end)
 	NetClient.on("WriteResult", function(outcome: string, spell: string, book: number)
@@ -458,27 +509,12 @@ function CampController.Init()
 end
 
 function CampController.Start()
-	local plots = workspace:WaitForChild("Map"):WaitForChild("Plots")
-	for _, d in plots:GetDescendants() do
-		gate(d)
-	end
-	plots.DescendantAdded:Connect(function(d)
-		task.defer(gate, d)
-	end)
-	for _, plot in plots:GetChildren() do
-		plot:GetAttributeChangedSignal("OwnerId"):Connect(function()
-			for _, d in plot:GetDescendants() do
-				gate(d)
-			end
-		end)
-	end
-	-- Walking away closes the panel.
 	while true do
 		task.wait(0.5)
 		local character = player.Character
-		if open and character then
+		if open and open ~= "quest" and character then
 			local pos = character:GetPivot().Position
-			if Vector2.new(pos.X, pos.Z).Magnitude > 150 then
+			if Vector2.new(pos.X, pos.Z).Magnitude > Zones.CAMP_R + 10 then
 				close()
 			end
 		end

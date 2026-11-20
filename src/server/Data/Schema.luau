@@ -63,15 +63,19 @@ function Schema.template(): any
 		level = 1,
 		xp = 0,
 		stats = { health = 0, power = 0, defense = 0 }, -- stat points spent
-		books = { { type = "Neutral", pages = {} } }, -- grimoires; pages = { { sp, lv } }
+		books = { { type = "Neutral", pages = { { sp = "arcane_bolt", lv = 1 } } } }, -- Page 1 (Z) starts unlocked!
 		equipped = { 1, 0, 0 }, -- book index per equipped slot (0 = empty)
 		active = 1, -- the equipped slot in hand
-		bank = { coins = 0, ink = { Neutral = 1 }, frag = {} }, -- one free ink for the first write
-		carried = bag(), -- picked up on this trip; banked at camp
-		stars = 0,
-		element = "", -- the starter element, once picked
-		quest = { step = 1, n = 0 }, -- the tutorial chain (Shared.Quests); step past the end = done
-		counts = { kills = 0, deaths = 0, bosses = 0, writes = 0 },
+		bank = { coins = 0, ink = { Universal = 2 }, frag = {} }, -- 2 starter Ink to unlock Page 2 (X)
+		carried = bag(), -- in your Backpack; banked at camp
+		stars = 5, -- 5 starter Stars for your first Grimoire Gacha roll
+		pity = 0, -- Grimoire Gacha pity counter
+		bounty = 0, -- PvP Bounty
+		gears = { backpack = 1, robe = 0, hat = 0, boots = 0 }, -- 4 visible Gear slots bought with Coins
+		element = "", -- first rolled/picked element
+		quest = { step = 1, n = 0 }, -- active tutorial/story quest
+		activeQuest = { id = "a1_wisps", n = 0 }, -- selected Area Quest Giver quest
+		counts = { kills = 0, deaths = 0, bosses = 0, writes = 0, rolls = 0 },
 		firstJoin = 0,
 		lastSeen = 0,
 		playSeconds = 0,
@@ -171,7 +175,7 @@ end
 function Schema.repair(data: any): { string }
 	local notes = {}
 	repairShape(data, Schema.template(), "", notes)
-	data.level = math.clamp(data.level, 1, 60)
+	data.level = math.clamp(data.level, 1, 50)
 	data.bank = cleanBag(data.bank)
 	data.carried = cleanBag(data.carried)
 	-- Books: a known type and at most 4 well-formed pages each.
@@ -196,10 +200,14 @@ function Schema.repair(data: any): { string }
 		end
 	end
 	if #books == 0 then
-		books = { { type = "Neutral", pages = {} } }
+		books = { { type = "Neutral", pages = { { sp = "arcane_bolt", lv = 1 } } } }
 		table.insert(notes, "books: none left, reset to a Neutral grimoire")
 	end
 	data.books = books
+	data.gears.backpack = math.clamp(data.gears.backpack, 1, 5)
+	data.gears.robe = math.clamp(data.gears.robe, 0, 4)
+	data.gears.hat = math.clamp(data.gears.hat, 0, 4)
+	data.gears.boots = math.clamp(data.gears.boots, 0, 4)
 	local equipped = {}
 	for i = 1, 3 do
 		local index = data.equipped[i]

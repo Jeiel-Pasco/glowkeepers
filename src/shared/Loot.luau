@@ -1,8 +1,9 @@
 --!strict
--- Carried and banked loot (GDD "Loot, camp and risk"). Pure.
+-- Carried and banked loot + Capped Backpack math & Universal Ink helpers. Pure.
 --
--- A bag is { coins, ink = { [type]: n }, frag = { [type]: n } }. What you pick up on a trip is
--- carried until you bank it at your camp. Death drops half of it; a raider's hit steals some.
+-- A bag is { coins, ink = { [type]: n }, frag = { [type]: n } }. What you pick up on a trip goes
+-- into your Backpack (carried) up to your Backpack Gear's capacity until you bank it at Camp.
+-- Walking a 100% full Backpack into Camp grants +15% bonus Coins.
 
 local Loot = {}
 
@@ -13,6 +14,9 @@ Loot.RAIDER_SHARE = 0.25 -- of each carried thing, per raider hit
 Loot.RAIDER_BONUS = 0.1 -- the victim gets this much extra back
 Loot.RAIDER_MIN_CARRY = 20 -- raiders only chase players carrying at least this value
 Loot.INK_VALUE = 10 -- coins an ink is "worth" when raiders pick targets
+Loot.FULL_BAG_BONUS = 0.15 -- +15% bonus coins when walking a full Backpack home on foot
+Loot.COINS_PER_WEIGHT = 10 -- 10 coins = 1 Backpack weight unit
+Loot.INK_WEIGHT = 2 -- 1 Ink = 2 Backpack weight units
 
 function Loot.empty(): Bag
 	return { coins = 0, ink = {}, frag = {} }
@@ -44,7 +48,59 @@ function Loot.isEmpty(bag: Bag): boolean
 	return true
 end
 
--- A rough value, for raiders choosing whom to chase.
+-- Total Universal Ink in a bag (sums across "Universal" and any legacy element keys).
+function Loot.totalInk(bag: Bag): number
+	local total = 0
+	for _, n in bag.ink do
+		if n > 0 then
+			total += n
+		end
+	end
+	return total
+end
+
+-- Spends `amount` Universal Ink from `bag.ink` in place. Returns true if spent.
+function Loot.spendInk(bag: Bag, amount: number): boolean
+	if amount <= 0 then
+		return true
+	end
+	if Loot.totalInk(bag) < amount then
+		return false
+	end
+	local left = amount
+	local keys = {}
+	for k, n in bag.ink do
+		if n > 0 then
+			table.insert(keys, k)
+		end
+	end
+	table.sort(keys)
+	for _, k in keys do
+		local have = bag.ink[k] or 0
+		local use = math.min(have, left)
+		bag.ink[k] = have - use
+		if bag.ink[k] <= 0 then
+			bag.ink[k] = nil
+		end
+		left -= use
+		if left <= 0 then
+			break
+		end
+	end
+	return true
+end
+
+-- Backpack weight units currently used by `bag`.
+function Loot.weight(bag: Bag): number
+	local coinUnits = if bag.coins > 0 then math.ceil(bag.coins / Loot.COINS_PER_WEIGHT) else 0
+	return coinUnits + Loot.totalInk(bag) * Loot.INK_WEIGHT
+end
+
+function Loot.isFull(bag: Bag, capacity: number): boolean
+	return Loot.weight(bag) >= capacity
+end
+
+-- Rough value for raiders choosing whom to chase.
 function Loot.value(bag: Bag): number
 	local v = bag.coins
 	for _, n in bag.ink do

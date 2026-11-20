@@ -1,15 +1,11 @@
 --!strict
--- Combat on the client: input, aim, the movement half of dash and blink, and every combat
--- effect the server's Fx describes. Damage itself is the server's (CombatService).
---
---   Click (hold)   the book's basic attack toward the mouse
---   Z X C V        the book's four spells
---   Q              dodge dash (brief invulnerability)
---   1 2 3          swap the book in hand
---   R              Recall to camp (5 s, broken by damage)
---
--- Your own bolts are drawn the moment you click (the server's copy of them is skipped), so
--- shots feel instant; everything else is drawn when the server's Fx arrives.
+-- Combat on the client:
+--   * 4-hit elemental M1 combo (Click) & 4 fixed skills (Z, X, C, V)
+--   * Q Dodge Dash (scaled by Boots Gear) & 1/2/3 Grimoire hot-swap (1.5 s swap cooldown)
+--   * Floating 3D Black Clover Grimoire hovering beside each player's right hand (3-Leaf,
+--     Golden 4-Leaf Light, or Crimson-Black 5-Leaf Dark)
+--   * 4 Visible 3D Low-Poly Gears worn by each player (Backpack that bulges/glows when full,
+--     Robe/Cloak, Wizard Hat/Crown, and Boots).
 
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
@@ -24,22 +20,26 @@ local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
 local Spells = require(Shared:WaitForChild("Spells")) :: any
 local Status = require(Shared:WaitForChild("Status")) :: any
 local Element = require(Shared:WaitForChild("Element")) :: any
+local Gears = require(Shared:WaitForChild("Gears")) :: any
+local CombatRules = require(Shared:WaitForChild("CombatRules")) :: any
 local NetClient = require(Client:WaitForChild("Net"):WaitForChild("NetClient"))
 local StateController = require(script.Parent:WaitForChild("StateController"))
 
 local CombatController = {}
-CombatController.Cast = Signal.new() -- (slot, readyAt): a spell went on cooldown (the HUD's bar)
-CombatController.Dashed = Signal.new() -- (readyAt)
+CombatController.Cast = Signal.new()
+CombatController.Dashed = Signal.new()
 
 CombatController.SPELL_KEYS = { Enum.KeyCode.Z, Enum.KeyCode.X, Enum.KeyCode.C, Enum.KeyCode.V }
 CombatController.BOOK_KEYS = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three }
 CombatController.DASH_COOLDOWN = 2.4
+CombatController.SWAP_COOLDOWN = 1.5
 
 local player = Players.LocalPlayer
 local fxFolder: Folder
 local ready: { [string]: number } = {}
 local durations: { [string]: number } = {}
 local mouseDown = false
+local combo, comboT = 0, -1e9 -- M1 combo mirror (CombatRules.comboStep)
 local shake = 0
 
 local function typeColor(kind: string): Color3
@@ -67,7 +67,7 @@ local function activeBook(): any?
 	return data.books[data.equipped[data.active]]
 end
 
--- Aim: where the mouse points in the world (enemies count, your own character doesn't).
+-- Aim: where the mouse points in the world.
 local aimParams = RaycastParams.new()
 aimParams.FilterType = Enum.RaycastFilterType.Exclude
 local function aimPoint(): Vector3
@@ -81,6 +81,218 @@ local function aimPoint(): Vector3
 	aimParams.FilterDescendantsInstances = exclude
 	local hit = workspace:Raycast(ray.Origin, ray.Direction * 400, aimParams)
 	return if hit then hit.Position else ray.Origin + ray.Direction * 400
+end
+
+-- 3D Floating Grimoire & 4 Visible Gears on Characters --------------------------------------
+
+local function weldPiece(
+	parent: Instance,
+	anchor: BasePart,
+	size: Vector3,
+	offset: CFrame,
+	color: Color3,
+	material: Enum.Material?,
+	shape: Enum.PartType?
+): Part
+	local p = Instance.new("Part")
+	p.Size = size
+	p.Shape = shape or Enum.PartType.Block
+	p.Color = color
+	p.Material = material or Enum.Material.SmoothPlastic
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Massless = true
+	p.CastShadow = false
+	p.CFrame = anchor.CFrame * offset
+	local w = Instance.new("WeldConstraint")
+	w.Part0 = anchor
+	w.Part1 = p
+	w.Parent = p
+	p.Parent = parent
+	return p
+end
+
+local function refreshCharacterVisuals(character: Model)
+	local hrp = character:WaitForChild("HumanoidRootPart", 5)
+	if hrp == nil or not hrp:IsA("BasePart") then
+		return
+	end
+	local old = character:FindFirstChild("WizardVisuals")
+	if old then
+		old:Destroy()
+	end
+	local folder = Instance.new("Model")
+	folder.Name = "WizardVisuals"
+	folder.Parent = character
+
+	-- 1. Floating open Black Clover Grimoire beside the right hand.
+	local bookType = tostring(character:GetAttribute("ActiveBook") or "Neutral")
+	local clovers = Element.clovers(bookType)
+	local coverColor = typeColor(bookType)
+	local bookOffset = CFrame.new(2.3, 0.4, -1.6) * CFrame.Angles(math.rad(-25), math.rad(15), 0)
+	weldPiece(
+		folder,
+		hrp,
+		Vector3.new(1.5, 0.18, 1.15),
+		bookOffset,
+		coverColor:Lerp(Color3.fromRGB(35, 28, 30), 0.35),
+		Enum.Material.SmoothPlastic
+	)
+	weldPiece(
+		folder,
+		hrp,
+		Vector3.new(1.36, 0.14, 1.0),
+		bookOffset * CFrame.new(0, 0.12, 0),
+		Color3.fromRGB(244, 234, 210),
+		Enum.Material.SmoothPlastic
+	)
+	local cloverColor = if clovers == 5
+		then Color3.fromRGB(230, 50, 80)
+		elseif clovers == 4 then Color3.fromRGB(255, 225, 110)
+		else coverColor
+	local emblem = weldPiece(
+		folder,
+		hrp,
+		Vector3.new(0.45, 0.22, 0.45),
+		bookOffset * CFrame.new(0, 0.12, 0),
+		cloverColor,
+		Enum.Material.Neon,
+		Enum.PartType.Ball
+	)
+	if clovers >= 4 then
+		local light = Instance.new("PointLight")
+		light.Color = cloverColor
+		light.Range = 10
+		light.Brightness = 1.3
+		light.Parent = emblem
+	end
+
+	-- 2. Visible 3D Backpack Gear (bulges & glows when BagFull == true).
+	local bpTier = tonumber(character:GetAttribute("GearBackpack")) or 1
+	local bpSpec = Gears.get("backpack", bpTier) or Gears.TIERS.backpack[1]
+	local bagFull = character:GetAttribute("BagFull") == true
+	local bpScale = (1 + (bpTier - 1) * 0.1) * (if bagFull then 1.22 else 1)
+	local bpColor = Color3.fromRGB(bpSpec.color[1], bpSpec.color[2], bpSpec.color[3])
+	local bpAccent = Color3.fromRGB(bpSpec.accent[1], bpSpec.accent[2], bpSpec.accent[3])
+	local pack = weldPiece(
+		folder,
+		hrp,
+		Vector3.new(1.7, 1.9, 1.05) * bpScale,
+		CFrame.new(0, 0.2, 1.05),
+		bpColor,
+		Enum.Material.Fabric
+	)
+	local clasp = weldPiece(
+		folder,
+		hrp,
+		Vector3.new(0.5, 0.4, 0.2) * bpScale,
+		CFrame.new(0, 0.4, 1.6 * bpScale),
+		if bagFull then Color3.fromRGB(255, 215, 80) else bpAccent,
+		if bagFull then Enum.Material.Neon else Enum.Material.Metal
+	)
+	if bagFull then
+		local l = Instance.new("PointLight")
+		l.Color = Color3.fromRGB(255, 210, 90)
+		l.Range = 11
+		l.Brightness = 1.2
+		l.Parent = clasp
+		pack.Color = bpColor:Lerp(Color3.fromRGB(255, 200, 90), 0.2)
+	end
+
+	-- 3. Visible 3D Robe / Cloak Gear.
+	local robeTier = tonumber(character:GetAttribute("GearRobe")) or 0
+	local robeSpec = Gears.get("robe", robeTier)
+	if robeSpec then
+		local rColor = Color3.fromRGB(robeSpec.color[1], robeSpec.color[2], robeSpec.color[3])
+		local rAccent = Color3.fromRGB(robeSpec.accent[1], robeSpec.accent[2], robeSpec.accent[3])
+		weldPiece(folder, hrp, Vector3.new(2.5, 0.45, 1.4), CFrame.new(0, 1.35, 0.1), rColor, Enum.Material.Fabric)
+		weldPiece(
+			folder,
+			hrp,
+			Vector3.new(2.3, 2.8, 0.2),
+			CFrame.new(0, -0.1, 0.85) * CFrame.Angles(0.14, 0, 0),
+			rColor,
+			Enum.Material.Fabric
+		)
+		weldPiece(folder, hrp, Vector3.new(2.55, 0.18, 1.45), CFrame.new(0, 1.5, 0.1), rAccent, Enum.Material.Fabric)
+	end
+
+	-- 4. Visible 3D Wizard Hat / Crown Gear.
+	local hatTier = tonumber(character:GetAttribute("GearHat")) or 0
+	local hatSpec = Gears.get("hat", hatTier)
+	local head = character:FindFirstChild("Head")
+	if hatSpec and head and head:IsA("BasePart") then
+		local hColor = Color3.fromRGB(hatSpec.color[1], hatSpec.color[2], hatSpec.color[3])
+		local hAccent = Color3.fromRGB(hatSpec.accent[1], hatSpec.accent[2], hatSpec.accent[3])
+		weldPiece(
+			folder,
+			head,
+			Vector3.new(0.25, 2.5, 2.5),
+			CFrame.new(0, 0.65, 0) * CFrame.Angles(0, 0, math.pi / 2),
+			hColor,
+			Enum.Material.Fabric,
+			Enum.PartType.Cylinder
+		)
+		weldPiece(folder, head, Vector3.new(1.3, 1.5, 1.3), CFrame.new(0, 1.35, 0), hColor, Enum.Material.Fabric)
+		weldPiece(
+			folder,
+			head,
+			Vector3.new(0.85, 1.1, 0.85),
+			CFrame.new(0, 2.3, 0.2) * CFrame.Angles(-0.25, 0, 0),
+			hColor,
+			Enum.Material.Fabric
+		)
+		weldPiece(
+			folder,
+			head,
+			Vector3.new(1.36, 0.25, 1.36),
+			CFrame.new(0, 0.82, 0),
+			hAccent,
+			if hatTier >= 3 then Enum.Material.Neon else Enum.Material.Fabric
+		)
+	end
+
+	-- 5. Visible 3D Boots Gear.
+	local bootsTier = tonumber(character:GetAttribute("GearBoots")) or 0
+	local bootsSpec = Gears.get("boots", bootsTier)
+	if bootsSpec then
+		local bColor = Color3.fromRGB(bootsSpec.color[1], bootsSpec.color[2], bootsSpec.color[3])
+		local bAccent = Color3.fromRGB(bootsSpec.accent[1], bootsSpec.accent[2], bootsSpec.accent[3])
+		for _, x in { -0.55, 0.55 } do
+			weldPiece(
+				folder,
+				hrp,
+				Vector3.new(0.95, 0.7, 1.15),
+				CFrame.new(x, -2.4, -0.05),
+				bColor,
+				Enum.Material.Fabric
+			)
+			weldPiece(
+				folder,
+				hrp,
+				Vector3.new(1.0, 0.2, 1.2),
+				CFrame.new(x, -2.0, -0.05),
+				bAccent,
+				Enum.Material.SmoothPlastic
+			)
+		end
+	end
+end
+
+local function watchCharacterVisuals(p: Player)
+	local function bind(character: Model)
+		task.defer(refreshCharacterVisuals, character)
+		for _, attr in { "ActiveBook", "Clovers", "GearBackpack", "GearRobe", "GearHat", "GearBoots", "BagFull" } do
+			character:GetAttributeChangedSignal(attr):Connect(function()
+				refreshCharacterVisuals(character)
+			end)
+		end
+	end
+	if p.Character then
+		bind(p.Character)
+	end
+	p.CharacterAdded:Connect(bind)
 end
 
 -- Effects ------------------------------------------------------------------------------------
@@ -165,7 +377,6 @@ local function impact(at: Vector3, color: Color3, size: number)
 	sparks(at, color, 8, 22)
 end
 
--- A travelling bolt, drawn locally; it stops at the first thing it touches.
 local boltParams = RaycastParams.new()
 boltParams.FilterType = Enum.RaycastFilterType.Exclude
 local function drawBolt(
@@ -208,10 +419,6 @@ local function drawBolt(
 		if enemies then
 			table.insert(exclude, enemies)
 		end
-	end
-	local emberfall = workspace:FindFirstChild("Emberfall")
-	if emberfall then
-		table.insert(exclude, emberfall)
 	end
 	boltParams.FilterDescendantsInstances = exclude
 	local params = boltParams
@@ -257,7 +464,6 @@ local function blast(at: Vector3, radius: number, color: Color3)
 	addShake(0.6, at)
 end
 
--- A telegraph: a faint disc whose bright ring fills in over `delay`.
 local function telegraph(at: Vector3, radius: number, delay: number, color: Color3)
 	local base = disc(at, radius, color, 0.75)
 	local fill = disc(at + Vector3.new(0, 0.05, 0), 0.5, color, 0.4)
@@ -272,8 +478,6 @@ local function telegraph(at: Vector3, radius: number, delay: number, color: Colo
 	Debris:AddItem(fill, delay)
 end
 
--- A line telegraph: a faint strip on the ground whose bright core fills from the start over
--- `delay`, the way `telegraph` fills a disc.
 local function lineTelegraph(origin: Vector3, dir: Vector3, length: number, width: number, delay: number, color: Color3)
 	local flat = if dir.Magnitude > 0.01 then dir.Unit else Vector3.zAxis
 	local base = CFrame.lookAt(origin, origin + flat) + Vector3.new(0, 0.15, 0)
@@ -388,7 +592,7 @@ local function onFx(kind: string, ...: any)
 	local a = { ... }
 	if kind == "bolt" then
 		if a[1] == player.UserId then
-			return -- drawn already
+			return
 		end
 		drawBolt(a[1], Vector3.new(a[2], a[3], a[4]), Vector3.new(a[5], a[6], a[7]), a[8], a[9], a[10], a[11])
 	elseif kind == "impact" then
@@ -409,7 +613,6 @@ local function onFx(kind: string, ...: any)
 		local at = Vector3.new(a[1], a[2], a[3])
 		local color = typeColor(a[5])
 		telegraph(at, a[4], a[6], color)
-		-- A meteor falling in on time.
 		local rock = fxPart(Vector3.one * 5, CFrame.new(at + Vector3.new(-20, 80, 0)), color, Enum.PartType.Ball)
 		local fire = Instance.new("Fire")
 		fire.Size = 10
@@ -580,7 +783,7 @@ local function moveDirection(): Vector3
 	return if flat.Magnitude > 0.1 then flat.Unit else Vector3.zAxis
 end
 
-local function blink(distance: number)
+local function blink(distance: number, backstab: boolean?)
 	local r = root()
 	local character = player.Character
 	if r == nil or character == nil then
@@ -592,7 +795,12 @@ local function blink(distance: number)
 	params.FilterDescendantsInstances = { character, fxFolder }
 	local hit = workspace:Raycast(r.Position, dir * distance, params)
 	local travel = if hit then math.max(0, hit.Distance - 2) else distance
-	character:PivotTo(CFrame.lookAt(r.Position + dir * travel, r.Position + dir * (travel + 1)))
+	if backstab then
+		local dest = r.Position + dir * math.min(distance, travel + 4)
+		character:PivotTo(CFrame.lookAt(dest, dest - dir))
+	else
+		character:PivotTo(CFrame.lookAt(r.Position + dir * travel, r.Position + dir * (travel + 1)))
+	end
 end
 
 -- Input ----------------------------------------------------------------------------------
@@ -607,9 +815,16 @@ local function tryReady(key: string, cooldown: number): boolean
 	return true
 end
 
--- When `key` is ready again, and how long its cooldown is.
 function CombatController.readyAt(key: string): (number, number)
 	return ready[key] or 0, durations[key] or 1
+end
+
+-- Same rules as the server (Shared.CombatRules), so the cooldown shown is the one enforced.
+local function clientCdr(): number
+	local data = StateController.get()
+	local book = activeBook()
+	local _, cdr = CombatRules.offense(if data then data.gears else nil, if book then book.type else "Neutral")
+	return cdr
 end
 
 local function basic()
@@ -625,14 +840,18 @@ local function basic()
 	end
 	local target = aimPoint()
 	NetClient.send("Basic", target.X, target.Y, target.Z)
+	-- Mirror the server's combo count so the 4th-hit finisher is drawn bigger right away.
+	local now = os.clock()
+	combo = CombatRules.comboStep(combo, comboT, now)
+	comboT = now
+	local radius = spec.radius * (if combo == CombatRules.COMBO_HITS then CombatRules.FINISHER_RADIUS else 1)
 	local origin = r.Position + Vector3.new(0, 1.2, 0)
 	local dir = (target - origin).Unit
 	dir = Vector3.new(dir.X, math.clamp(dir.Y, -0.35, 0.35), dir.Z).Unit
-	drawBolt(player.UserId, origin + dir * 1.5, dir, spec.speed, spec.range, kind, spec.radius)
+	drawBolt(player.UserId, origin + dir * 1.5, dir, spec.speed, spec.range, kind, radius)
 	sound("cast", nil, 0.25)
 end
 
--- Rooted (Shared.Status): no dash, dash spell or blink.
 local function rooted(): boolean
 	local character = player.Character
 	return character ~= nil
@@ -651,7 +870,7 @@ local function cast(slot: number)
 		return
 	end
 	local key = `{book.type}:{spell.id}:{slot}`
-	local cooldown = Spells.cooldownAt(spell, page.lv)
+	local cooldown = Spells.cooldownAt(spell, page.lv) * (1 - clientCdr())
 	if not tryReady(key, cooldown) then
 		return
 	end
@@ -667,12 +886,14 @@ local function cast(slot: number)
 	elseif spell.kind == "dash" and not rooted() then
 		push(flatAim(), spell.distance / 0.3, 0.3)
 	elseif spell.kind == "blink" and not rooted() then
-		blink(spell.distance)
+		blink(spell.distance, spell.backstab)
 	end
 end
 
 local function dash()
-	if humanoid() == nil or rooted() or not tryReady("dash", CombatController.DASH_COOLDOWN) then
+	local data = StateController.get()
+	local cd = CombatRules.dashCooldown(CombatController.DASH_COOLDOWN, if data then data.gears else nil)
+	if humanoid() == nil or rooted() or not tryReady("dash", cd) then
 		return
 	end
 	NetClient.send("Dash")
@@ -692,6 +913,11 @@ function CombatController.Init()
 	NetClient.on("Fx", onFx)
 	NetClient.on("Hit", damageNumber)
 
+	for _, p in Players:GetPlayers() do
+		watchCharacterVisuals(p)
+	end
+	Players.PlayerAdded:Connect(watchCharacterVisuals)
+
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if processed then
 			return
@@ -709,7 +935,9 @@ function CombatController.Init()
 		end
 		for slot, key in CombatController.BOOK_KEYS do
 			if input.KeyCode == key then
-				NetClient.send("SwapBook", slot)
+				if tryReady("swap", CombatController.SWAP_COOLDOWN) then
+					NetClient.send("SwapBook", slot)
+				end
 				return
 			end
 		end

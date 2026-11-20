@@ -1,14 +1,16 @@
 --!strict
--- Enemies (GDD "Enemies and bosses"): spawns them on the east trail and in Emberfall Ridge,
--- runs their AI, and hands out XP, loot and quest credit when they die.
+-- Enemies (GDD "Enemies and bosses", LAYER_ONE Step 6): spawns wild Neutral creatures in the
+-- lowland forest (re-rolling a random forest spot on every respawn), elemental packs and bosses
+-- in the 3 stepped valleys, and raiders in the forest wedges.
 --
--- AI per enemy, ticked every 0.15 s: idle near home → chase the nearest player in aggro range
--- → wind up (telegraphed on clients by Fx "windup") → attack → cool down. Past the leash it
--- walks home and heals. Nobody follows you into the camp clearing.
---
--- Raiders hunt players carrying loot, steal a share per hit, then flee; killing one returns it
--- all plus a bonus. The tutorial raider is spawned for one player on that quest step.
--- The Cinder Golem's health grows with each new attacker; drops need 10% of its health dealt.
+-- Distinct elemental abilities (Step 6):
+--   Fire:  Ember Imp melee burns; Cinder Caster bolt burns; Cinder Golem does slam ring, 5-bolt
+--          fireball volley (burns), and lava eruptions under players (burns).
+--   Water: Tide Crab melee knocks back; Mist Caller bolt slows; Tide Warden does tidal-wave line
+--          (knockback), whirlpool ring (pull + slow), and bubble volley (slows).
+--   Leaf:  Thorn Sprout lunges + poisons; Spore Puff casts a telegraphed poison spore cloud;
+--          Elder Treant does root-snare circles (roots), thorn line (poisons), and summons
+--          sprouts + heals.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -31,13 +33,25 @@ local ProgressionService = require(script.Parent:WaitForChild("ProgressionServic
 local EnemyService = {}
 
 local TICK = 0.15
-local RESPAWN =
-	{ ember_imp = 9, cinder_caster = 12, ashling = 25, cinder_golem = 90, raider = 40 } :: { [string]: number }
+local RESPAWN = {
+	forest_wisp = 8,
+	ashling = 22,
+	ember_imp = 9,
+	cinder_caster = 12,
+	cinder_golem = 90,
+	tide_crab = 9,
+	mist_caster = 12,
+	tide_warden = 90,
+	thorn_sprout = 9,
+	spore_caster = 12,
+	elder_treant = 90,
+	raider = 40,
+} :: { [string]: number }
 local OVERLEVEL_XP = 8 -- this many levels above a normal enemy: a quarter of the XP
 local FLEE_SECONDS = 9
 local RAIDER_STASH_SECONDS = 60 -- stolen loot is gone this long after the raider escapes
 
-type Spawn = { kind: string, pos: Vector3, level: number, wander: number? }
+type Spawn = { kind: string, pos: Vector3, level: number, wander: number?, wild: boolean? }
 
 local SPAWNS: { Spawn } = Zones.spawns()
 
@@ -56,6 +70,8 @@ type Enemy = {
 	owner: Player?, -- the tutorial raider's one target
 	fleeFrom: Vector3?,
 	camp: Vector3?, -- a raider camp guard's camp centre
+	summons: { Model }?, -- Elder Treant's summoned sprouts
+	summonedBy: Model?, -- a summoned add's boss model
 }
 
 local live: { [Model]: Enemy } = {}
@@ -65,8 +81,6 @@ local function groundAt(pos: Vector3): Vector3
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Include
 	params.FilterDescendantsInstances = { workspace.Terrain }
-	-- From well above whichever is higher, the point or the map's ground there (the plateau
-	-- sits ~60 up), down past the lowland floor.
 	local top = math.max(pos.Y, Zones.groundY(Vector2.new(pos.X, pos.Z).Magnitude)) + 80
 	local ray = workspace:Raycast(Vector3.new(pos.X, top, pos.Z), Vector3.new(0, Zones.FLOOR_Y - 40 - top, 0), params)
 	return if ray then ray.Position else pos
@@ -141,6 +155,22 @@ local function spawnEnemy(kindId: string, level: number, pos: Vector3, spawn: Sp
 	return enemy
 end
 
+local function clearSummons(enemy: Enemy)
+	if enemy.summons == nil then
+		return
+	end
+	for _, addModel in enemy.summons do
+		local add = live[addModel]
+		if add and not add.info.dead then
+			add.info.dead = true
+			live[addModel] = nil
+			CombatService.removeEnemy(addModel)
+			addModel:Destroy()
+		end
+	end
+	table.clear(enemy.summons)
+end
+
 -- Targeting ---------------------------------------------------------------------------------
 
 local function pickTarget(enemy: Enemy): Player?
@@ -152,7 +182,6 @@ local function pickTarget(enemy: Enemy): Player?
 	end
 	local camp = enemy.camp
 	if camp then
-		-- Guards attack anyone inside their palisade, and anyone who hit them.
 		local best, bestD = nil, math.huge
 		for _, player in Players:GetPlayers() do
 			local root = rootOf(player)
@@ -177,7 +206,7 @@ local function pickTarget(enemy: Enemy): Player?
 				and LootService.carriedValue(player) < Loot.RAIDER_MIN_CARRY
 				and enemy.info.dealt[player] == nil
 			then
-				continue -- raiders ignore empty pockets unless you hit them
+				continue
 			end
 			if d < bestD then
 				best, bestD = player, d
@@ -187,34 +216,67 @@ local function pickTarget(enemy: Enemy): Player?
 	return best
 end
 
--- Attacks -----------------------------------------------------------------------------------
+-- Attacks (Step 6: distinct abilities per element) ------------------------------------------
 
 local function melee(enemy: Enemy, target: Player)
 	local info = enemy.info
+	local kind = info.kind
 	local root = rootOf(target)
 	if root == nil then
 		return
 	end
-	NetServer.sendAll("Fx", "slash", info.model, info.kind.reach)
-	if (root.Position - info.root.Position).Magnitude <= info.kind.reach + info.kind.size + 1.5 then
-		local dealt = CombatService.hurtPlayer(target, Enemies.damage(info.kind, info.level), info.type, info.model)
-		if info.kind.raider and dealt > 0 then
-			local taken = LootService.steal(target, Loot.RAIDER_SHARE)
-			if not Loot.isEmpty(taken) then
-				local mine = enemy.stolen[target] or Loot.empty()
-				Loot.add(mine, taken)
-				enemy.stolen[target] = mine
-				info.model:SetAttribute("Loaded", true)
-				enemy.state = "flee"
-				enemy.fleeFrom = root.Position
-				enemy.stateUntil = os.clock() + FLEE_SECONDS
+	-- Leaf Thorn Sprout lunges forward on its strike.
+	if kind.lunge then
+		local delta = Vector3.new(root.Position.X - info.root.Position.X, 0, root.Position.Z - info.root.Position.Z)
+		if delta.Magnitude > 1 then
+			local step = math.min(kind.lunge, math.max(0, delta.Magnitude - 2.5))
+			local dest = groundAt(info.root.Position + delta.Unit * step)
+			info.model:PivotTo(
+				CFrame.lookAt(
+					dest + Vector3.new(0, info.humanoid.HipHeight + 1, 0),
+					Vector3.new(root.Position.X, dest.Y + info.humanoid.HipHeight + 1, root.Position.Z)
+				)
+			)
+		end
+	end
+	NetServer.sendAll("Fx", "slash", info.model, kind.reach)
+	if (root.Position - info.root.Position).Magnitude <= kind.reach + kind.size + 1.5 then
+		local dealt = CombatService.hurtPlayer(target, Enemies.damage(kind, info.level), info.type, info.model)
+		if dealt > 0 then
+			if kind.burn then
+				CombatService.burnPlayer(target, kind.burn.dps, kind.burn.duration)
+			end
+			if kind.poison then
+				CombatService.poisonPlayer(target, kind.poison.dps, kind.poison.duration)
+			end
+			if kind.knockback then
+				CombatService.pushPlayer(
+					target,
+					info.root.Position,
+					kind.knockback.speed,
+					kind.knockback.lift,
+					kind.knockback.duration
+				)
+			end
+			if kind.raider then
+				local taken = LootService.steal(target, Loot.RAIDER_SHARE)
+				if not Loot.isEmpty(taken) then
+					local mine = enemy.stolen[target] or Loot.empty()
+					Loot.add(mine, taken)
+					enemy.stolen[target] = mine
+					info.model:SetAttribute("Loaded", true)
+					enemy.state = "flee"
+					enemy.fleeFrom = root.Position
+					enemy.stateUntil = os.clock() + FLEE_SECONDS
+				end
 			end
 		end
 	end
 end
 
-local function bolt(enemy: Enemy, target: Player, spread: number?)
+local function bolt(enemy: Enemy, target: Player, spread: number?, extraSlow: any?)
 	local info = enemy.info
+	local kind = info.kind
 	local root = rootOf(target)
 	if root == nil then
 		return
@@ -227,25 +289,57 @@ local function bolt(enemy: Enemy, target: Player, spread: number?)
 	CombatService.fire({
 		team = "enemy",
 		source = info.model,
-		pos = origin + dir * (info.kind.size + 1),
+		pos = origin + dir * (kind.size + 1),
 		dir = dir,
-		speed = if info.kind.boss then 55 else 62,
-		range = info.kind.reach + 20,
+		speed = if kind.boss then 55 else 62,
+		range = kind.reach + 20,
 		travelled = 0,
-		radius = if info.kind.boss then 2.2 else 1.3,
-		damage = Enemies.damage(info.kind, info.level) * (if info.kind.boss then 0.6 else 1),
+		radius = if kind.boss then 2.2 else 1.3,
+		damage = Enemies.damage(kind, info.level) * (if kind.boss then 0.6 else 1),
 		type = info.type,
-		burn = if info.kind.boss and info.type == "Fire" then { dps = 3, duration = 2 } else nil,
+		burn = kind.burn or (if kind.boss and info.type == "Fire" then { dps = 3, duration = 2 } else nil),
+		slow = extraSlow or kind.slow,
 	})
 end
 
--- The Golem rotates: slam (ring round it), volley (5 fireballs), eruptions (circles under players).
-local function bossAttack(enemy: Enemy, target: Player)
+-- Spore Puff (Leaf caster): a telegraphed poison spore cloud under the target.
+local function sporeCloud(enemy: Enemy, target: Player)
 	local info = enemy.info
-	enemy.bossStep += 1
-	local step = enemy.bossStep % 3
-	local pos = info.root.Position
-	local damage = Enemies.damage(info.kind, info.level)
+	local kind = info.kind
+	local root = rootOf(target)
+	if root == nil then
+		return
+	end
+	local spot = groundAt(root.Position)
+	local radius = 8
+	local delay = 1.0
+	local damage = Enemies.damage(kind, info.level)
+	NetServer.sendAll("Fx", "ring", spot.X, spot.Y, spot.Z, radius, delay)
+	task.delay(delay, function()
+		if info.dead then
+			return
+		end
+		NetServer.sendAll("Fx", "blast", spot.X, spot.Y, spot.Z, radius, "Leaf")
+		for _, player in Players:GetPlayers() do
+			local now = rootOf(player)
+			if now and (now.Position - spot).Magnitude <= radius then
+				CombatService.hurtPlayer(player, damage, "Leaf", info.model)
+				if kind.poison then
+					CombatService.poisonPlayer(player, kind.poison.dps, kind.poison.duration)
+				end
+			end
+		end
+	end)
+end
+
+local function flatDirToward(from: Vector3, to: Vector3): Vector3
+	local d = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
+	return if d.Magnitude > 0.1 then d.Unit else Vector3.zAxis
+end
+
+-- Fire boss (Cinder Golem): slam ring, 5-fireball burning volley, burning lava eruptions.
+local function golemAttack(enemy: Enemy, target: Player, step: number, pos: Vector3, damage: number)
+	local info = enemy.info
 	if step == 1 then
 		local radius = 22
 		local ground = groundAt(pos)
@@ -254,11 +348,11 @@ local function bossAttack(enemy: Enemy, target: Player)
 			if info.dead then
 				return
 			end
-			NetServer.sendAll("Fx", "blast", ground.X, ground.Y, ground.Z, radius, info.type)
+			NetServer.sendAll("Fx", "blast", ground.X, ground.Y, ground.Z, radius, "Fire")
 			for _, player in Players:GetPlayers() do
 				local root = rootOf(player)
 				if root and (root.Position - ground).Magnitude <= radius then
-					CombatService.hurtPlayer(player, damage * 1.3, info.type, info.model)
+					CombatService.hurtPlayer(player, damage * 1.3, "Fire", info.model)
 				end
 			end
 		end)
@@ -276,17 +370,161 @@ local function bossAttack(enemy: Enemy, target: Player)
 					if info.dead then
 						return
 					end
-					NetServer.sendAll("Fx", "blast", spot.X, spot.Y, spot.Z, 9, info.type)
+					NetServer.sendAll("Fx", "blast", spot.X, spot.Y, spot.Z, 9, "Fire")
 					local now = rootOf(player)
 					if now and (now.Position - spot).Magnitude <= 9 then
-						CombatService.hurtPlayer(player, damage, info.type, info.model)
-						if info.type == "Fire" then
-							CombatService.burnPlayer(player, 4, 3)
-						end
+						CombatService.hurtPlayer(player, damage, "Fire", info.model)
+						CombatService.burnPlayer(player, 4, 3)
 					end
 				end)
 			end
 		end
+	end
+end
+
+-- Water boss (Tide Warden): tidal-wave line (knockback), whirlpool (pull + slow), bubble volley.
+local function wardenAttack(enemy: Enemy, target: Player, step: number, pos: Vector3, damage: number)
+	local info = enemy.info
+	local ground = groundAt(pos)
+	if step == 1 then
+		local troot = rootOf(target)
+		local dir = if troot then flatDirToward(ground, troot.Position) else Vector3.zAxis
+		local length, width, delay = 56, 14, 1.05
+		CombatService.telegraphLine(ground, dir, length, width, delay, "Water")
+		task.delay(delay, function()
+			if info.dead then
+				return
+			end
+			local endPos = ground + dir * length
+			NetServer.sendAll(
+				"Fx",
+				"beam",
+				ground.X,
+				ground.Y + 2,
+				ground.Z,
+				endPos.X,
+				endPos.Y + 2,
+				endPos.Z,
+				"Water",
+				width * 0.6
+			)
+			for _, player in CombatService.playersInLine(ground, dir, length, width) do
+				CombatService.hurtPlayer(player, damage * 1.25, "Water", info.model)
+				CombatService.pushPlayer(player, ground, 52, 14, 0.3)
+			end
+		end)
+	elseif step == 2 then
+		local radius = 24
+		NetServer.sendAll("Fx", "ring", ground.X, ground.Y, ground.Z, radius, 1.1)
+		task.delay(1.1, function()
+			if info.dead then
+				return
+			end
+			NetServer.sendAll("Fx", "blast", ground.X, ground.Y, ground.Z, radius, "Water")
+			for _, player in Players:GetPlayers() do
+				local root = rootOf(player)
+				if root and (root.Position - ground).Magnitude <= radius then
+					CombatService.hurtPlayer(player, damage, "Water", info.model)
+					CombatService.pushPlayer(player, ground, -42, 6, 0.35)
+					CombatService.slowPlayer(player, 0.5, 2.5)
+				end
+			end
+		end)
+	else
+		local slow = { factor = 0.6, duration = 2 }
+		for i = -2, 2 do
+			bolt(enemy, target, i * 0.2, slow)
+		end
+	end
+end
+
+-- Leaf boss (Elder Treant): root-snare circles, poison thorn line, summon sprouts + heal.
+local function treantAttack(enemy: Enemy, target: Player, step: number, pos: Vector3, damage: number)
+	local info = enemy.info
+	local ground = groundAt(pos)
+	if step == 1 then
+		for _, player in Players:GetPlayers() do
+			local root = rootOf(player)
+			if root and (root.Position - pos).Magnitude < 90 then
+				local spot = groundAt(root.Position)
+				NetServer.sendAll("Fx", "ring", spot.X, spot.Y, spot.Z, 9, 1.15)
+				task.delay(1.15, function()
+					if info.dead then
+						return
+					end
+					NetServer.sendAll("Fx", "blast", spot.X, spot.Y, spot.Z, 9, "Leaf")
+					local now = rootOf(player)
+					if now and (now.Position - spot).Magnitude <= 9 then
+						CombatService.hurtPlayer(player, damage, "Leaf", info.model)
+						CombatService.rootPlayer(player, 1.8)
+					end
+				end)
+			end
+		end
+	elseif step == 2 then
+		local troot = rootOf(target)
+		local dir = if troot then flatDirToward(ground, troot.Position) else Vector3.zAxis
+		local length, width, delay = 58, 10, 1.05
+		CombatService.telegraphLine(ground, dir, length, width, delay, "Leaf")
+		task.delay(delay, function()
+			if info.dead then
+				return
+			end
+			local endPos = ground + dir * length
+			NetServer.sendAll(
+				"Fx",
+				"beam",
+				ground.X,
+				ground.Y + 2,
+				ground.Z,
+				endPos.X,
+				endPos.Y + 2,
+				endPos.Z,
+				"Leaf",
+				width * 0.6
+			)
+			for _, player in CombatService.playersInLine(ground, dir, length, width) do
+				CombatService.hurtPlayer(player, damage * 1.25, "Leaf", info.model)
+				CombatService.poisonPlayer(player, 4, 3)
+			end
+		end)
+	else
+		-- Heal 4% and summon up to 2 Thorn Sprout adds.
+		local humanoid = info.humanoid
+		humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + humanoid.MaxHealth * 0.04)
+		NetServer.sendAll("Fx", "burst", ground.X, ground.Y + 2, ground.Z, 12, "Leaf")
+		local summons = enemy.summons or {}
+		enemy.summons = summons
+		for i = #summons, 1, -1 do
+			if live[summons[i]] == nil or live[summons[i]].info.dead then
+				table.remove(summons, i)
+			end
+		end
+		for i = 1, 2 do
+			if #summons >= 2 then
+				break
+			end
+			local a = math.random() * math.pi * 2 + i * math.pi
+			local addPos = ground + Vector3.new(math.cos(a) * 12, 0, math.sin(a) * 12)
+			local add = spawnEnemy("thorn_sprout", 8, addPos, nil)
+			add.summonedBy = info.model
+			table.insert(summons, add.info.model)
+		end
+	end
+end
+
+local function bossAttack(enemy: Enemy, target: Player)
+	local info = enemy.info
+	enemy.bossStep += 1
+	local step = enemy.bossStep % 3
+	local pos = info.root.Position
+	local damage = Enemies.damage(info.kind, info.level)
+	if info.type == "Water" then
+		wardenAttack(enemy, target, step, pos, damage)
+	elseif info.type == "Leaf" then
+		treantAttack(enemy, target, step, pos, damage)
+	else
+		golemAttack(enemy, target, step, pos, damage)
 	end
 end
 
@@ -323,7 +561,6 @@ local function think(enemy: Enemy, now: number)
 	if enemy.state == "home" then
 		humanoid.WalkSpeed = kind.speed
 		if math.abs(pos.Y - enemy.home.Y) > 15 then
-			-- fell off the cliff (or got knocked down): it can't climb back, so put it home
 			info.model:PivotTo(CFrame.new(enemy.home + Vector3.new(0, humanoid.HipHeight + 1, 0)))
 		end
 		humanoid:MoveTo(enemy.home)
@@ -335,6 +572,7 @@ local function think(enemy: Enemy, now: number)
 			if kind.boss then
 				humanoid.MaxHealth = Enemies.maxHp(kind, info.level)
 				humanoid.Health = humanoid.MaxHealth
+				clearSummons(enemy)
 			end
 			if next(enemy.stolen) ~= nil then
 				task.delay(RAIDER_STASH_SECONDS, function()
@@ -357,6 +595,8 @@ local function think(enemy: Enemy, now: number)
 					melee(enemy, target)
 				elseif kind.attack == "bolt" then
 					bolt(enemy, target)
+				elseif kind.attack == "cloud" then
+					sporeCloud(enemy, target)
 				else
 					bossAttack(enemy, target)
 				end
@@ -399,13 +639,13 @@ local function think(enemy: Enemy, now: number)
 
 	local inReach
 	if kind.attack == "melee" then
-		inReach = dist <= kind.reach + kind.size
+		local engageReach = kind.reach + kind.size + (kind.lunge or 0) * 0.7
+		inReach = dist <= engageReach
 		if not inReach then
 			humanoid:MoveTo(troot.Position - flat.Unit * (kind.reach * 0.6))
 		end
-	elseif kind.attack == "bolt" then
+	elseif kind.attack == "bolt" or kind.attack == "cloud" then
 		inReach = dist <= kind.reach
-		-- Casters keep their distance.
 		if dist < kind.reach * 0.45 then
 			humanoid:MoveTo(pos - flat.Unit * 12)
 		elseif not inReach then
@@ -426,7 +666,6 @@ local function think(enemy: Enemy, now: number)
 		enemy.state = "windup"
 		enemy.stateUntil = now + kind.windup
 		humanoid:MoveTo(pos)
-		-- Face the target while winding up.
 		info.root.CFrame = CFrame.lookAt(pos, Vector3.new(troot.Position.X, pos.Y, troot.Position.Z))
 		NetServer.sendAll("Fx", "windup", info.model, kind.windup, kind.attack)
 	end
@@ -457,6 +696,9 @@ local function onKilled(model: Model, info: any)
 	local kind = info.kind
 	local pos = info.root.Position
 	NetServer.sendAll("Fx", "death", pos.X, pos.Y, pos.Z, info.type, kind.size)
+	if kind.boss then
+		clearSummons(enemy)
+	end
 
 	for player, dealt in info.dealt do
 		if player.Parent == nil then
@@ -490,7 +732,6 @@ local function onKilled(model: Model, info: any)
 			ProgressionService.note(player, "raider")
 		end
 	end
-	-- Raiders give back what they stole, plus a bonus, to each player they robbed.
 	for victim, stolen in enemy.stolen do
 		if victim.Parent then
 			LootService.give(victim, Loot.recovered(stolen))
@@ -506,12 +747,14 @@ local function onKilled(model: Model, info: any)
 	elseif enemy.spawn then
 		local spawn = enemy.spawn
 		task.delay(RESPAWN[kind.id] or 10, function()
-			spawnEnemy(spawn.kind, spawn.level, spawn.pos, spawn)
+			-- Wild Neutral creatures re-roll a brand-new random spot in the lowland forest!
+			local nextPos = if spawn.wild or kind.wild then Zones.randomWildPos() else spawn.pos
+			spawn.pos = nextPos
+			spawnEnemy(spawn.kind, spawn.level, nextPos, spawn)
 		end)
 	end
 end
 
--- The tutorial raider: appears near a player on that quest step and robs them.
 local function tutorialRaider(player: Player)
 	if tutorialRaiders[player] then
 		return
@@ -529,7 +772,6 @@ local function tutorialRaider(player: Player)
 	enemy.owner = player
 	enemy.home = groundAt(root.Position + Vector3.new(60, 0, 0))
 	tutorialRaiders[player] = enemy.info.model
-	-- Make sure there's something to steal: the Ashling's drops are in the carried bag.
 	if Loot.isEmpty(data.carried) then
 		LootService.give(player, { coins = 20, ink = {}, frag = {} })
 	end
@@ -545,8 +787,6 @@ local function tutorialRaider(player: Player)
 	end)
 end
 
--- A raider camp guard (RaiderCampService): never respawns on its own; the camp brings its
--- guards back together.
 function EnemyService.spawnGuard(kindId: string, level: number, pos: Vector3, camp: Vector3, campId: number): Model
 	local enemy = spawnEnemy(kindId, level, pos, nil)
 	enemy.camp = camp
@@ -559,7 +799,7 @@ function EnemyService.Init()
 	CombatService.EnemyHurt:Connect(function(model: Model, _info: any, player: Player)
 		local enemy = live[model]
 		if enemy and enemy.state == "idle" then
-			enemy.target = player -- being hit wakes them, even out of aggro range
+			enemy.target = player
 		end
 	end)
 	Players.PlayerRemoving:Connect(function(player)
@@ -581,7 +821,9 @@ end
 
 function EnemyService.Start()
 	for _, spawn in SPAWNS do
-		spawnEnemy(spawn.kind, spawn.level, spawn.pos, spawn)
+		local initialPos = if spawn.wild then Zones.randomWildPos() else spawn.pos
+		spawn.pos = initialPos
+		spawnEnemy(spawn.kind, spawn.level, initialPos, spawn)
 	end
 	local lastTutorial = 0
 	while true do

@@ -1,16 +1,13 @@
 --!strict
--- Levels, stat points and the quest chain (GDD "Getting stronger", "Tutorial").
---
--- XP comes from kills and quests. Each level gives 3 stat points (health, power, defense);
--- resetting them is free in the slice. Max health follows level and health points. Quests
--- advance on events other services report through note(); the tracked quest goes to the client
--- as a Quest view.
+-- Levels, stat points, Robe Gear HP bonuses, and Black Clover Storyline Area Quests
+-- (selectable at Elder Orsi, Scout Captain, and Knight Envoy; awards XP, Coins, Ink & ★ Stars).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Server = script.Parent.Parent
+local Gears = require(Shared:WaitForChild("Gears")) :: any
 local Level = require(Shared:WaitForChild("Level")) :: any
 local Quests = require(Shared:WaitForChild("Quests")) :: any
 local Zones = require(Shared:WaitForChild("Zones")) :: any
@@ -28,16 +25,17 @@ local function applyHealth(player: Player)
 	if data == nil or humanoid == nil then
 		return
 	end
-	local max = Level.maxHealth(data.level, data.stats.health)
+	local gearStats = Gears.stats(data.gears)
+	local max = Level.maxHealth(data.level, data.stats.health) + gearStats.hp
 	local full = humanoid.Health >= humanoid.MaxHealth - 0.5
 	humanoid.MaxHealth = max
 	if full or humanoid.Health > max then
 		humanoid.Health = max
 	end
 	player:SetAttribute("Level", data.level)
+	player:SetAttribute("Bounty", data.bounty or 0)
 end
 
--- Fills {zone} and {boss} with the player's element zone.
 function ProgressionService.questText(data: any, text: string): string
 	local zone = Zones.forElement(data.element)
 	local text1 = string.gsub(text, "{zone}", zone.name)
@@ -48,6 +46,20 @@ end
 local function sendQuest(player: Player)
 	local data = DataService.get(player)
 	if data == nil then
+		return
+	end
+	local active = data.activeQuest
+	local boardQuest = active and Quests.BOARD_BY_ID[active.id]
+	if boardQuest then
+		NetServer.send(player, "Quest", {
+			id = boardQuest.id,
+			title = `{boardQuest.areaName} · {boardQuest.title}`,
+			text = boardQuest.text,
+			n = boardQuest.n,
+			progress = math.min(active.n or 0, boardQuest.n),
+			hint = nil,
+			tutorial = false,
+		})
 		return
 	end
 	local step = Quests.step(data.quest.step)
@@ -87,12 +99,59 @@ function ProgressionService.addXp(player: Player, amount: number)
 	end
 end
 
--- Reports a quest event (see Shared.Quests).
+local function acceptQuest(player: Player, questId: string)
+	local data = DataService.get(player)
+	local q = Quests.BOARD_BY_ID[questId]
+	if data == nil or q == nil then
+		return
+	end
+	if data.level < q.minLevel then
+		NetServer.send(player, "Toast", `Requires Level {q.minLevel} for {q.title}`, "warn")
+		return
+	end
+	data.activeQuest = { id = q.id, n = 0 }
+	DataService.changed(player, "activeQuest")
+	NetServer.send(player, "Toast", `Accepted: {q.title} ({q.areaName})`, "quest")
+	sendQuest(player)
+end
+
 function ProgressionService.note(player: Player, event: string, arg: any?, role: string?)
 	local data = DataService.get(player)
 	if data == nil then
 		return
 	end
+	-- 1. Advance active Area Quest from a Quest Giver NPC.
+	local active = data.activeQuest
+	local boardQuest = active and Quests.BOARD_BY_ID[active.id]
+	if boardQuest then
+		local p = Quests.advance(boardQuest, active.n or 0, event, arg, role)
+		if p ~= nil then
+			active.n = p
+			if p >= boardQuest.n then
+				active.n = 0
+				local r = boardQuest.reward
+				LootService.reward(player, {
+					coins = r.coins,
+					ink = if r.ink and r.ink > 0 then { Universal = r.ink } else {},
+					frag = {},
+				})
+				data.stars += r.stars
+				DataService.changed(player, "stars", "activeQuest")
+				NetServer.send(
+					player,
+					"Toast",
+					`Quest Complete: {boardQuest.title}! +{r.xp} XP, +{r.coins} Coins, +{r.stars}★ Stars`,
+					"quest"
+				)
+				ProgressionService.addXp(player, r.xp)
+			else
+				DataService.changed(player, "activeQuest")
+			end
+			sendQuest(player)
+		end
+	end
+
+	-- 2. Also advance linear tutorial steps if still in progress.
 	local step = Quests.step(data.quest.step)
 	local progress = Quests.advance(step, data.quest.n, event, arg, role)
 	if progress == nil then
@@ -104,19 +163,17 @@ function ProgressionService.note(player: Player, event: string, arg: any?, role:
 		data.quest.n = 0
 		local reward = step.reward
 		local ink = {}
-		for kind, n in reward.ink or {} do
-			local real = if kind == "element" then (if data.element ~= "" then data.element else "Neutral") else kind
-			ink[real] = (ink[real] or 0) + n
+		for _, n in reward.ink or {} do
+			ink.Universal = (ink.Universal or 0) + n
 		end
 		LootService.reward(player, { coins = reward.coins, ink = ink, frag = {} })
-		NetServer.send(player, "Toast", `Quest complete: {ProgressionService.questText(data, step.text)}`, "quest")
+		local starsEarned = reward.stars or 0
+		if starsEarned > 0 then
+			data.stars += starsEarned
+			DataService.changed(player, "stars")
+		end
 		DataService.changed(player, "quest")
 		ProgressionService.addXp(player, reward.xp)
-		-- A new "reach level" step may already be met.
-		local nextStep = Quests.step(data.quest.step)
-		if nextStep.event == "level" then
-			task.defer(ProgressionService.note, player, "level", data.level)
-		end
 	else
 		DataService.changed(player, "quest")
 	end
@@ -157,9 +214,11 @@ end
 function ProgressionService.Init()
 	NetServer.on("AllocateStat", allocate)
 	NetServer.on("ResetStats", reset)
+	NetServer.on("AcceptQuest", acceptQuest)
 	LootService.Banked:Connect(function(player: Player)
 		ProgressionService.note(player, "bank")
 	end)
+	LootService.GearChanged:Connect(applyHealth)
 	DataService.ClientReady:Connect(function(player: Player)
 		task.defer(sendQuest, player)
 	end)
@@ -179,7 +238,7 @@ function ProgressionService.Init()
 	end
 	DataService.PlayerReady:Connect(function(player: Player)
 		applyHealth(player)
-		task.defer(sendQuest, player) -- whichever of PlayerReady and ClientReady comes last sends it
+		task.defer(sendQuest, player)
 	end)
 end
 
