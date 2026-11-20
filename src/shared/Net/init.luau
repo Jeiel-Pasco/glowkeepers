@@ -86,7 +86,7 @@ Net.remotes = {
 	},
 	Buy = {
 		dir = "c2s",
-		args = { { type = "enum", values = { "ink_Neutral", "ink_Fire" } } },
+		args = { { type = "enum", values = { "ink_Neutral", "ink_Fire", "ink_Water", "ink_Leaf" } } },
 		rate = { perSecond = 3, burst = 5 },
 	},
 	ResetStats = { dir = "c2s", args = {}, rate = { perSecond = 0.5, burst = 1 } },

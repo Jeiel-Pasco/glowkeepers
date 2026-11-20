@@ -13,6 +13,7 @@ local Client = script.Parent.Parent
 local Spells = require(Shared:WaitForChild("Spells")) :: any
 local Element = require(Shared:WaitForChild("Element")) :: any
 local Level = require(Shared:WaitForChild("Level")) :: any
+local Zones = require(Shared:WaitForChild("Zones")) :: any
 local NetClient = require(Client:WaitForChild("Net"):WaitForChild("NetClient"))
 local Kit = require(Client:WaitForChild("Ui"):WaitForChild("Kit"))
 local StateController = require(script.Parent:WaitForChild("StateController"))
@@ -242,10 +243,13 @@ local function hintTarget(): Vector3?
 		return nearest("ashling") or Vector3.new(238, 2, 0)
 	elseif hint == "raider" then
 		return nearest("raider")
-	elseif hint == "emberfall" then
-		return Vector3.new(300, 2, 0)
-	elseif hint == "golem" then
-		return nearest("cinder_golem") or Vector3.new(600, 2, 0)
+	elseif hint == "zone" or hint == "boss" then
+		local data = StateController.get()
+		local zone = Zones.forElement(if data then data.element else "")
+		if hint == "boss" then
+			return nearest(zone.boss) or Zones.toWorld(zone, Zones.BOSS_D, 0)
+		end
+		return Zones.toWorld(zone, 320, 0)
 	end
 	return nil
 end

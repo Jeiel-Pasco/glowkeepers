@@ -48,10 +48,11 @@ export type EnemyInfo = {
 	humanoid: Humanoid,
 	dealt: { [Player]: number },
 	dead: boolean,
+	slow: { amount: number, untilT: number }?,
 	onHurt: ((player: Player, amount: number) -> ())?,
 }
 
-type Burn = { dps: number, untilT: number, owner: Player? }
+type Burn = { dps: number, untilT: number, owner: Player?, type: string? }
 type PlayerCombat = {
 	ready: { [string]: number },
 	shield: { amount: number, untilT: number, burn: any? }?,
@@ -75,6 +76,7 @@ type Projectile = {
 	damage: number,
 	type: string,
 	burn: any?,
+	slow: any?,
 }
 
 local enemies: { [Model]: EnemyInfo } = {}
@@ -163,7 +165,8 @@ local function hurtEnemy(
 	base: number,
 	levelScale: number,
 	attackType: string,
-	burn: any?
+	burn: any?,
+	slow: any?
 )
 	if info.dead then
 		return
@@ -173,7 +176,7 @@ local function hurtEnemy(
 	local now = os.clock()
 	local power = if data then data.stats.power else 0
 	local mult = Element.mult(attackType, info.type)
-	local amount = Level.damage(base, levelScale, power, mult, 0)
+	local amount = Level.damage(base, levelScale, power, mult, 0) * Level.power(if data then data.level else 1)
 	if s.buff and s.buff.untilT > now then
 		amount *= 1 + s.buff.power
 		burn = burn or s.buff.burn
@@ -189,7 +192,10 @@ local function hurtEnemy(
 		info.onHurt(player, amount)
 	end
 	if burn then
-		enemyBurns[info.model] = { dps = burn.dps, untilT = now + burn.duration, owner = player }
+		enemyBurns[info.model] = { dps = burn.dps, untilT = now + burn.duration, owner = player, type = attackType }
+	end
+	if slow then
+		info.slow = { amount = slow.amount, untilT = now + slow.duration }
 	end
 	if info.humanoid.Health <= 0 and not info.dead then
 		info.dead = true
@@ -299,7 +305,7 @@ local function stepProjectiles(dt: number)
 				end
 			end
 			if best and p.owner then
-				hurtEnemy(best, p.owner, p.damage, 1, p.type, p.burn)
+				hurtEnemy(best, p.owner, p.damage, 1, p.type, p.burn, p.slow)
 				hitPos = best.root.Position
 			end
 		else
@@ -422,12 +428,13 @@ local function onCast(player: Player, slot: number, x: number, y: number, z: num
 			damage = spell.damage * scale,
 			type = spell.type,
 			burn = spell.burn,
+			slow = spell.slow,
 		})
 	elseif kind == "burst" then
 		local pos = root.Position
 		fxAll("burst", pos.X, pos.Y, pos.Z, spell.radius, spell.type)
 		for _, info in enemiesNear(pos, spell.radius) do
-			hurtEnemy(info, player, spell.damage, scale, spell.type, spell.burn)
+			hurtEnemy(info, player, spell.damage, scale, spell.type, spell.burn, spell.slow)
 		end
 	elseif kind == "area" then
 		local flat = Vector3.new(target.X - root.Position.X, 0, target.Z - root.Position.Z)
@@ -446,7 +453,7 @@ local function onCast(player: Player, slot: number, x: number, y: number, z: num
 				return
 			end
 			for _, info in enemiesNear(pos, spell.radius) do
-				hurtEnemy(info, player, spell.damage, scale, spell.type, spell.burn)
+				hurtEnemy(info, player, spell.damage, scale, spell.type, spell.burn, spell.slow)
 			end
 		end)
 	elseif kind == "beam" then
@@ -457,7 +464,7 @@ local function onCast(player: Player, slot: number, x: number, y: number, z: num
 		end
 		fxAll("beam", origin.X, origin.Y, origin.Z, finish.X, finish.Y, finish.Z, spell.type, spell.width)
 		for _, info in enemiesAlong(origin, finish, spell.width) do
-			hurtEnemy(info, player, spell.damage, scale, spell.type, spell.burn)
+			hurtEnemy(info, player, spell.damage, scale, spell.type, spell.burn, spell.slow)
 		end
 	elseif kind == "shield" then
 		s.shield = { amount = spell.amount * scale, untilT = now + spell.duration, burn = spell.burn }
@@ -477,7 +484,7 @@ local function onCast(player: Player, slot: number, x: number, y: number, z: num
 		fxAll("dash", uid, spell.type)
 		task.delay(0.12, function()
 			for _, info in enemiesAlong(a, b, 4) do
-				hurtEnemy(info, player, spell.damage, scale, spell.type, spell.burn)
+				hurtEnemy(info, player, spell.damage, scale, spell.type, spell.burn, spell.slow)
 			end
 		end)
 	elseif kind == "blink" then
@@ -507,7 +514,7 @@ local function tick()
 		if info == nil or info.dead or burn.untilT < now then
 			enemyBurns[model] = nil
 		elseif burn.owner and burn.owner.Parent then
-			hurtEnemy(info, burn.owner, burn.dps * TICK, 1, "Fire", nil)
+			hurtEnemy(info, burn.owner, burn.dps * TICK, 1, burn.type or "Fire", nil)
 		end
 	end
 	for player, s in state do

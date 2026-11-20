@@ -162,7 +162,186 @@ BUILDERS.raider = function(body)
 	end
 end
 
+-- Tide Crab: a wide teal shell, two chunky claws, eye stalks.
+BUILDERS.tide_crab = function(body)
+	local shell = Color3.fromRGB(56, 112, 128)
+	local claw = Color3.fromRGB(70, 132, 146)
+	piece(body, Vector3.new(3.2, 0.9, 2.4), CFrame.new(0, 0.6, 0.1), shell, M.SmoothPlastic)
+	for _, x in { -1, 1 } do
+		piece(body, Vector3.new(1.1, 0.9, 1.3), CFrame.new(x * 1.9, -0.1, -1.2) * CFrame.Angles(0, x * 0.4, 0), claw)
+		piece(body, Vector3.new(0.6, 0.5, 0.9), CFrame.new(x * 2.1, 0.25, -1.9) * CFrame.Angles(0, x * 0.4, 0), claw)
+		piece(body, Vector3.new(0.25, 0.8, 0.25), CFrame.new(x * 0.45, 1.2, -0.8), shell)
+		glow(
+			body,
+			Vector3.new(0.35, 0.35, 0.35),
+			CFrame.new(x * 0.45, 1.65, -0.8),
+			Color3.fromRGB(170, 240, 255),
+			Enum.PartType.Ball
+		)
+		for _, z in { -0.4, 0.5 } do
+			piece(body, Vector3.new(0.3, 0.9, 0.3), CFrame.new(x * 1.35, -0.75, z) * CFrame.Angles(0, 0, x * 0.5), claw)
+		end
+	end
+end
+
+-- Mist Caller: a floating jelly bell with dangling tendrils and a glowing heart.
+BUILDERS.mist_caster = function(body)
+	local bell = Color3.fromRGB(120, 180, 220)
+	local dome = piece(body, Vector3.new(2.8, 2.2, 2.8), CFrame.new(0, 0.9, 0), bell, M.Glass, Enum.PartType.Ball)
+	dome.Transparency = 0.35
+	glow(body, Vector3.new(1, 1, 1), CFrame.new(0, 0.8, 0), Color3.fromRGB(150, 230, 255), Enum.PartType.Ball)
+	for i = 0, 5 do
+		local a = i / 6 * math.pi * 2
+		piece(
+			body,
+			Vector3.new(0.25, 1.8, 0.25),
+			CFrame.new(math.cos(a) * 0.9, -0.9, math.sin(a) * 0.9)
+				* CFrame.Angles(math.sin(a) * 0.2, 0, math.cos(a) * 0.2),
+			Color3.fromRGB(96, 150, 196)
+		)
+	end
+	eyes(body, 1.0, -1.3, 0.35, 0.25, Color3.fromRGB(230, 250, 255))
+end
+
+-- Tide Warden: a great shelled guardian with coral spikes and two huge claws.
+BUILDERS.tide_warden = function(body)
+	local shell = Color3.fromRGB(48, 92, 110)
+	local plate = Color3.fromRGB(66, 120, 136)
+	local coral = Color3.fromRGB(220, 130, 120)
+	piece(body, Vector3.new(9, 4.2, 8), CFrame.new(0, 2.6, 0.6), shell, M.Slate, Enum.PartType.Ball)
+	piece(body, Vector3.new(5, 2.6, 2), CFrame.new(0, 0.6, -3.4), plate, M.Slate)
+	eyes(body, 1.2, -4.45, 1.1, 0.7, Color3.fromRGB(150, 240, 255))
+	for i = -1, 1 do
+		piece(
+			body,
+			Vector3.new(0.8, 2.6, 0.8),
+			CFrame.new(i * 2.2, 5.4, 0.8 + math.abs(i)) * CFrame.Angles(0, 0, i * 0.3),
+			coral
+		)
+	end
+	for _, x in { -1, 1 } do
+		piece(
+			body,
+			Vector3.new(2.6, 2.4, 3.2),
+			CFrame.new(x * 5.4, -0.4, -3) * CFrame.Angles(0, x * 0.35, 0),
+			plate,
+			M.Slate
+		)
+		piece(
+			body,
+			Vector3.new(1.6, 1.4, 2.4),
+			CFrame.new(x * 5.9, 0.4, -5.2) * CFrame.Angles(0, x * 0.35, 0),
+			plate,
+			M.Slate
+		)
+		for _, z in { -1, 2.4 } do
+			piece(
+				body,
+				Vector3.new(1.2, 4.2, 1.2),
+				CFrame.new(x * 3.6, -3, z) * CFrame.Angles(0, 0, x * 0.25),
+				shell,
+				M.Slate
+			)
+		end
+		glow(body, Vector3.new(0.4, 2, 0.3), CFrame.new(x * 2, 2.4, -3.2), Color3.fromRGB(110, 220, 255))
+	end
+end
+
+-- Thorn Sprout: a bulb with a leafy crown, thorns and root feet.
+BUILDERS.thorn_sprout = function(body)
+	local leaf = Color3.fromRGB(110, 160, 70)
+	piece(body, Vector3.new(1.4, 0.6, 1.4), CFrame.new(0, -1.2, 0), Color3.fromRGB(96, 72, 50), M.Wood)
+	for i = 0, 2 do
+		local a = i / 3 * math.pi * 2
+		piece(
+			body,
+			Vector3.new(0.35, 0.9, 0.35),
+			CFrame.new(math.cos(a) * 0.6, -1.5, math.sin(a) * 0.6)
+				* CFrame.Angles(math.sin(a) * 0.5, 0, math.cos(a) * 0.5),
+			Color3.fromRGB(96, 72, 50),
+			M.Wood
+		)
+		piece(
+			body,
+			Vector3.new(1.6, 0.2, 0.8),
+			CFrame.new(math.cos(a) * 0.7, 1.15, math.sin(a) * 0.7) * CFrame.Angles(0, -a, 0.5),
+			leaf
+		)
+	end
+	for _, x in { -1, 1 } do
+		piece(
+			body,
+			Vector3.new(0.2, 0.6, 0.2),
+			CFrame.new(x * 0.95, 0.1, 0) * CFrame.Angles(0, 0, -x * 1.2),
+			Color3.fromRGB(220, 210, 160)
+		)
+	end
+	eyes(body, 0.25, -0.9, 0.3, 0.3, Color3.fromRGB(230, 255, 140))
+	glow(body, Vector3.new(0.5, 0.5, 0.5), CFrame.new(0, 1.35, 0), Color3.fromRGB(190, 255, 120), Enum.PartType.Ball)
+end
+
+-- Spore Puff: a mushroom with a glowing spotted cap.
+BUILDERS.spore_caster = function(body)
+	local cap = Color3.fromRGB(150, 96, 140)
+	piece(
+		body,
+		Vector3.new(2, 1.6, 1.6),
+		CFrame.new(0, -1.2, 0) * CFrame.Angles(0, 0, math.pi / 2),
+		Color3.fromRGB(226, 214, 190),
+		M.SmoothPlastic,
+		Enum.PartType.Cylinder
+	)
+	piece(body, Vector3.new(3.4, 1.4, 3.4), CFrame.new(0, 0.6, 0), cap, M.SmoothPlastic, Enum.PartType.Ball)
+	for i = 0, 4 do
+		local a = i / 5 * math.pi * 2
+		glow(
+			body,
+			Vector3.new(0.45, 0.45, 0.45),
+			CFrame.new(math.cos(a) * 1.2, 0.95, math.sin(a) * 1.2),
+			Color3.fromRGB(200, 255, 150),
+			Enum.PartType.Ball
+		)
+	end
+	eyes(body, -0.7, -0.82, 0.3, 0.25, Color3.fromRGB(40, 30, 30))
+end
+
+-- Elder Treant: a walking trunk with branch arms and a mossy crown.
+BUILDERS.elder_treant = function(body)
+	local bark = Color3.fromRGB(88, 66, 48)
+	local moss = Color3.fromRGB(86, 130, 66)
+	piece(body, Vector3.new(4.6, 7, 4.2), CFrame.new(0, 2.6, 0.2), bark, M.Wood)
+	piece(body, Vector3.new(9, 4, 8), CFrame.new(0, 7.6, 0.4), moss, M.Grass, Enum.PartType.Ball)
+	piece(
+		body,
+		Vector3.new(5, 3, 5),
+		CFrame.new(2.4, 9.2, -1),
+		Color3.fromRGB(100, 146, 74),
+		M.Grass,
+		Enum.PartType.Ball
+	)
+	eyes(body, 3.6, -2.15, 0.9, 0.6, Color3.fromRGB(200, 255, 120))
+	glow(body, Vector3.new(1.6, 0.4, 0.2), CFrame.new(0, 1.8, -2.15), Color3.fromRGB(170, 240, 100))
+	for _, x in { -1, 1 } do
+		piece(
+			body,
+			Vector3.new(1.4, 6, 1.4),
+			CFrame.new(x * 3.8, 1.8, -0.6) * CFrame.Angles(0.2, 0, x * 0.45),
+			bark,
+			M.Wood
+		)
+		piece(body, Vector3.new(2.4, 1.6, 2.4), CFrame.new(x * 5, -1, -1.4), moss, M.Grass)
+		piece(body, Vector3.new(2, 4.4, 2.2), CFrame.new(x * 1.4, -3.4, 0), bark, M.Wood)
+		piece(body, Vector3.new(2.8, 1, 3.2), CFrame.new(x * 1.6, -5.5, -0.4), Color3.fromRGB(72, 54, 40), M.Wood)
+	end
+end
+
 local SPECS: { [string]: Spec } = {
+	tide_crab = { hip = 0.2, body = Vector3.new(2.2, 1.6, 2) },
+	mist_caster = { hip = 2.6, body = Vector3.new(1.4, 1.4, 1.4) },
+	tide_warden = { hip = 4.1, body = Vector3.new(6, 4, 6) },
+	thorn_sprout = { hip = 1.0, body = Vector3.new(1.8, 2, 1.8) },
+	spore_caster = { hip = 1.2, body = Vector3.new(1.4, 1.4, 1.4) },
+	elder_treant = { hip = 5, body = Vector3.new(4, 5, 4) },
 	ember_imp = { hip = 0.9, body = Vector3.new(2, 1.8, 1.7) },
 	cinder_caster = { hip = 1.3, body = Vector3.new(2.2, 2, 2) },
 	ashling = { hip = 1.6, body = Vector3.new(3.8, 3, 3.2) },
@@ -171,6 +350,12 @@ local SPECS: { [string]: Spec } = {
 }
 
 local BODY_COLORS: { [string]: Color3 } = {
+	tide_crab = Color3.fromRGB(60, 118, 134),
+	mist_caster = Color3.fromRGB(110, 170, 210),
+	tide_warden = Color3.fromRGB(52, 98, 116),
+	thorn_sprout = Color3.fromRGB(98, 140, 66),
+	spore_caster = Color3.fromRGB(226, 214, 190),
+	elder_treant = Color3.fromRGB(88, 66, 48),
 	ember_imp = Color3.fromRGB(150, 58, 40),
 	cinder_caster = Color3.fromRGB(70, 56, 54),
 	ashling = Color3.fromRGB(120, 114, 110),

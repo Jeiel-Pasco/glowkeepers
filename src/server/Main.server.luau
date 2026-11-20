@@ -16,7 +16,6 @@ local ORDER = {
 	"SettingsService",
 	"CycleService",
 	"CampService",
-	"WorldService",
 	"CombatService",
 	"LootService",
 	"ProgressionService",

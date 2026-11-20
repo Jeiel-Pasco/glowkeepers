@@ -146,7 +146,7 @@ local function renderDesk()
 			Kit.GOLD
 		)
 		for i, kind in { "Fire", "Water", "Leaf" } do
-			local ready = kind == "Fire"
+			local ready = true
 			local b = Kit.button(
 				body,
 				if ready then `<b>{kind}</b>` else `{kind}\n<font size="11">coming soon</font>`,
@@ -363,12 +363,14 @@ local function renderShop()
 	local items = {
 		{ "ink_Neutral", "Neutral ink", 40, true },
 		{ "ink_Fire", "Fire ink", 80, data.element == "Fire" },
+		{ "ink_Water", "Water ink", 80, data.element == "Water" },
+		{ "ink_Leaf", "Leaf ink", 80, data.element == "Leaf" },
 	}
 	for i, item in items do
 		local row = Kit.frame(body, UDim2.new(1, 0, 0, 50), UDim2.fromOffset(0, 30 + (i - 1) * 58), Kit.PANEL_LIGHT)
 		Kit.label(
 			row,
-			`<b>{item[2]}</b>{if item[4] then "" else "  (pick Fire first)"}`,
+			`<b>{item[2]}</b>{if item[4] then "" else "  (your element only)"}`,
 			UDim2.new(1, -140, 1, 0),
 			UDim2.fromOffset(10, 0),
 			15
@@ -407,7 +409,7 @@ local TITLES = {
 	desk = { "Writing desk", Vector2.new(520, 470) },
 	shelf = { "Shelf: grimoires & stats", Vector2.new(520, 420) },
 	bank = { "Bank", Vector2.new(400, 300) },
-	shop = { "Ink Merchant", Vector2.new(400, 200) },
+	shop = { "Ink Merchant", Vector2.new(400, 320) },
 } :: { [string]: { any } }
 
 -- Prompts on plots that aren't yours stay hidden.

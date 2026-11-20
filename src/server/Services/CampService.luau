@@ -216,6 +216,12 @@ local function discover()
 		end
 		local shop = stations:FindFirstChild("LanternShop")
 		if shop and shop:IsA("Model") then
+			shop.Name = "InkMerchant"
+			for _, d in shop:GetDescendants() do
+				if d:IsA("TextLabel") then
+					d.Text = "Ink Merchant"
+				end
+			end
 			local anchor = part(shop, "PromptAnchor", Vector3.new(4, 4, 4), shop:GetPivot() * CFrame.new(0, 3, 0), WOOD)
 			anchor.Transparency = 1
 			anchor.CanCollide = false

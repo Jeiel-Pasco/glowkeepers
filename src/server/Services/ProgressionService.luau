@@ -13,6 +13,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Server = script.Parent.Parent
 local Level = require(Shared:WaitForChild("Level")) :: any
 local Quests = require(Shared:WaitForChild("Quests")) :: any
+local Zones = require(Shared:WaitForChild("Zones")) :: any
+local Enemies = require(Shared:WaitForChild("Enemies")) :: any
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local LootService = require(script.Parent:WaitForChild("LootService"))
@@ -35,6 +37,14 @@ local function applyHealth(player: Player)
 	player:SetAttribute("Level", data.level)
 end
 
+-- Fills {zone} and {boss} with the player's element zone.
+function ProgressionService.questText(data: any, text: string): string
+	local zone = Zones.forElement(data.element)
+	local text1 = string.gsub(text, "{zone}", zone.name)
+	local text2 = string.gsub(text1, "{boss}", Enemies.kinds[zone.boss].name)
+	return text2
+end
+
 local function sendQuest(player: Player)
 	local data = DataService.get(player)
 	if data == nil then
@@ -43,7 +53,7 @@ local function sendQuest(player: Player)
 	local step = Quests.step(data.quest.step)
 	NetServer.send(player, "Quest", {
 		index = data.quest.step,
-		text = step.text,
+		text = ProgressionService.questText(data, step.text),
 		n = step.n,
 		progress = math.min(data.quest.n, step.n),
 		hint = step.hint,
@@ -78,13 +88,13 @@ function ProgressionService.addXp(player: Player, amount: number)
 end
 
 -- Reports a quest event (see Shared.Quests).
-function ProgressionService.note(player: Player, event: string, arg: any?)
+function ProgressionService.note(player: Player, event: string, arg: any?, role: string?)
 	local data = DataService.get(player)
 	if data == nil then
 		return
 	end
 	local step = Quests.step(data.quest.step)
-	local progress = Quests.advance(step, data.quest.n, event, arg)
+	local progress = Quests.advance(step, data.quest.n, event, arg, role)
 	if progress == nil then
 		return
 	end
@@ -93,8 +103,13 @@ function ProgressionService.note(player: Player, event: string, arg: any?)
 		data.quest.step += 1
 		data.quest.n = 0
 		local reward = step.reward
-		LootService.reward(player, { coins = reward.coins, ink = reward.ink or {}, frag = {} })
-		NetServer.send(player, "Toast", `Quest complete: {step.text}`, "quest")
+		local ink = {}
+		for kind, n in reward.ink or {} do
+			local real = if kind == "element" then (if data.element ~= "" then data.element else "Neutral") else kind
+			ink[real] = (ink[real] or 0) + n
+		end
+		LootService.reward(player, { coins = reward.coins, ink = ink, frag = {} })
+		NetServer.send(player, "Toast", `Quest complete: {ProgressionService.questText(data, step.text)}`, "quest")
 		DataService.changed(player, "quest")
 		ProgressionService.addXp(player, reward.xp)
 		-- A new "reach level" step may already be met.

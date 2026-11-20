@@ -22,7 +22,7 @@ LootService.Banked = Signal.new() -- (player, bag)
 
 LootService.RECALL_SECONDS = 5
 LootService.SATCHEL_SECONDS = 120
-LootService.PRICES = { ink_Neutral = 40, ink_Fire = 80 } :: { [string]: number }
+LootService.PRICES = { ink_Neutral = 40, ink_Fire = 80, ink_Water = 80, ink_Leaf = 80 } :: { [string]: number }
 
 local recalls: { [Player]: number } = {} -- player → os.clock() when it lands
 
@@ -200,8 +200,8 @@ local function buy(player: Player, item: string)
 		return
 	end
 	local kind = string.sub(item, 5)
-	if kind == "Fire" and data.element ~= "Fire" then
-		NetServer.send(player, "Toast", "Pick Fire as your element first", "warn")
+	if kind ~= "Neutral" and data.element ~= kind then
+		NetServer.send(player, "Toast", `Only {kind} players can buy {kind} ink`, "warn")
 		return
 	end
 	if data.bank.coins < price then
