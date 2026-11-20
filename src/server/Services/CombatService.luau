@@ -19,6 +19,7 @@ local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
 local Spells = require(Shared:WaitForChild("Spells")) :: any
 local Element = require(Shared:WaitForChild("Element")) :: any
 local Level = require(Shared:WaitForChild("Level")) :: any
+local Status = require(Shared:WaitForChild("Status")) :: any
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
 local CampService = require(script.Parent:WaitForChild("CampService"))
@@ -243,8 +244,82 @@ function CombatService.hurtPlayer(player: Player, base: number, attackType: stri
 	return amount
 end
 
-function CombatService.burnPlayer(player: Player, dps: number, duration: number)
-	stateOf(player).burn = { dps = dps, untilT = os.clock() + duration }
+function CombatService.burnPlayer(player: Player, dps: number, duration: number, kind: string?)
+	stateOf(player).burn = { dps = dps, untilT = os.clock() + duration, type = kind or "Fire" }
+end
+
+-- Status effects (Shared.Status) ------------------------------------------------------------
+
+-- Poison: a Leaf damage-over-time, the same tick as a burn.
+function CombatService.poisonPlayer(player: Player, dps: number, duration: number)
+	CombatService.burnPlayer(player, dps, duration, "Leaf")
+end
+
+-- Slows walk and run speed to `factor` (≥ Status.MIN_SLOW) for `duration` seconds.
+function CombatService.slowPlayer(player: Player, factor: number, duration: number)
+	local character = player.Character
+	if character == nil then
+		return
+	end
+	local now = workspace:GetServerTimeNow()
+	local attrs = { SlowUntil = character:GetAttribute("SlowUntil"), SlowFactor = character:GetAttribute("SlowFactor") }
+	local f, untilT = Status.addSlow(attrs :: any, now, factor, duration)
+	character:SetAttribute("SlowFactor", f)
+	character:SetAttribute("SlowUntil", untilT)
+	fxAll("status", player.UserId, "slow", untilT - now)
+end
+
+-- Roots: no moving, jumping, dashing or blinking for `duration` seconds.
+function CombatService.rootPlayer(player: Player, duration: number)
+	local character = player.Character
+	if character == nil then
+		return
+	end
+	local now = workspace:GetServerTimeNow()
+	local untilT = math.max(character:GetAttribute("RootUntil") or 0, now + duration)
+	character:SetAttribute("RootUntil", untilT)
+	fxAll("status", player.UserId, "root", untilT - now)
+end
+
+-- Knockback (positive speed, away from `from`) or pull (negative, toward it). The player's own
+-- client moves them, since it owns their character's physics.
+function CombatService.pushPlayer(player: Player, from: Vector3, speed: number, lift: number, seconds: number)
+	local root = rootOf(player)
+	if
+		root == nil
+		or Status.rooted(
+			{ RootUntil = root.Parent and root.Parent:GetAttribute("RootUntil") } :: any,
+			workspace:GetServerTimeNow()
+		)
+	then
+		return
+	end
+	local v = Status.pushVelocity(from, root.Position, speed, lift)
+	NetServer.send(player, "Fx", "push", v.X, v.Y, v.Z, seconds)
+end
+
+-- A line telegraph: a ground strip from `origin` along flat unit `dir`, filling over `delay`.
+function CombatService.telegraphLine(
+	origin: Vector3,
+	dir: Vector3,
+	length: number,
+	width: number,
+	delay: number,
+	kind: string
+)
+	fxAll("line", origin.X, origin.Y, origin.Z, dir.X, dir.Z, length, width, delay, kind)
+end
+
+-- Players standing in a line telegraph's strip.
+function CombatService.playersInLine(origin: Vector3, dir: Vector3, length: number, width: number): { Player }
+	local out = {}
+	for _, player in Players:GetPlayers() do
+		local root = rootOf(player)
+		if root and Status.inLine(origin, dir, length, width + 3, root.Position) then
+			table.insert(out, player)
+		end
+	end
+	return out
 end
 
 function CombatService.inCombat(player: Player): boolean
@@ -527,7 +602,7 @@ local function tick()
 			if s.burn.untilT < now then
 				s.burn = nil
 			else
-				CombatService.hurtPlayer(player, s.burn.dps * TICK, "Fire", nil)
+				CombatService.hurtPlayer(player, s.burn.dps * TICK, s.burn.type or "Fire", nil)
 			end
 		end
 		local heal = 0
