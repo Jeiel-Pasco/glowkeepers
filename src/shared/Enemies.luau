@@ -10,7 +10,7 @@
 --     minute, and their big hits are telegraphed.
 --
 -- attack: melee (wind up, hit in front), bolt (projectile), boss (slam, volley, eruptions).
--- role:   minion, caster, miniboss, boss, raider (quests count kills by role or by kind).
+-- role:   minion, caster, miniboss, boss, raider, guard (quests count kills by role or by kind).
 
 local Enemies = {}
 
@@ -36,6 +36,7 @@ export type Kind = {
 	stars: number?,
 	boss: boolean?,
 	raider: boolean?,
+	guard: boolean?, -- raider camp guards: attack anyone inside their camp (Shared.RaiderCamps)
 }
 
 Enemies.GROWTH = 0.1 -- health and damage per level above 1
@@ -178,6 +179,47 @@ Enemies.kinds = {
 		coins = { 4, 8 },
 		ink = {},
 		raider = true,
+	},
+	-- Raider camp guards: they don't steal, they defend the camp and its chest.
+	raider_brute = {
+		id = "raider_brute",
+		name = "Raider Brute",
+		type = "Neutral",
+		role = "guard",
+		attack = "melee",
+		size = 2.2,
+		hp = 110,
+		damage = 8,
+		speed = 15,
+		reach = 7,
+		cooldown = 1.6,
+		windup = 0.55,
+		aggro = 34,
+		leash = 50,
+		xp = 22,
+		coins = { 6, 12 },
+		ink = {},
+		guard = true,
+	},
+	raider_archer = {
+		id = "raider_archer",
+		name = "Raider Archer",
+		type = "Neutral",
+		role = "guard",
+		attack = "bolt",
+		size = 1.8,
+		hp = 55,
+		damage = 6.5,
+		speed = 12,
+		reach = 46,
+		cooldown = 2.2,
+		windup = 0.7,
+		aggro = 46,
+		leash = 50,
+		xp = 18,
+		coins = { 5, 10 },
+		ink = {},
+		guard = true,
 	},
 } :: { [string]: Kind }
 

@@ -7,6 +7,7 @@ local Spells = require("../src/shared/Spells")
 local Level = require("../src/shared/Level")
 local Enemies = require("../src/shared/Enemies")
 local Zones = require("../src/shared/Zones")
+local RaiderCamps = require("../src/shared/RaiderCamps")
 -- selene: allow(incorrect_standard_library_use, shadowing)
 local Vector3 = (require("@lune/roblox") :: any).Vector3
 
@@ -194,6 +195,56 @@ H.test("the quest guide goes through a gate and along the trail", function()
 	-- Back to camp from the lowland: in through the nearest gate.
 	local back = Zones.guide(Zones.polar(math.rad(100), 400) + Vector3.new(0, 3, 0), Vector3.new(0, 0, 0))
 	H.ok((back - Zones.polar(math.rad(120), Zones.GATE_D - 16)).Magnitude < 1, `gate back {back}`)
+end)
+
+H.test("raider camp guards are a real fight at their camp's level", function()
+	for _, site in Zones.CAMP_SITES do
+		local level = RaiderCamps.level(site)
+		H.ok(level >= 4 and level <= 8, `camp level {level}`)
+		local brute, archer = Enemies.kinds.raider_brute, Enemies.kinds.raider_archer
+		local bruteKill = Enemies.maxHp(brute, level) / kitDps(level, "Fire")
+		H.ok(bruteKill >= 3 and bruteKill <= 6, `brute kit kill {bruteKill}s`)
+		local archerKill = Enemies.maxHp(archer, level) / kitDps(level, "Fire")
+		H.ok(archerKill >= 1.5 and archerKill <= 3, `archer kit kill {archerKill}s`)
+		-- The whole camp at once kills an idle player in 5–10 s: walking in unready is deadly.
+		local dps = 0
+		for _, guard in RaiderCamps.GUARDS do
+			dps += enemyDps(Enemies.kinds[guard.kind], level)
+		end
+		local survive = Level.maxHealth(level, 0) / dps
+		H.ok(survive >= 5 and survive <= 10, `camp kills an idle player in {survive}s`)
+	end
+end)
+
+H.test("raider camps: one per gap, guards inside, chest mostly coins", function()
+	for _, n in { 1, 2, 3 } do
+		local picks = RaiderCamps.pick(function()
+			return n
+		end)
+		H.ok(#picks == RaiderCamps.ACTIVE, `{#picks} camps`)
+		for gap, index in picks do
+			local site = Zones.CAMP_SITES[index]
+			local centre = math.deg(site.angle) - (gap - 1) * 120
+			H.ok(math.abs(centre - 60) <= 20, `camp {gap} in gap {gap} ({centre})`)
+		end
+	end
+	local centre = Vector3.new(400, 0, 0)
+	for _, guard in RaiderCamps.GUARDS do
+		local pos = RaiderCamps.guardPos(centre, Vector3.new(-1, 0, 0), guard)
+		H.ok((pos - centre).Magnitude < RaiderCamps.WALL_R - 4, `{guard.kind} inside the wall`)
+		H.ok(Enemies.kinds[guard.kind] and Enemies.kinds[guard.kind].guard, `{guard.kind} is a guard`)
+	end
+	local ink, coins = 0, 0
+	for i = 1, 1000 do
+		local bag = RaiderCamps.chestBag(6, (i - 0.5) / 1000, (i * 7 % 1000) / 1000)
+		if next(bag.ink) then
+			ink += 1
+		else
+			H.ok(bag.coins > 0, "coins otherwise")
+			coins += 1
+		end
+	end
+	H.ok(ink >= 80 and ink <= 120, `{ink} ink chests of 1000`)
 end)
 
 H.finish("balance")

@@ -21,6 +21,7 @@ local ORDER = {
 	"ProgressionService",
 	"GrimoireService",
 	"EnemyService",
+	"RaiderCampService",
 }
 
 local loaded: { [string]: any } = {}

@@ -49,7 +49,7 @@ r ~1150      sheer outer cliff + invisible wall (future layer 2; unclimbable for
 | 2 | Builder v2 (`tools/BuildZones.luau` rewrite): heightmap by WriteVoxels in chunks (camp r<255 preserved), noisy cliffs, parkour ledges, single ground tiling, tall forest from `WorldAssets.Forest` (jitter grid, clearings for zones, camps and routes), remove the old r700 edge, tree wall and `Map.Zones`. Run it async with a progress attribute. | DONE |
 | 3 | Fix-ups for the new map: `EnemyService.groundAt` raycast start height, HUD guide hints and quest guide positions, spawn heights on the plateau. | DONE |
 | 2b | Playtest rework: ramps replace the ledges, lantern trails to the zones, a mixed and thinner forest with floor decor all through it, mushrooms and lanterns glow at night, camp floor decor removed. | DONE |
-| 4 | Raider camps: 3 random sites from ~8 candidates, built at runtime (palisade, tents, fire, chest). New guards `raider_brute` (melee) and `raider_archer` (bolt) that attack anyone inside and drop XP and coins. The chest stays locked while guards live; on clear it has a low chance of random-type ink (otherwise coins) into carried, once per player per clear. Guards respawn after ~90 s. | TODO |
+| 4 | Raider camps: 3 random sites from ~8 candidates, built at runtime (palisade, tents, fire, chest). New guards `raider_brute` (melee) and `raider_archer` (bolt) that attack anyone inside and drop XP and coins. The chest stays locked while guards live; on clear it has a low chance of random-type ink (otherwise coins) into carried, once per player per clear. Guards respawn after ~90 s. | DONE |
 | 5 | Player status effects: slow/root via character attributes that `MovementController` respects; knockback/pull via an Fx applied by the owning client (LinearVelocity); poison reuses `burnPlayer`; a new "line" telegraph Fx. | TODO |
 | 6 | Distinct element abilities (uses step 5). **Fire:** imp hits burn, caster fireball burns, Golem keeps slam/volley/eruption. **Water:** crab knockback (tanky), Mist Caller bolt slows, Tide Warden does a tidal-wave line (knockback), a whirlpool (pull + slow) and a bubble volley. **Leaf:** sprout lunge + poison, Spore Puff spore cloud (telegraphed poison), Elder Treant does root-snare circles, a thorn line, and summons sprouts + heals. Rebalance in the spec. | TODO |
 | 7 | Playtest pass in DEV, tune numbers, save the place, and close this doc's open questions. | TODO |
@@ -115,7 +115,26 @@ r ~1150      sheer outer cliff + invisible wall (future layer 2; unclimbable for
   glow parts were Neon with their lights on. DEV place saved (version 119).
 - The step 2 and step 3 notes above about ledges are now out of date.
 
+### Step 4 notes (raider camps)
+
+- Rules live in `Shared.RaiderCamps` (pure, tested); the runtime is `RaiderCampService`, which starts after
+  EnemyService. Each server picks 3 of the 9 sites at random, one per gap between zones, so camps re-roll
+  per server.
+- Each camp is built at runtime in `workspace.RaiderCamps`: a palisade (r26) with an entrance facing the
+  campfire, 3 tents, a lit fire, crates and a chest (about 85 parts).
+- There are 4 guards: 2 `raider_brute` (melee) and 2 `raider_archer` (bolt), at level 4–8 depending on
+  distance (r330 → 4, r440 → 8). They attack anyone inside the palisade, or anyone who hit them, and drop
+  XP and coins. They don't steal. A whole camp kills an idle player in about 6 s.
+- The chest is locked while any guard lives. Once the camp is cleared, each player can open it once per
+  clear: a 10% chance of 1 random Fire, Water or Leaf ink, otherwise 35–65 coins, into the carried bag.
+  The guards come back together 90 s after the clear.
+- Playtest: 3 camps with 4 guards each. Guards ignored a player outside and hit one inside (140 → 68 HP in
+  5 s, then killed them). After the clear, the chest gave 38 coins once and refused a second open. The 90 s
+  respawn was not waited out in the playtest.
+
 ## Open questions (UNSURE)
+
+- Is a chest worth the fight: 35–65 coins, or 10% ink, for 4 guards?
 
 - Night is very dark away from the trails. Should more of the forest glow?
 
@@ -129,8 +148,6 @@ r ~1150      sheer outer cliff + invisible wall (future layer 2; unclimbable for
 - Which 3 of the 9 camp sites are used: one per gap between zones, or any 3?
 
 - Tree count (~4–5k) against performance with StreamingEnabled. The forest may need to be thinner far from paths.
-- How often raider-camp ink drops ("low chance"; start ~10%?), and whether guards scale with distance.
-- Whether camps should also re-roll positions per server, or stay fixed per server.
 - How long the walk takes from camp to a zone after the map grows. The tutorial trail and quest guide may need a shorter route.
 
 ## Running the builder
