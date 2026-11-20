@@ -63,7 +63,10 @@ local function groundAt(pos: Vector3): Vector3
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Include
 	params.FilterDescendantsInstances = { workspace.Terrain }
-	local ray = workspace:Raycast(Vector3.new(pos.X, 120, pos.Z), Vector3.new(0, -240, 0), params)
+	-- From well above whichever is higher, the point or the map's ground there (the plateau
+	-- sits ~60 up), down past the lowland floor.
+	local top = math.max(pos.Y, Zones.groundY(Vector2.new(pos.X, pos.Z).Magnitude)) + 80
+	local ray = workspace:Raycast(Vector3.new(pos.X, top, pos.Z), Vector3.new(0, Zones.FLOOR_Y - 40 - top, 0), params)
 	return if ray then ray.Position else pos
 end
 
@@ -300,6 +303,10 @@ local function think(enemy: Enemy, now: number)
 
 	if enemy.state == "home" then
 		humanoid.WalkSpeed = kind.speed
+		if math.abs(pos.Y - enemy.home.Y) > 15 then
+			-- fell off the cliff (or got knocked down): it can't climb back, so put it home
+			info.model:PivotTo(CFrame.new(enemy.home + Vector3.new(0, humanoid.HipHeight + 1, 0)))
+		end
 		humanoid:MoveTo(enemy.home)
 		if fromHome < 6 then
 			enemy.state = "idle"

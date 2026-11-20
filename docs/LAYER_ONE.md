@@ -47,7 +47,7 @@ r ~1150      sheer outer cliff + invisible wall (future layer 2; unclimbable for
 |---|------|--------|
 | 1 | Zones v3 geometry in `Zones.luau`: radii, cliff, ledges, circle zones, pack rings, raider camp candidate sites. Update `tests/balance.spec.luau` limits. | DONE |
 | 2 | Builder v2 (`tools/BuildZones.luau` rewrite): heightmap by WriteVoxels in chunks (camp r<255 preserved), noisy cliffs, parkour ledges, single ground tiling, tall forest from `WorldAssets.Forest` (jitter grid, clearings for zones, camps and routes), remove the old r700 edge, tree wall and `Map.Zones`. Run it async with a progress attribute. | DONE |
-| 3 | Fix-ups for the new map: `EnemyService.groundAt` raycast start height, HUD guide hints and quest guide positions, spawn heights on the plateau. | TODO |
+| 3 | Fix-ups for the new map: `EnemyService.groundAt` raycast start height, HUD guide hints and quest guide positions, spawn heights on the plateau. | DONE |
 | 4 | Raider camps: 3 random sites from ~8 candidates, built at runtime (palisade, tents, fire, chest). New guards `raider_brute` (melee) and `raider_archer` (bolt) that attack anyone inside and drop XP and coins. The chest stays locked while guards live; on clear it has a low chance of random-type ink (otherwise coins) into carried, once per player per clear. Guards respawn after ~90 s. | TODO |
 | 5 | Player status effects: slow/root via character attributes that `MovementController` respects; knockback/pull via an Fx applied by the owning client (LinearVelocity); poison reuses `burnPlayer`; a new "line" telegraph Fx. | TODO |
 | 6 | Distinct element abilities (uses step 5). **Fire:** imp hits burn, caster fireball burns, Golem keeps slam/volley/eruption. **Water:** crab knockback (tanky), Mist Caller bolt slows, Tide Warden does a tidal-wave line (knockback), a whirlpool (pull + slow) and a bubble volley. **Leaf:** sprout lunge + poison, Spore Puff spore cloud (telegraphed poison), Elder Treant does root-snare circles, a thorn line, and summons sprouts + heals. Rebalance in the spec. | TODO |
@@ -84,7 +84,22 @@ r ~1150      sheer outer cliff + invisible wall (future layer 2; unclimbable for
 - `EnemyService.groundAt` still starts its ray at y=120, which is enough for the plateau (about 60). Step 3 still
   needs to check spawns on the plateau.
 
+### Step 3 notes (fix-ups)
+
+- `EnemyService.groundAt` now starts its ray 80 studs above the higher of the point and `Zones.groundY`, and
+  casts down past the lowland floor. An enemy in the "home" state that is more than 15 studs above or below its
+  home (it fell off the cliff) is put back home.
+- New `Zones.entry(zone)` gives the zone hint target, just inside each circle on the side facing camp.
+  New `Zones.guide(from, target)` gives the quest beam's next waypoint: out through the nearest camp gate,
+  then the first ledge of the closest route, then the next ledge up, then the target. Coming back from
+  the lowland, it leads in through the nearest gate. Both are covered in `balance.spec`.
+- Playtest in DEV: all 39 zone enemies spawned on the plateau (y 55–80) and stayed there. The beam
+  pointed to the gate from camp, to ledge 1 from the lowland, and to the zone entry from the plateau.
+
 ## Open questions (UNSURE)
+
+- Output shows `rbxassetid://203785492 … Asset type does not match` three times at play start. I didn't
+  check whether this is new; look in step 7.
 
 - Trunks are thick (Oak_Tall scaled ×4 is about 17 wide). Is the forest too hard to walk through, or about right?
 - The forest has about 16.5k instances. Check client FPS and streaming on a low-end device in step 7.

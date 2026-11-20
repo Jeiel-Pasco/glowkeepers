@@ -197,6 +197,63 @@ function Zones.campSites(): { Vector3 }
 	return out
 end
 
+-- Where a player heading for a zone walks in: just inside the circle, on the side facing camp.
+function Zones.entry(zone: Zone): Vector3
+	return Zones.toWorld(zone, Zones.ZONE_D - Zones.ZONE_R + 25, 0)
+end
+
+local function flatR(v: Vector3): number
+	return math.sqrt(v.X * v.X + v.Z * v.Z)
+end
+
+-- The nearest camp ring gate to an angle, just past the ring on the inside or outside.
+local function gateToward(angle: number, outside: boolean): Vector3
+	local best, bestGap = Zones.list[1], math.huge
+	for _, zone in Zones.list do
+		local gap = math.abs((angle - zone.angle + math.pi) % (2 * math.pi) - math.pi)
+		if gap < bestGap then
+			best, bestGap = zone, gap
+		end
+	end
+	return Zones.polar(best.angle, Zones.GATE_D + (if outside then 16 else -16))
+end
+
+-- The next point for the quest guide on the way from `from` (a HumanoidRootPart position) to
+-- `target`: through a camp ring gate, then up the nearest ledge route to reach the plateau.
+local guideRoutes: { Route }? = nil -- built once; the guide runs every frame
+function Zones.guide(from: Vector3, target: Vector3): Vector3
+	local fromR, targetR = flatR(from), flatR(target)
+	local point = target
+	local feet = from.Y - 3
+	if targetR > Zones.CLIFF_OUT and feet < Zones.PLATEAU_Y - 4 and fromR < Zones.CLIFF_OUT + 10 then
+		local best, bestCost = nil, math.huge
+		guideRoutes = guideRoutes or Zones.routes()
+		for _, route in guideRoutes :: { Route } do
+			local first, last = route.ledges[1], route.ledges[#route.ledges]
+			local cost = (Vector3.new(from.X, 0, from.Z) - Vector3.new(first.X, 0, first.Z)).Magnitude
+				+ (target - last).Magnitude
+			if cost < bestCost then
+				best, bestCost = route, cost
+			end
+		end
+		assert(best, "no routes")
+		point = target
+		for _, ledge in best.ledges do
+			if ledge.Y > feet + 1 then
+				point = ledge
+				break
+			end
+		end
+	end
+	local pointR = flatR(point)
+	if fromR < Zones.GATE_D and pointR > Zones.GATE_D then
+		return gateToward(math.atan2(point.Z, point.X), true)
+	elseif fromR > Zones.GATE_D and pointR < Zones.GATE_D and fromR < Zones.CLIFF_IN then
+		return gateToward(math.atan2(from.Z, from.X), false)
+	end
+	return point
+end
+
 export type Spawn = { kind: string, pos: Vector3, level: number, wander: number? }
 
 function Zones.spawns(): { Spawn }
