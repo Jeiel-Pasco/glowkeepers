@@ -16,6 +16,7 @@ CombatRules.MAX_CDR = 0.4 -- cooldown reduction cap (Hat + passive)
 CombatRules.MAX_DEFENSE = 0.5 -- damage-taken reduction cap (Robe + passive)
 CombatRules.MIN_DASH_COOLDOWN = 1.4
 CombatRules.PVP_DAMAGE = 0.5 -- player-vs-player damage scale, so ultimates don't one-shot
+CombatRules.PVP_POWER_POINTS = 74 -- power stat points that count in PvP (half of Lv 50's 147)
 
 CombatRules.COMBO_HITS = 4
 CombatRules.COMBO_WINDOW = 1.2 -- seconds between M1 clicks before the combo resets

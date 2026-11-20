@@ -274,7 +274,8 @@ local list: { Spell } = {
 		damage = 20,
 		cooldown = 6,
 		slow = { amount = 0.4, duration = 2 },
-		blurb = "Surf forward on a wave, slowing everything you pass.",
+		speedBoost = { mult = 1.2, duration = 2.5 },
+		blurb = "Surf forward on a wave, slowing everything you pass; +20% speed for 2.5s after.",
 	},
 	{
 		id = "undertow",

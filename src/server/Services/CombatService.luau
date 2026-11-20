@@ -301,10 +301,13 @@ local function addChill(holder: any, now: number, n: number): boolean
 end
 
 -- Damage from a player's blow before the target's defences: base × spell level × stat power ×
--- type × level growth × (Hat + passive + bonus).
-local function attackAmount(player: Player, hit: Hit, mult: number): number
+-- type × level growth × (Hat + passive + bonus). In PvP only the first PVP_POWER_POINTS count.
+local function attackAmount(player: Player, hit: Hit, mult: number, pvp: boolean?): number
 	local data = DataService.get(player)
 	local statPower = if data then data.stats.power else 0
+	if pvp then
+		statPower = math.min(statPower, CombatRules.PVP_POWER_POINTS)
+	end
 	local power = CombatRules.offense(if data then data.gears else nil, playerType(player))
 	return Level.damage(hit.base, hit.scale, statPower, mult, 0)
 		* Level.power(if data then data.level else 1)
@@ -521,7 +524,7 @@ local function strikePlayer(victim: Player, attacker: Player, hit: Hit, from: Ve
 	local s = stateOf(attacker)
 	local now = os.clock()
 	local mult = Element.mult(hit.type, playerType(victim), true)
-	local amount = attackAmount(attacker, hit, mult) * CombatRules.PVP_DAMAGE
+	local amount = attackAmount(attacker, hit, mult, true) * CombatRules.PVP_DAMAGE
 	local burn = hit.burn
 	if not hit.dot and s.buff and s.buff.untilT > now then
 		amount *= 1 + s.buff.power
@@ -958,9 +961,6 @@ local function onCast(player: Player, slot: number, x: number, y: number, z: num
 				CombatService.pushPlayer(foe, pos, spell.push.speed, spell.push.lift, spell.push.duration)
 			end
 		end
-		if spell.speedBoost then
-			boostSpeed(player, spell.speedBoost.mult, spell.speedBoost.duration)
-		end
 	elseif kind == "heal" then
 		s.heal = { perSecond = spell.amount * scale / spell.duration, untilT = now + spell.duration }
 		if spell.cleanse then
@@ -1000,6 +1000,9 @@ local function onCast(player: Player, slot: number, x: number, y: number, z: num
 				strikeNear(player, pos, radius, hit, awayFrom(pos))
 			end)
 		end
+	end
+	if spell.speedBoost then
+		boostSpeed(player, spell.speedBoost.mult, spell.speedBoost.duration)
 	end
 	s.lastAction = now
 end

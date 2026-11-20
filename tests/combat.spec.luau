@@ -85,7 +85,8 @@ end)
 -- defence and Robe/passive defence. A build is { level, power, health, defense } stat points.
 local function pvpHit(base: number, scale: number, mult: number, a: any, d: any): number
 	local power = CombatRules.offense(a.gears, a.book)
-	local raw = Level.damage(base, scale, a.power, mult, 0) * Level.power(a.level) * (1 + power)
+	local points = math.min(a.power, CombatRules.PVP_POWER_POINTS)
+	local raw = Level.damage(base, scale, points, mult, 0) * Level.power(a.level) * (1 + power)
 	local dealt = raw * CombatRules.PVP_DAMAGE / (1 + d.defense * Level.DEFENSE_PER_POINT)
 	return dealt * (1 - CombatRules.defense(d.gears, d.book))
 end
@@ -109,6 +110,10 @@ H.test("PvP at Lv 50, even builds and max gear: no ultimate one-shots", function
 	H.ok(maxHp(victim) / hit >= 1.8, `strongest Lv5 ultimate takes {maxHp(victim) / hit} hits`)
 	local m1 = pvpHit(Spells.BASIC.Dark.damage, 1, Element.PVP_MYTHIC, even, victim)
 	H.ok(maxHp(victim) / m1 >= 15, `M1 takes {maxHp(victim) / m1} hits`)
+	local glass = table.clone(even)
+	glass.power, glass.health, glass.defense = 147, 0, 0
+	local allIn = pvpHit(strongest, Spells.levelScale(5), Element.PVP_MYTHIC, glass, victim)
+	H.ok(maxHp(victim) / allIn >= 1.5, `all-power build's ultimate takes {maxHp(victim) / allIn} hits`)
 end)
 
 H.test("PvP at Lv 1 with starter kits takes several bolts", function()
