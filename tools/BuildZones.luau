@@ -1,20 +1,25 @@
 --!nocheck
--- Builder v2 for Layer One (docs/LAYER_ONE.md, step 2). Run once in Studio Edit, then save the place.
+-- Builder v2 for Layer One (docs/LAYER_ONE.md). Run once in Studio Edit, then save the place.
 -- It rebuilds everything outside the camp (r ≥ Zones.CAMP_R) from Shared.Zones:
---   1. Clears the old world: Map.Zones, Map.WorldEdge, trees and props outside the camp (the old
---      r700 tree wall included), and the last run's Map.Layer.
+--   1. Clears the old world: Map.Zones, Map.WorldEdge, trees and props outside the camp, the camp's
+--      floor decor (props, wood piles, flowers; the fireflies stay), and the last run's Map.Layer.
 --   2. Writes a terrain heightmap with WriteVoxels in chunks: the lowland, a noisy cliff up to the
---      plateau (kept straight where the ledge routes climb), and the sheer outer cliff. Grass all
---      over; rock on the cliffs; each zone's material only inside its circle. Camp voxels are kept.
---   3. Parkour ledges up the cliff (Zones.routes) and an invisible wall at Zones.WORLD_R.
---   4. A tall forest of WorldAssets.Forest oaks on a jitter grid, with clearings for the zones, the
---      raider camp sites, the cliff and the walking routes. Canopies sit above the camera and
---      neither collide nor block it (CanCollide/CanQuery off); trunks still collide.
---   5. Zone decor inside each circle, and the gates and signs in the camp ring.
+--      plateau with a ramp cut across it toward each zone, and the sheer outer cliff. Grass with a
+--      few dirt patches; rock on the cliffs; faint dirt along the trails; each zone's material only
+--      inside its circle. Camp voxels are kept.
+--   3. An invisible wall at Zones.WORLD_R.
+--   4. A mixed forest on a jitter grid (oaks, pines, birches, dead snags; varied muted greens),
+--      clear of the zones, the raider camp sites, the cliff, the ramps and the trails. Canopies
+--      neither collide nor block the camera (CanCollide/CanQuery off); trunks still collide.
+--      Clusters of bushes, logs, stumps, rocks and mushrooms all through it; some mushrooms glow
+--      at night (tag NightGlow, see CycleFXController).
+--   5. Lanterns along each zone's trail (Zones.trail), lit at night.
+--   6. Zone decor inside each circle, and the gates and signs in the camp ring.
 -- It runs async: watch workspace's "BuildProgress" attribute (ends with "done").
 -- Safe to run again. Run: copy to src/server/_tmp/, then in the command bar
 --   task.spawn(loadstring(game.ServerScriptService.Server._tmp.BuildZones.Source))
 
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Zones = require(ReplicatedStorage.Shared.Zones)
@@ -67,38 +72,80 @@ local function segmentDistance(p, a, b)
 	return (p - (a + ab * t)).Magnitude
 end
 
--- Shape ---------------------------------------------------------------------------------------
-
-local ROUTES = Zones.routes()
-local ZONE_MATERIAL = { emberfall = M.Basalt, mistfall = M.Sand, elderwood = M.LeafyGrass }
-local CENTRES = {}
-for _, zone in Zones.list do
-	CENTRES[zone.id] = flat(Zones.toWorld(zone, Zones.ZONE_D, 0))
-end
-local SITES = Zones.campSites()
-local LEDGES = {}
-for _, route in ROUTES do
-	for _, ledge in route.ledges do
-		table.insert(LEDGES, ledge)
+-- A part that glows at night: Neon and its lights on (CycleFXController flips them).
+local function nightGlow(p, color, range, brightness)
+	p:SetAttribute("DayMaterial", p.Material.Name)
+	CollectionService:AddTag(p, "NightGlow")
+	if range then
+		local l = Instance.new("PointLight")
+		l.Color = color
+		l.Range = range
+		l.Brightness = brightness
+		l.Shadows = false
+		l.Enabled = false
+		l.Parent = p
 	end
 end
 
--- How far the cliff is pushed in or out at an angle: noisy, but zero where a ledge route climbs.
-local ROUTE_BANDS = {}
-for _, route in ROUTES do
-	local first, last = route.ledges[1], route.ledges[#route.ledges]
-	local a0, a1 = math.atan2(first.Z, first.X), math.atan2(last.Z, last.X)
-	local mid = a0 + (((a1 - a0 + math.pi) % TAU) - math.pi) / 2
-	table.insert(ROUTE_BANDS, { mid = mid, half = angleGap(a0, a1) / 2 + math.rad(3) })
+-- Shape ---------------------------------------------------------------------------------------
+
+local ZONE_MATERIAL = { emberfall = M.Basalt, mistfall = M.Sand, elderwood = M.LeafyGrass }
+local CENTRES = {}
+local TRAILS = {}
+for _, zone in Zones.list do
+	CENTRES[zone.id] = flat(Zones.toWorld(zone, Zones.ZONE_D, 0))
+	local segs = {}
+	local trail = Zones.trail(zone)
+	for i = 2, #trail do
+		table.insert(segs, { flat(trail[i - 1]), flat(trail[i]) })
+	end
+	TRAILS[zone.id] = { points = trail, segs = segs }
 end
+local SITES = Zones.campSites()
+local RAMP_HALF = Zones.RAMP_WIDTH / 2
+
+-- How far the cliff is pushed in or out at an angle: noisy, but calm where a ramp climbs.
 local function cliffShift(a)
 	local calm = 1
-	for _, band in ROUTE_BANDS do
-		calm = math.min(calm, smooth((angleGap(a, band.mid) - band.half) / math.rad(5)))
+	for _, zone in Zones.list do
+		calm = math.min(calm, smooth((angleGap(a, zone.angle) - Zones.RAMP_SPAN / 2 - math.rad(4)) / math.rad(5)))
 	end
 	local n = math.noise(math.cos(a) * 7, math.sin(a) * 7, 2.3)
 		+ 0.5 * math.noise(math.cos(a) * 19, math.sin(a) * 19, 5.1)
 	return n * 9 * calm
+end
+
+-- Flat distance from (x, z) to the nearest trail (only trails within 35° of it are checked).
+local function trailDistance(x, z)
+	local a = math.atan2(z, x)
+	local p = Vector3.new(x, 0, z)
+	local best = math.huge
+	for _, zone in Zones.list do
+		if angleGap(a, zone.angle) < math.rad(35) then
+			for _, seg in TRAILS[zone.id].segs do
+				best = math.min(best, segmentDistance(p, seg[1], seg[2]))
+			end
+		end
+	end
+	return best
+end
+
+-- How much of a zone's ramp is at (x, z) (0..1) and the ramp's height there.
+local function rampAt(x, z)
+	local bestWeight, bestY = 0, 0
+	for _, zone in Zones.list do
+		local t, off = Zones.rampFrame(zone, x, z)
+		if t > -0.2 and t < 1.2 then
+			local across = 1 - smooth((math.abs(off) - RAMP_HALF) / 10)
+			local along = 1 - smooth(math.max(-t, t - 1) / 0.15)
+			local weight = across * along
+			if weight > bestWeight then
+				bestWeight = weight
+				bestY = FLOOR + Zones.CLIFF_HEIGHT * math.clamp(t, 0, 1)
+			end
+		end
+	end
+	return bestWeight, bestY
 end
 
 -- Ground height and material at (x, z), outside the camp.
@@ -126,24 +173,28 @@ local function ground(x, z)
 	local high = Zones.PLATEAU_Y + hills * 3.5 * smooth((r - cliffOut) / 40) * (0.25 + 0.75 * smooth(zoneEdge / 30))
 	local t = math.clamp((r - cliffIn) / (cliffOut - cliffIn), 0, 1)
 	local h = low + (high - low) * t
+	-- The ramps: a shelf cut diagonally across the cliff face.
+	local ramp, rampY = 0, 0
+	if r > Zones.CLIFF_IN - 40 and r < Zones.CLIFF_OUT + 40 then
+		ramp, rampY = rampAt(x, z)
+		h += (rampY - h) * ramp
+	end
 	-- The outer cliff: sheer, just inside the invisible wall.
 	local outer = r - (Zones.WORLD_R - 8 + shift * 0.6)
 	if outer > 0 then
 		h += math.min(outer / 6, 1) * Zones.OUTER_CLIFF_HEIGHT + math.noise(x / 12, z / 12, 9.1) * 4
 	end
-	-- A notch in the face at each ledge, so smoothed voxels don't bulge over its top.
-	if t > 0 and t < 1 then
-		for _, ledge in LEDGES do
-			if math.abs(x - ledge.X) < 5 and math.abs(z - ledge.Z) < 5 then
-				h = math.min(h, ledge.Y - 1.5)
-			end
-		end
-	end
 	local material = M.Grass
-	if (t > 0 and t < 1) or outer > -2 then
+	if (t > 0 and t < 1 and ramp < 0.3) or outer > -2 then
 		material = M.Rock
-	elseif zoneEdge < 0 then
+	elseif zoneEdge < 0 and ramp <= 0.6 then
 		material = ZONE_MATERIAL[inZone.id]
+	else
+		local trail = trailDistance(x, z) < 3 and math.noise(x / 9, z / 9, 4.4) > -0.25 -- faint, broken
+		local patch = math.noise(x / 55, z / 55, 6.2) > 0.42 -- bare patches under the trees
+		if ramp > 0.6 or trail or patch then
+			material = M.Ground
+		end
 	end
 	return h, material
 end
@@ -161,12 +212,16 @@ local oldEmber = workspace:FindFirstChild("Emberfall")
 if oldEmber then
 	oldEmber:Destroy()
 end
-for _, folder in { map.Forest.Trees, map.Forest.Props, map.Forest:FindFirstChild("WoodPiles") } do
-	for _, thing in folder:GetChildren() do
-		local ok, pos = pcall(function()
-			return thing:GetPivot().Position
-		end)
-		if ok and Vector2.new(pos.X, pos.Z).Magnitude > Zones.CAMP_R then
+-- Trees outside the camp; all the camp's floor decor (but its fireflies).
+for _, tree in map.Forest.Trees:GetChildren() do
+	local pos = tree:GetPivot().Position
+	if Vector2.new(pos.X, pos.Z).Magnitude > Zones.CAMP_R then
+		tree:Destroy()
+	end
+end
+for _, folder in { map.Forest.Props, map.Forest:FindFirstChild("WoodPiles"), map:FindFirstChild("Dressing") } do
+	for _, thing in folder and folder:GetChildren() or {} do
+		if thing.Name ~= "Fireflies" then
 			thing:Destroy()
 		end
 	end
@@ -186,6 +241,7 @@ end
 -- 2. Terrain ------------------------------------------------------------------------------------
 
 terrain:SetMaterialColor(M.Rock, Color3.fromRGB(104, 98, 90))
+terrain:SetMaterialColor(M.Ground, Color3.fromRGB(106, 90, 70))
 local RES = 4
 local CHUNK = 128
 local EXTENT = Zones.WORLD_R + 48 -- terrain ends here
@@ -240,24 +296,7 @@ for i, c in chunks do
 	task.wait()
 end
 
--- 3. Ledges and the edge ------------------------------------------------------------------------
-
-progress("ledges")
-local ledgeFolder = folderIn(layer, "Ledges")
-local ledgeRng = rngFor(11)
-for _, route in ROUTES do
-	for _, top in route.ledges do
-		local size = Zones.LEDGE_SIZE
-		local rock = part(
-			ledgeFolder,
-			Vector3.new(size.X, 2, size.Z),
-			CFrame.new(top - Vector3.new(0, 1, 0)) * CFrame.Angles(0, ledgeRng:NextNumber(0, TAU), 0),
-			Color3.fromRGB(112, 106, 98):Lerp(Color3.fromRGB(92, 88, 82), ledgeRng:NextNumber()),
-			M.Slate
-		)
-		rock.Name = "Ledge"
-	end
-end
+-- 3. The edge -----------------------------------------------------------------------------------
 
 local edge = folderIn(layer, "Edge")
 local SEGMENTS = 96
@@ -275,20 +314,10 @@ for i = 1, SEGMENTS do
 	wall.Transparency = 1
 	wall.CanQuery = false
 end
-game:GetService("StarterPlayer").CharacterMaxSlopeAngle = 50 -- cliffs only by the ledges
+game:GetService("StarterPlayer").CharacterMaxSlopeAngle = 50 -- cliffs only by the ramps
 task.wait()
 
 -- 4. Forest -------------------------------------------------------------------------------------
-
--- Walking routes kept clear: camp gate → first ledge, and cliff top → zone circle.
-local CORRIDORS = {}
-for _, route in ROUTES do
-	local first, last = flat(route.ledges[1]), flat(route.ledges[#route.ledges])
-	table.insert(CORRIDORS, { flat(Zones.polar(route.zone.angle, Zones.GATE_D)), first })
-	local rim = last.Unit * (Zones.CLIFF_OUT + 8)
-	local c = CENTRES[route.zone.id]
-	table.insert(CORRIDORS, { rim, c + (rim - c).Unit * Zones.ZONE_R })
-end
 
 local function clear(pos)
 	local r = pos.Magnitude
@@ -297,6 +326,9 @@ local function clear(pos)
 	end
 	local shift = cliffShift(math.atan2(pos.Z, pos.X))
 	if r > Zones.CLIFF_IN + shift - 8 and r < Zones.CLIFF_OUT + shift + 8 then
+		return false
+	end
+	if r > Zones.CLIFF_IN - 30 and r < Zones.CLIFF_OUT + 30 and rampAt(pos.X, pos.Z) > 0.05 then
 		return false
 	end
 	for _, c in CENTRES do
@@ -309,75 +341,184 @@ local function clear(pos)
 			return false
 		end
 	end
-	for _, seg in CORRIDORS do
-		if segmentDistance(pos, seg[1], seg[2]) < 10 then
-			return false
+	return trailDistance(pos.X, pos.Z) >= 6
+end
+
+-- Muted greens, a few olive and autumn ones.
+local LEAVES = {
+	Color3.fromRGB(70, 112, 60),
+	Color3.fromRGB(84, 122, 64),
+	Color3.fromRGB(98, 134, 70),
+	Color3.fromRGB(62, 98, 70),
+	Color3.fromRGB(112, 128, 72),
+	Color3.fromRGB(128, 136, 78),
+	Color3.fromRGB(146, 116, 70),
+}
+local function leafColor(rng)
+	local i = rng:NextInteger(1, #LEAVES + 2) -- the first two twice as common
+	return LEAVES[if i > #LEAVES then i - #LEAVES else i]
+end
+
+-- An asset tree (Trunk + Leaves), scaled and standing on the ground.
+local function assetTree(name, min, max)
+	return function(parent, rng, x, z)
+		local tree = assets[name]:Clone()
+		tree.Name = "Tree"
+		tree:ScaleTo(rng:NextNumber(min, max))
+		local cf, size = tree:GetBoundingBox()
+		local base = cf.Position.Y - size.Y / 2
+		local color = leafColor(rng)
+		tree:PivotTo(
+			CFrame.new(x, ground(x, z) - 1 + (tree:GetPivot().Position.Y - base), z)
+				* CFrame.Angles(rng:NextNumber(-0.04, 0.04), rng:NextNumber(0, TAU), rng:NextNumber(-0.04, 0.04))
+		)
+		for _, p in tree:GetDescendants() do
+			if p:IsA("BasePart") then
+				p.Anchored = true
+				if p.Name == "Leaves" then
+					p.CanCollide = false
+					p.CanQuery = false
+					p.CanTouch = false
+					p.Color = color
+				end
+			end
 		end
+		tree.Parent = parent
 	end
-	return true
+end
+
+local function canopyPart(model, size, cf, color)
+	local p = part(model, size, cf, color, M.Grass)
+	p.Name = "Leaves"
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	return p
+end
+
+-- A birch: a tall pale trunk and a few chunky blocks of light leaves high up.
+local function birch(parent, rng, x, z)
+	local model = Instance.new("Model")
+	model.Name = "Tree"
+	local h = rng:NextNumber(30, 42)
+	local w = rng:NextNumber(1.6, 2.4)
+	local base = CFrame.new(x, ground(x, z) - 1, z) * CFrame.Angles(rng:NextNumber(-0.05, 0.05), 0, 0)
+	local trunk =
+		part(model, Vector3.new(w, h, w), base * CFrame.new(0, h / 2, 0), Color3.fromRGB(196, 190, 176), M.Wood)
+	trunk.Name = "Trunk"
+	local color = Color3.fromRGB(128, 146, 80):Lerp(Color3.fromRGB(104, 132, 72), rng:NextNumber())
+	for k = 1, 3 do
+		local a = rng:NextNumber(0, TAU)
+		local s = rng:NextNumber(8, 12)
+		canopyPart(
+			model,
+			Vector3.new(s, s * 0.7, s),
+			base
+				* CFrame.new(math.cos(a) * 3, h - 4 + k * 2.5, math.sin(a) * 3)
+				* CFrame.Angles(rng:NextNumber(-0.4, 0.4), rng:NextNumber(0, TAU), rng:NextNumber(-0.4, 0.4)),
+			color
+		)
+	end
+	model.Parent = parent
+end
+
+-- A dead snag: a bare grey trunk and a branch or two.
+local function snag(parent, rng, x, z)
+	local model = Instance.new("Model")
+	model.Name = "Tree"
+	local h = rng:NextNumber(16, 26)
+	local w = rng:NextNumber(2, 3)
+	local bark = Color3.fromRGB(96, 88, 80)
+	local base = CFrame.new(x, ground(x, z) - 1, z)
+		* CFrame.Angles(rng:NextNumber(-0.08, 0.08), rng:NextNumber(0, TAU), rng:NextNumber(-0.08, 0.08))
+	local trunk = part(model, Vector3.new(w, h, w), base * CFrame.new(0, h / 2, 0), bark, M.Wood)
+	trunk.Name = "Trunk"
+	for k = 1, rng:NextInteger(1, 2) do
+		local len = rng:NextNumber(5, 8)
+		part(
+			model,
+			Vector3.new(len, w * 0.45, w * 0.45),
+			base * CFrame.new(0, h * (0.55 + k * 0.15), 0) * CFrame.Angles(0, k * 2.4, 0.5) * CFrame.new(len / 2, 0, 0),
+			bark,
+			M.Wood
+		)
+	end
+	model.Parent = parent
 end
 
 local TREES = {
-	{ name = "Tree_Oak_Tall", weight = 6, min = 3.2, max = 4.2 },
-	{ name = "Tree_Oak_Round", weight = 4, min = 1.4, max = 1.9 },
+	{ weight = 30, plant = assetTree("Tree_Oak_Tall", 2.6, 3.8) },
+	{ weight = 22, plant = assetTree("Tree_Oak_Round", 1.2, 1.8) },
+	{ weight = 14, plant = assetTree("Tree_Pine_Tall", 3.2, 4.5) },
+	{ weight = 8, plant = assetTree("Tree_Pine_Classic", 4, 5.5) },
+	{ weight = 16, plant = birch },
+	{ weight = 6, plant = snag },
 }
 local PROPS = {
-	{ name = "Bush_Round", collide = false, min = 1.2, max = 2 },
-	{ name = "Bush_Wide", collide = false, min = 1.2, max = 2 },
-	{ name = "Bush_Compact", collide = false, min = 1.2, max = 2 },
-	{ name = "Bush_Berries", collide = false, min = 1, max = 1.6 },
-	{ name = "Rock_Mossy", collide = true, min = 0.8, max = 1.6 },
-	{ name = "Rock_Boulder", collide = true, min = 1, max = 2 },
-	{ name = "Log_Fallen", collide = true, min = 1, max = 1.5 },
-	{ name = "Stump_Short", collide = true, min = 1, max = 1.5 },
-	{ name = "Mushrooms_Brown_Cluster", collide = false, min = 1, max = 1.5 },
+	{ name = "Bush_Round", weight = 6, collide = false, min = 1.2, max = 2 },
+	{ name = "Bush_Wide", weight = 5, collide = false, min = 1.2, max = 2 },
+	{ name = "Bush_Compact", weight = 5, collide = false, min = 1.2, max = 2 },
+	{ name = "Bush_Berries", weight = 3, collide = false, min = 1, max = 1.6 },
+	{ name = "Rock_Mossy", weight = 3, collide = true, min = 0.8, max = 1.6 },
+	{ name = "Rock_Boulder", weight = 2, collide = true, min = 1, max = 2 },
+	{ name = "Rock_Flat", weight = 2, collide = true, min = 1, max = 1.8 },
+	{ name = "Rock_Pebble", weight = 2, collide = false, min = 1, max = 2 },
+	{ name = "Log_Fallen", weight = 3, collide = true, min = 1, max = 1.5 },
+	{ name = "Stump_Short", weight = 2, collide = true, min = 1, max = 1.5 },
+	{ name = "Stump_Branch", weight = 2, collide = true, min = 1, max = 1.5 },
+	{
+		name = "Mushrooms_Brown_Cluster",
+		weight = 3,
+		collide = false,
+		min = 1,
+		max = 1.6,
+		glow = Color3.fromRGB(200, 170, 120),
+	},
+	{
+		name = "Mushrooms_Red_Cluster",
+		weight = 2,
+		collide = false,
+		min = 1,
+		max = 1.6,
+		glow = Color3.fromRGB(220, 120, 100),
+	},
+	{
+		name = "Mushrooms_Golden_Cluster",
+		weight = 2,
+		collide = false,
+		min = 1,
+		max = 1.6,
+		glow = Color3.fromRGB(230, 200, 110),
+	},
+	{ name = "Mushroom_Brown", weight = 2, collide = false, min = 1, max = 1.8, glow = Color3.fromRGB(200, 170, 120) },
+	{ name = "Mushroom_Red", weight = 1, collide = false, min = 1, max = 1.8, glow = Color3.fromRGB(220, 120, 100) },
+	{ name = "Mushroom_Golden", weight = 1, collide = false, min = 1, max = 1.8, glow = Color3.fromRGB(230, 200, 110) },
 }
-local totalWeight = 0
-for _, t in TREES do
-	totalWeight += t.weight
+local function pick(list, rng)
+	local total = 0
+	for _, item in list do
+		total += item.weight
+	end
+	local roll = rng:NextNumber(0, total)
+	for _, item in list do
+		roll -= item.weight
+		if roll <= 0 then
+			return item
+		end
+	end
+	return list[1]
 end
-local LEAF_A, LEAF_B = Color3.fromRGB(70, 112, 60), Color3.fromRGB(98, 134, 70)
 
-local function plantTree(parent, rng, x, z)
-	local pick = rng:NextNumber(0, totalWeight)
-	local kind = TREES[1]
-	for _, t in TREES do
-		pick -= t.weight
-		if pick <= 0 then
-			kind = t
-			break
-		end
-	end
-	local tree = assets[kind.name]:Clone()
-	tree.Name = "Tree"
-	tree:ScaleTo(rng:NextNumber(kind.min, kind.max))
-	local cf, size = tree:GetBoundingBox()
-	local base = cf.Position.Y - size.Y / 2
-	local shade = rng:NextNumber()
-	tree:PivotTo(
-		CFrame.new(x, ground(x, z) - 1 + (tree:GetPivot().Position.Y - base), z)
-			* CFrame.Angles(0, rng:NextNumber(0, TAU), 0)
-	)
-	for _, p in tree:GetDescendants() do
-		if p:IsA("BasePart") then
-			p.Anchored = true
-			if p.Name == "Leaves" then
-				p.CanCollide = false
-				p.CanQuery = false
-				p.CanTouch = false
-				p.Color = LEAF_A:Lerp(LEAF_B, shade)
-			end
-		end
-	end
-	tree.Parent = parent
-end
+local glowLights = 0
+local MAX_GLOW_LIGHTS = 260
 
 local function plantProp(parent, rng, x, z)
-	local kind = PROPS[rng:NextInteger(1, #PROPS)]
+	local kind = pick(PROPS, rng)
 	local prop = assets[kind.name]:Clone()
 	local s = rng:NextNumber(kind.min, kind.max)
 	local h = ground(x, z)
 	local spin = CFrame.Angles(0, rng:NextNumber(0, TAU), 0)
+	local parts = {}
 	if prop:IsA("Model") then
 		prop:ScaleTo(s)
 		local cf, size = prop:GetBoundingBox()
@@ -385,15 +526,27 @@ local function plantProp(parent, rng, x, z)
 		prop:PivotTo(CFrame.new(x, h - 0.4 + (prop:GetPivot().Position.Y - base), z) * spin)
 		for _, p in prop:GetDescendants() do
 			if p:IsA("BasePart") then
-				p.Anchored = true
-				p.CanCollide = kind.collide
+				table.insert(parts, p)
 			end
 		end
 	else
 		prop.Size *= s
 		prop.CFrame = CFrame.new(x, h - 0.4 + prop.Size.Y / 2, z) * spin
-		prop.Anchored = true
-		prop.CanCollide = kind.collide
+		parts = { prop }
+	end
+	for _, p in parts do
+		p.Anchored = true
+		p.CanCollide = kind.collide
+	end
+	-- About half the mushrooms glow at night; some of those light the ground round them.
+	if kind.glow and rng:NextNumber() < 0.5 then
+		for i, p in parts do
+			local lit = i == 1 and glowLights < MAX_GLOW_LIGHTS and rng:NextNumber() < 0.5
+			if lit then
+				glowLights += 1
+			end
+			nightGlow(p, kind.glow, if lit then 9 else nil, 0.6)
+		end
 	end
 	prop.Parent = parent
 end
@@ -403,11 +556,11 @@ local rng = rngFor(7)
 local trees, props = 0, 0
 local row = 0
 -- Denser in the lowland; each band owns its side of the cliff.
-for _, band in { { cell = 20, low = true }, { cell = 28, low = false } } do
+for _, band in { { cell = 26, low = true }, { cell = 34, low = false } } do
 	local cell = band.cell
 	for gx = -Zones.WORLD_R, Zones.WORLD_R, cell do
 		row += 1
-		progress(`forest row {row} ({trees} trees)`)
+		progress(`forest row {row} ({trees} trees, {props} props)`)
 		local rowFolder = Instance.new("Folder")
 		rowFolder.Name = `Row{row}`
 		for gz = -Zones.WORLD_R, Zones.WORLD_R, cell do
@@ -415,24 +568,71 @@ for _, band in { { cell = 20, low = true }, { cell = 28, low = false } } do
 			local z = gz + rng:NextNumber(0.15, 0.85) * cell
 			local pos = Vector3.new(x, 0, z)
 			local mine = (pos.Magnitude < Zones.CLIFF_IN) == band.low
-			if mine and clear(pos) and rng:NextNumber() < 0.92 then
-				plantTree(rowFolder, rng, x, z)
+			if mine and rng:NextNumber() < 0.85 and clear(pos) then
+				pick(TREES, rng).plant(rowFolder, rng, x, z)
 				trees += 1
 			end
-			local px, pz = gx + rng:NextNumber() * cell, gz + rng:NextNumber() * cell
-			local propPos = Vector3.new(px, 0, pz)
-			if (propPos.Magnitude < Zones.CLIFF_IN) == band.low and rng:NextNumber() < 0.45 and clear(propPos) then
-				plantProp(rowFolder, rng, px, pz)
-				props += 1
+			-- A small cluster of floor decor in most cells.
+			local cx, cz = gx + rng:NextNumber() * cell, gz + rng:NextNumber() * cell
+			if ((Vector3.new(cx, 0, cz).Magnitude < Zones.CLIFF_IN) == band.low) and rng:NextNumber() < 0.85 then
+				for _ = 1, rng:NextInteger(1, 3) do
+					local px, pz = cx + rng:NextNumber(-5, 5), cz + rng:NextNumber(-5, 5)
+					if clear(Vector3.new(px, 0, pz)) then
+						plantProp(rowFolder, rng, px, pz)
+						props += 1
+					end
+				end
 			end
 		end
 		rowFolder.Parent = forest
 		task.wait()
 	end
 end
-print(`[BuildZones] {trees} trees, {props} props`)
+print(`[BuildZones] {trees} trees, {props} props, {glowLights} mushroom lights`)
 
--- 5. Zones --------------------------------------------------------------------------------------
+-- 5. Lantern trails ---------------------------------------------------------------------------
+
+progress("lanterns")
+local lanterns = folderIn(layer, "Lanterns")
+local lanternRng = rngFor(13)
+local POST = Color3.fromRGB(78, 60, 46)
+local function lantern(pos, facing)
+	local model = Instance.new("Model")
+	model.Name = "Lantern"
+	local base = CFrame.lookAt(pos, pos + facing) * CFrame.Angles(0, 0, lanternRng:NextNumber(-0.05, 0.05))
+	part(model, Vector3.new(0.5, 5, 0.5), base * CFrame.new(0, 2.5, 0), POST, M.Wood)
+	part(model, Vector3.new(0.4, 0.4, 1.6), base * CFrame.new(0, 4.8, -0.6), POST, M.Wood)
+	local glass =
+		part(model, Vector3.new(0.9, 1.1, 0.9), base * CFrame.new(0, 3.9, -1.3), Color3.fromRGB(214, 168, 104), M.Glass)
+	glass.Transparency = 0.2
+	glass.CanCollide = false
+	nightGlow(glass, Color3.fromRGB(255, 188, 120), 16, 0.9)
+	part(model, Vector3.new(1.1, 0.3, 1.1), base * CFrame.new(0, 4.55, -1.3), POST, M.Wood).CanCollide = false
+	model.Parent = lanterns
+end
+local lanternCount = 0
+for _, zone in Zones.list do
+	local points = TRAILS[zone.id].points
+	for i = 2, #points - 1 do
+		local p, nextP = points[i], points[i + 1]
+		local along = flat(nextP - p)
+		if along.Magnitude > 0.1 and lanternRng:NextNumber() < 0.8 then
+			local side = Vector3.new(-along.Z, 0, along.X).Unit * (if i % 2 == 0 then 1 else -1)
+			local r = flat(p).Magnitude
+			local onRamp = r > Zones.RAMP_R0 - 1 and r < Zones.RAMP_R1 + 1
+			if onRamp then
+				side = flat(p).Unit -- the cliff side of the ramp
+			end
+			local at = flat(p) + side * (if onRamp then RAMP_HALF - 1.5 else 4)
+			lantern(Vector3.new(at.X, ground(at.X, at.Z) - 0.5, at.Z), -side)
+			lanternCount += 1
+		end
+	end
+end
+print(`[BuildZones] {lanternCount} lanterns`)
+task.wait()
+
+-- 6. Zones --------------------------------------------------------------------------------------
 
 progress("zones")
 local zonesFolder = folderIn(layer, "Zones")

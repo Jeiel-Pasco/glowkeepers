@@ -32,14 +32,14 @@ r 0–150      camp clearing (unchanged)
 r 150–260    camp forest ring + ring wall (unchanged)
 r 260–510    LOWLAND: dense tall forest at ground level, raider camps, roaming raiders
 r ~520       CLIFF up to the plateau (~60 studs high), natural and noisy,
-             ~6 parkour routes of rock ledges (~5 studs apart, ±20° of each zone's angle)
+             a smooth ramp cut diagonally across it toward each zone (was parkour ledges; changed in 2b)
 r 520–1150   PLATEAU: forest + three CIRCLE zones (radius ~180, centre r~820, at 0/120/240°)
 r ~1150      sheer outer cliff + invisible wall (future layer 2; unclimbable for now)
 ```
 
 - Ground: one Grass material everywhere outside the camp. Zone materials are used only inside each zone circle.
 - Zone packs sit in rings inside each circle: outer L2–5, middle L6–9, inner L10–11, boss at the centre L12.
-- Lower `CharacterMaxSlopeAngle` to about 50 so cliffs can only be climbed by the ledges.
+- `CharacterMaxSlopeAngle` is 50, so the cliffs can only be climbed by the ramps.
 
 ## Steps
 
@@ -48,6 +48,7 @@ r ~1150      sheer outer cliff + invisible wall (future layer 2; unclimbable for
 | 1 | Zones v3 geometry in `Zones.luau`: radii, cliff, ledges, circle zones, pack rings, raider camp candidate sites. Update `tests/balance.spec.luau` limits. | DONE |
 | 2 | Builder v2 (`tools/BuildZones.luau` rewrite): heightmap by WriteVoxels in chunks (camp r<255 preserved), noisy cliffs, parkour ledges, single ground tiling, tall forest from `WorldAssets.Forest` (jitter grid, clearings for zones, camps and routes), remove the old r700 edge, tree wall and `Map.Zones`. Run it async with a progress attribute. | DONE |
 | 3 | Fix-ups for the new map: `EnemyService.groundAt` raycast start height, HUD guide hints and quest guide positions, spawn heights on the plateau. | DONE |
+| 2b | Playtest rework: ramps replace the ledges, lantern trails to the zones, a mixed and thinner forest with floor decor all through it, mushrooms and lanterns glow at night, camp floor decor removed. | DONE |
 | 4 | Raider camps: 3 random sites from ~8 candidates, built at runtime (palisade, tents, fire, chest). New guards `raider_brute` (melee) and `raider_archer` (bolt) that attack anyone inside and drop XP and coins. The chest stays locked while guards live; on clear it has a low chance of random-type ink (otherwise coins) into carried, once per player per clear. Guards respawn after ~90 s. | TODO |
 | 5 | Player status effects: slow/root via character attributes that `MovementController` respects; knockback/pull via an Fx applied by the owning client (LinearVelocity); poison reuses `burnPlayer`; a new "line" telegraph Fx. | TODO |
 | 6 | Distinct element abilities (uses step 5). **Fire:** imp hits burn, caster fireball burns, Golem keeps slam/volley/eruption. **Water:** crab knockback (tanky), Mist Caller bolt slows, Tide Warden does a tidal-wave line (knockback), a whirlpool (pull + slow) and a bubble volley. **Leaf:** sprout lunge + poison, Spore Puff spore cloud (telegraphed poison), Elder Treant does root-snare circles, a thorn line, and summons sprouts + heals. Rebalance in the spec. | TODO |
@@ -96,7 +97,27 @@ r ~1150      sheer outer cliff + invisible wall (future layer 2; unclimbable for
 - Playtest in DEV: all 39 zone enemies spawned on the plateau (y 55–80) and stayed there. The beam
   pointed to the gate from camp, to ledge 1 from the lowland, and to the zone entry from the plateau.
 
+### Step 2b notes (playtest rework)
+
+- After step 3, the user asked for changes: a smooth ramp instead of parkour, a not-too-obvious lantern path
+  to each zone, fewer and more varied trees, floor decor through the forest and none on the camp floor, and
+  mushrooms that glow at night.
+- `Zones`: `rampAt(zone, t)` and `rampFrame` describe one ramp per zone, cut diagonally across the cliff face
+  (18° of arc, 12 wide, about 20° steep). `trail(zone)` gives the lantern trail points from the gate to the
+  zone entry. `routes()` and the ledge constants are gone. The guide now follows the trail and the ramp.
+- Builder: the ramp is a dirt shelf in the heightmap, and the trail is faint, broken dirt with 44 lanterns.
+  There are 2,701 trees: oak, round oak, two pines, part-built birches and dead snags, in 7 muted leaf
+  colours. There are 5,434 props in small clusters (bushes, rocks, logs, stumps, mushrooms). The camp's
+  props, wood piles and flowers are gone (the fireflies stay).
+- Night glow: parts tagged `NightGlow` (lanterns, about half the forest mushrooms) turn Neon from dusk to
+  dawn and switch on their lights. This is handled by `CycleFXController`, and there are 304 lights in total.
+- Playtest: walking up all 3 ramps reached the plateau without getting stuck. At night, the streamed-in
+  glow parts were Neon with their lights on. DEV place saved (version 119).
+- The step 2 and step 3 notes above about ledges are now out of date.
+
 ## Open questions (UNSURE)
+
+- Night is very dark away from the trails. Should more of the forest glow?
 
 - Output shows `rbxassetid://203785492 … Asset type does not match` three times at play start. I didn't
   check whether this is new; look in step 7.
@@ -104,11 +125,9 @@ r ~1150      sheer outer cliff + invisible wall (future layer 2; unclimbable for
 - Trunks are thick (Oak_Tall scaled ×4 is about 17 wide). Is the forest too hard to walk through, or about right?
 - The forest has about 16.5k instances. Check client FPS and streaming on a low-end device in step 7.
 
-- The ledge gaps are about 3.2 studs edge to edge with a 5-stud rise, and each route has 11 jumps. Is that "a little parkour" or too long? Tune in step 7.
 - Is the walk from camp to a zone too long now? It is about 260 studs of lowland, the climb, then about 110 studs of plateau forest before the circle edge.
 - Which 3 of the 9 camp sites are used: one per gap between zones, or any 3?
 
-- Cliff height (~60) and ledge spacing: what does "a little parkour" feel like? Tune in step 7.
 - Tree count (~4–5k) against performance with StreamingEnabled. The forest may need to be thinner far from paths.
 - How often raider-camp ink drops ("low chance"; start ~10%?), and whether guards scale with distance.
 - Whether camps should also re-roll positions per server, or stay fixed per server.
