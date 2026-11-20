@@ -72,6 +72,20 @@ H.test("levelling 1 → 50 on on-level minions takes reasonable playtime", funct
 	H.ok(hours >= 1 and hours <= 120, `{hours} hours`)
 end)
 
+H.test("each area's front pack is near its entry level and the back pack near its cap", function()
+	for _, zone in Zones.list do
+		local low, high = math.huge, 0
+		for _, pack in Zones.PACKS do
+			if pack.role ~= "boss" then
+				local lv = math.floor(zone.minLevel + (zone.maxLevel - zone.minLevel) * pack.t + 0.5)
+				low, high = math.min(low, lv), math.max(high, lv)
+			end
+		end
+		H.ok(low <= zone.minLevel + 2, `{zone.name} front pack Lv {low}`)
+		H.ok(high >= zone.maxLevel - 3, `{zone.name} back pack Lv {high}`)
+	end
+end)
+
 H.test("every zone pack has a real enemy kind; zones sit apart and inside the world", function()
 	local count = 0
 	for _, spawn in Zones.spawns() do
