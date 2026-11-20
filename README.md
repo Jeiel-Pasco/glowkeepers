@@ -39,6 +39,8 @@ In Studio, open the Rojo plugin and connect. Code and `config/*.json` sync live.
   task.spawn(loadstring(game.ServerScriptService.Server._tmp.BuildZones.Source))
   ```
   Watch Workspace's `BuildProgress` attribute until `done`, delete `src/server/_tmp`, and save the place.
+- **Test a Grimoire in Studio:** in a Clients and Servers test, set a test player's `DebugGrimoire` attribute (server side) to a type such as `Frost`. They get that Grimoire with all four pages, in hand. It only works in Studio, for local test players.
+- **PvP:** War Mode (switched in camp) and the Duel Arena Ring south of camp. Rules are in [docs/LAYER_ONE.md](docs/LAYER_ONE.md#combat--pvp).
 - **New remote:** declare it in `src/shared/Net/init.luau` first, with its argument schema and rate limit.
 - **New service or controller:** add it to `ORDER` in `src/server/Main.server.luau` or `src/client/Main.client.luau`.
 

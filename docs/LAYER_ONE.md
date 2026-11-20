@@ -37,6 +37,22 @@ r 650        Sheer outer mountain rim + invisible wall (future Layer 2)
 | 5 | Player status effects (`Shared.Status`, `CombatService`, `MovementController`, `CombatController`): slow, root, knockback/pull, poison, line telegraph Fx. | DONE |
 | 6 | Distinct element abilities (`Enemies`, `EnemyService`, `CombatService`): **Fire** (imp melee burn, caster fireball burn, Golem slam/burning volley/burning eruptions); **Water** (crab melee knockback, Mist Caller slowing bolt, Tide Warden tidal-wave knockback line, pulling/slowing whirlpool, slowing bubble volley); **Leaf** (sprout lunge + poison, Spore Puff telegraphed poison spore cloud, Elder Treant root-snare circles, poison thorn line, sprout summon + heal). | DONE |
 | 7 | Playtest pass in Studio: run `tools/BuildZones.luau`, tune numbers, and save the place. | TODO |
+| 8 | Combat rewrite (`Shared.CombatRules`, `CombatService`, `LootService`, `CombatController`): War Mode and Duel Arena PvP, 4-hit M1 combo finishers, gear and passive stats in combat, Permafrost freeze, push/weaken/root/cleanse, telegraphed beams, bounty. | DONE |
+
+## Combat & PvP
+
+- **Rules live in `Shared.CombatRules`**, used by both server and client, so displayed cooldowns match enforced ones.
+  - Hat and passive: +damage and cooldown cut (CDR capped at 40%).
+  - Robe and Earth passive: less damage taken (capped at 50%).
+  - Boots: shorter dash cooldown (never under 1.4 s). Leaf passive: faster regen.
+- **M1 combo**: the 4th click within 1.2 s is a finisher (1.5× damage, bigger bolt) carrying the Grimoire's `m1Effect`: knockback, burn, slow, poison, chill, shock or pull.
+- **Permafrost**: Frost hits from a wizard holding the Frost Grimoire add chill. 3 stacks Freeze (1.2 s root). Stacks melt after 4 s.
+- **Who can fight whom**: never inside the camp courtyard (`r < 80`). Two players can fight when both stand in the Duel Arena Ring (`Zones.inArena`, centre `(0, 114)`, r 24) or both have War Mode on. War Mode is switched with `TogglePvp`, in camp only.
+- **PvP damage** is ×0.5 with the PvP type curve. `combat.spec` checks there are no one-shots between even Lv 50 builds. An all-power build can still one-shot.
+- **Deaths**: `PlayerDied(player, pos, killer?, duel)`.
+  - Arena duels drop nothing.
+  - A War Mode kill gives the killer +1 bounty and `20 + 30 × victim bounty` coins, into their backpack. The victim's bounty resets.
+- **Studio testing**: set a local test player's (UserId < 0) `DebugGrimoire` attribute to a Grimoire type to give and equip that Grimoire with all four pages.
 
 ## Running the builder
 

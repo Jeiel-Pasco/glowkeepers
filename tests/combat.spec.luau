@@ -2,6 +2,9 @@
 local H = require("./harness")
 local CombatRules = require("../src/shared/CombatRules")
 local Element = require("../src/shared/Element")
+local Gears = require("../src/shared/Gears")
+local Level = require("../src/shared/Level")
+local Spells = require("../src/shared/Spells")
 local Zones = require("../src/shared/Zones")
 local Vector3 = (require("@lune/roblox") :: any).Vector3
 
@@ -76,6 +79,42 @@ H.test("Duel Arena Ring sits outside the camp courtyard", function()
 	H.ok(Zones.inArena(Vector3.new(Zones.ARENA_X, 0, Zones.ARENA_Z)), "centre")
 	H.ok(not Zones.inArena(Vector3.new(0, 0, 0)), "camp centre")
 	H.ok(Zones.ARENA_Z - Zones.ARENA_R > Zones.CAMP_R, "ring clear of the safe radius")
+end)
+
+-- One PvP blow, as CombatService deals it: attackAmount × PVP_DAMAGE, then the victim's stat
+-- defence and Robe/passive defence. A build is { level, power, health, defense } stat points.
+local function pvpHit(base: number, scale: number, mult: number, a: any, d: any): number
+	local power = CombatRules.offense(a.gears, a.book)
+	local raw = Level.damage(base, scale, a.power, mult, 0) * Level.power(a.level) * (1 + power)
+	local dealt = raw * CombatRules.PVP_DAMAGE / (1 + d.defense * Level.DEFENSE_PER_POINT)
+	return dealt * (1 - CombatRules.defense(d.gears, d.book))
+end
+
+local function maxHp(b: any): number
+	return Level.maxHealth(b.level, b.health) + Gears.stats(b.gears).hp
+end
+
+local MAX_GEAR = { backpack = 5, robe = 4, hat = 4, boots = 4 }
+
+H.test("PvP at Lv 50, even builds and max gear: no ultimate one-shots", function()
+	local even = { level = 50, power = 49, health = 49, defense = 49, gears = MAX_GEAR, book = "Dark" }
+	local victim = table.clone(even)
+	victim.book = "Fire"
+	local strongest = 0
+	for _, kind in Element.TYPES do
+		local ult = Spells.get(Spells.fixedFor(kind)[4])
+		strongest = math.max(strongest, ult.damage)
+	end
+	local hit = pvpHit(strongest, Spells.levelScale(5), Element.PVP_MYTHIC, even, victim)
+	H.ok(maxHp(victim) / hit >= 1.8, `strongest Lv5 ultimate takes {maxHp(victim) / hit} hits`)
+	local m1 = pvpHit(Spells.BASIC.Dark.damage, 1, Element.PVP_MYTHIC, even, victim)
+	H.ok(maxHp(victim) / m1 >= 15, `M1 takes {maxHp(victim) / m1} hits`)
+end)
+
+H.test("PvP at Lv 1 with starter kits takes several bolts", function()
+	local starter = { level = 1, power = 0, health = 0, defense = 0, gears = nil, book = "Neutral" }
+	local hit = pvpHit(Spells.get("arcane_bolt").damage, 1, 1, starter, starter)
+	H.ok(maxHp(starter) / hit >= 6, `Arcane Bolt takes {maxHp(starter) / hit} hits`)
 end)
 
 H.test("bounty pays more for wanted wizards", function()

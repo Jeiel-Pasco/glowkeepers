@@ -7,6 +7,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Server = script.Parent.Parent
@@ -292,6 +293,30 @@ function GrimoireService.Init()
 		end)
 	end)
 	DataService.PlayerReady:Connect(onCharacter)
+
+	-- DEV: in Studio, a local test player's DebugGrimoire attribute (a Grimoire type) gives them
+	-- that Grimoire with all four pages at Lv 1 and puts it in hand. Never on real accounts.
+	if RunService:IsStudio() then
+		Players.PlayerAdded:Connect(function(player)
+			player:GetAttributeChangedSignal("DebugGrimoire"):Connect(function()
+				local kind = player:GetAttribute("DebugGrimoire")
+				local data = DataService.get(player)
+				if player.UserId > 0 or data == nil or not Element.isType(kind) then
+					return
+				end
+				local book = Writing.newBook(kind)
+				for slot, id in Spells.fixedFor(kind) do
+					book.pages[slot] = { sp = id, lv = 1 }
+				end
+				table.insert(data.books, book)
+				data.equipped[1] = #data.books
+				data.active = 1
+				DataService.changed(player, "books", "equipped", "active")
+				GrimoireService.syncActiveAttr(player)
+			end)
+		end)
+	end
+
 	DataService.PlayerLeaving:Connect(function(player: Player)
 		pending[player] = nil
 		swapReadyAt[player] = nil
