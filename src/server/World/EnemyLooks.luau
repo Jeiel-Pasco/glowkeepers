@@ -162,6 +162,59 @@ BUILDERS.raider = function(body)
 	end
 end
 
+-- Raider Brute: a broad raider with a leather shoulder plate, a mask and a heavy club.
+BUILDERS.raider_brute = function(body)
+	local leather = Color3.fromRGB(88, 66, 50)
+	piece(body, Vector3.new(2.6, 1.5, 1.9), CFrame.new(0, -1.4, 0), Color3.fromRGB(92, 76, 60), M.Fabric)
+	piece(body, Vector3.new(1.4, 1.2, 1.3), CFrame.new(0, 1.35, 0), Color3.fromRGB(74, 60, 48), M.Fabric)
+	piece(body, Vector3.new(1.2, 0.5, 0.2), CFrame.new(0, 1.3, -0.68), Color3.fromRGB(40, 36, 34))
+	eyes(body, 1.4, -0.7, 0.28, 0.22, Color3.fromRGB(240, 200, 150))
+	piece(body, Vector3.new(1.2, 0.5, 1.6), CFrame.new(-1.3, 0.75, 0) * CFrame.Angles(0, 0, 0.35), leather)
+	piece(
+		body,
+		Vector3.new(0.6, 3.2, 0.6),
+		CFrame.new(1.5, -0.2, -0.6) * CFrame.Angles(0.5, 0, 0),
+		Color3.fromRGB(70, 52, 38),
+		M.Wood
+	)
+	piece(
+		body,
+		Vector3.new(1.1, 1.3, 1.1),
+		CFrame.new(1.5, 1.3, -1.4) * CFrame.Angles(0.5, 0, 0),
+		Color3.fromRGB(80, 60, 44),
+		M.Wood
+	)
+	for _, x in { -0.7, 0.7 } do
+		piece(body, Vector3.new(0.7, 0.9, 0.8), CFrame.new(x, -2.4, 0), Color3.fromRGB(60, 50, 42))
+	end
+end
+
+-- Raider Archer: a lean hooded raider with a bow and a quiver.
+BUILDERS.raider_archer = function(body)
+	local cloak = Color3.fromRGB(84, 84, 66)
+	piece(body, Vector3.new(1.8, 1.4, 1.4), CFrame.new(0, -1.2, 0), cloak, M.Fabric)
+	piece(body, Vector3.new(1.5, 1.3, 1.4), CFrame.new(0, 1.0, 0.05), Color3.fromRGB(70, 72, 56), M.Fabric)
+	piece(body, Vector3.new(1.0, 0.45, 0.2), CFrame.new(0, 0.75, -0.68), Color3.fromRGB(40, 36, 34))
+	eyes(body, 1.0, -0.7, 0.24, 0.2, Color3.fromRGB(240, 240, 220))
+	piece(
+		body,
+		Vector3.new(0.3, 3.4, 0.3),
+		CFrame.new(-1.2, 0, -0.5) * CFrame.Angles(0, 0, 0.15),
+		Color3.fromRGB(96, 70, 48),
+		M.Wood
+	)
+	piece(
+		body,
+		Vector3.new(0.6, 1.8, 0.6),
+		CFrame.new(0.4, 0.6, 0.9) * CFrame.Angles(0, 0, -0.4),
+		Color3.fromRGB(110, 84, 58),
+		M.Fabric
+	)
+	for _, x in { -0.5, 0.5 } do
+		piece(body, Vector3.new(0.55, 0.8, 0.65), CFrame.new(x, -2.1, 0), Color3.fromRGB(60, 50, 42))
+	end
+end
+
 -- Tide Crab: a wide teal shell, two chunky claws, eye stalks.
 BUILDERS.tide_crab = function(body)
 	local shell = Color3.fromRGB(56, 112, 128)
@@ -347,6 +400,8 @@ local SPECS: { [string]: Spec } = {
 	ashling = { hip = 1.6, body = Vector3.new(3.8, 3, 3.2) },
 	cinder_golem = { hip = 6, body = Vector3.new(5.4, 5.6, 7) },
 	raider = { hip = 1.55, body = Vector3.new(1.8, 1.8, 1.4) },
+	raider_brute = { hip = 1.9, body = Vector3.new(2.2, 2.2, 1.7) },
+	raider_archer = { hip = 1.5, body = Vector3.new(1.6, 1.8, 1.3) },
 }
 
 local BODY_COLORS: { [string]: Color3 } = {
@@ -361,6 +416,8 @@ local BODY_COLORS: { [string]: Color3 } = {
 	ashling = Color3.fromRGB(120, 114, 110),
 	cinder_golem = Color3.fromRGB(70, 60, 58),
 	raider = Color3.fromRGB(110, 90, 70),
+	raider_brute = Color3.fromRGB(116, 92, 72),
+	raider_archer = Color3.fromRGB(98, 96, 76),
 }
 
 function EnemyLooks.build(kindId: string): Model

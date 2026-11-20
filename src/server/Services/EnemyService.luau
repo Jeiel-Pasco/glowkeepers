@@ -18,6 +18,7 @@ local Server = script.Parent.Parent
 local Enemies = require(Shared:WaitForChild("Enemies")) :: any
 local Loot = require(Shared:WaitForChild("Loot")) :: any
 local Quests = require(Shared:WaitForChild("Quests")) :: any
+local RaiderCamps = require(Shared:WaitForChild("RaiderCamps")) :: any
 local Zones = require(Shared:WaitForChild("Zones")) :: any
 local EnemyLooks = require(Server:WaitForChild("World"):WaitForChild("EnemyLooks"))
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
@@ -54,6 +55,7 @@ type Enemy = {
 	stolen: { [Player]: any }, -- raiders
 	owner: Player?, -- the tutorial raider's one target
 	fleeFrom: Vector3?,
+	camp: Vector3?, -- a raider camp guard's camp centre
 }
 
 local live: { [Model]: Enemy } = {}
@@ -147,6 +149,23 @@ local function pickTarget(enemy: Enemy): Player?
 	if enemy.owner then
 		local root = rootOf(enemy.owner)
 		return if root and not CampService.isSafe(root.Position) then enemy.owner else nil
+	end
+	local camp = enemy.camp
+	if camp then
+		-- Guards attack anyone inside their palisade, and anyone who hit them.
+		local best, bestD = nil, math.huge
+		for _, player in Players:GetPlayers() do
+			local root = rootOf(player)
+			if root then
+				local inside = (Vector3.new(root.Position.X - camp.X, 0, root.Position.Z - camp.Z)).Magnitude
+					<= RaiderCamps.WALL_R + 2
+				local d = (root.Position - pos).Magnitude
+				if (inside or (enemy.info.dealt[player] and d < kind.leash)) and d < bestD then
+					best, bestD = player, d
+				end
+			end
+		end
+		return best
 	end
 	local best, bestD = nil, kind.aggro
 	for _, player in Players:GetPlayers() do
@@ -524,6 +543,15 @@ local function tutorialRaider(player: Player)
 			model:Destroy()
 		end
 	end)
+end
+
+-- A raider camp guard (RaiderCampService): never respawns on its own; the camp brings its
+-- guards back together.
+function EnemyService.spawnGuard(kindId: string, level: number, pos: Vector3, camp: Vector3, campId: number): Model
+	local enemy = spawnEnemy(kindId, level, pos, nil)
+	enemy.camp = camp
+	enemy.info.model:SetAttribute("Camp", campId)
+	return enemy.info.model
 end
 
 function EnemyService.Init()
