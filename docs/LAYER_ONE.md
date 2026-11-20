@@ -45,7 +45,7 @@ r ~1150      sheer outer cliff + invisible wall (future layer 2; unclimbable for
 
 | # | Step | Status |
 |---|------|--------|
-| 1 | Zones v3 geometry in `Zones.luau`: radii, cliff, ledges, circle zones, pack rings, raider camp candidate sites. Update `tests/balance.spec.luau` limits. | TODO |
+| 1 | Zones v3 geometry in `Zones.luau`: radii, cliff, ledges, circle zones, pack rings, raider camp candidate sites. Update `tests/balance.spec.luau` limits. | DONE |
 | 2 | Builder v2 (`tools/BuildZones.luau` rewrite): heightmap by WriteVoxels in chunks (camp r<255 preserved), noisy cliffs, parkour ledges, single ground tiling, tall forest from `WorldAssets.Forest` (jitter grid, clearings for zones, camps and routes), remove the old r700 edge, tree wall and `Map.Zones`. Run it async with a progress attribute. | TODO |
 | 3 | Fix-ups for the new map: `EnemyService.groundAt` raycast start height, HUD guide hints and quest guide positions, spawn heights on the plateau. | TODO |
 | 4 | Raider camps: 3 random sites from ~8 candidates, built at runtime (palisade, tents, fire, chest). New guards `raider_brute` (melee) and `raider_archer` (bolt) that attack anyone inside and drop XP and coins. The chest stays locked while guards live; on clear it has a low chance of random-type ink (otherwise coins) into carried, once per player per clear. Guards respawn after ~90 s. | TODO |
@@ -54,7 +54,27 @@ r ~1150      sheer outer cliff + invisible wall (future layer 2; unclimbable for
 | 7 | Playtest pass in DEV, tune numbers, save the place, and close this doc's open questions. | TODO |
 | — | Layer 2 (twice as big, higher, three new elements + enhanced old ones, binding enemies) | FUTURE, not now |
 
+### Step 1 notes (Zones v3)
+
+- Numbers are in `src/shared/Zones.luau`: lowland r260–510 at y=-1; cliff r510–530, 60 tall (plateau y=59);
+  plateau out to `WORLD_R` 1150; zone circles radius 180 centred at r820; packs on rings 145 (L2–5),
+  100 (L6–9), 45 (L10–11), with the boss at the centre; 9 raider camp candidate sites (radius 30) at
+  r330/380/440; roaming raiders at r470.
+- New API: `groundY(r)`, `polar(angle, r)`, `routes()` (6 ledge staircases, 11 ledges each, given as
+  top-face centres), and `campSites()`. `toWorld` now returns the ground height. `PACKS` keep `d`/`s`,
+  worked out from `ring`/`a`.
+- `Zones.PATH` (the old strip floor) is gone. The old `tools/BuildZones.luau` no longer runs, and step 2
+  rewrites it.
+- **Until step 2 is built in DEV**, zone spawns sit past the old r700 wall on flat ground. The game is
+  not playable between the step 1 and step 2 merges.
+- The HUD "zone" hint still points at `toWorld(zone, 320, 0)`, which is now in the lowland toward the
+  zone. Step 3 should point it at the nearest ledge route.
+
 ## Open questions (UNSURE)
+
+- The ledge gaps are about 3.2 studs edge to edge with a 5-stud rise, and each route has 11 jumps. Is that "a little parkour" or too long? Tune in step 7.
+- Is the walk from camp to a zone too long now? It is about 260 studs of lowland, the climb, then about 110 studs of plateau forest before the circle edge.
+- Which 3 of the 9 camp sites are used: one per gap between zones, or any 3?
 
 - Cliff height (~60) and ledge spacing: what does "a little parkour" feel like? Tune in step 7.
 - Tree count (~4–5k) against performance with StreamingEnabled. The forest may need to be thinner far from paths.

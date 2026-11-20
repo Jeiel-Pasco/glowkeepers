@@ -7,6 +7,8 @@ local Spells = require("../src/shared/Spells")
 local Level = require("../src/shared/Level")
 local Enemies = require("../src/shared/Enemies")
 local Zones = require("../src/shared/Zones")
+-- selene: allow(incorrect_standard_library_use, shadowing)
+local Vector3 = (require("@lune/roblox") :: any).Vector3
 
 local function kitDps(level: number, kind: string): number
 	local basic = Spells.BASIC[kind]
@@ -77,16 +79,88 @@ H.test("every zone pack has a real enemy kind; zones sit apart and inside the wo
 		count += 1
 	end
 	H.ok(count <= 50, `{count} enemies in the world`)
-	-- Packs at least 12 studs apart, so one pull is one pack.
+	-- Packs at least 40 studs apart (past minion and caster aggro), so one pull is one pack, and
+	-- every pack inside its zone circle.
 	for _, zone in Zones.list do
+		local centre = Zones.toWorld(zone, Zones.ZONE_D, 0)
 		for i, a in Zones.PACKS do
+			local pa = Zones.toWorld(zone, a.d, a.s)
+			H.ok((pa - centre).Magnitude <= Zones.ZONE_R - 25, `{zone.id} pack {i} inside the circle`)
+			H.ok(math.abs(pa.Y - Zones.PLATEAU_Y) < 0.01, `{zone.id} pack {i} on the plateau`)
 			for j, b in Zones.PACKS do
 				if i < j then
-					local d = (Zones.toWorld(zone, a.d, a.s) - Zones.toWorld(zone, b.d, b.s)).Magnitude
-					H.ok(d >= 12, `{zone.id} packs {i},{j} {d}`)
+					local d = (pa - Zones.toWorld(zone, b.d, b.s)).Magnitude
+					H.ok(d >= 40, `{zone.id} packs {i},{j} {d}`)
 				end
 			end
 		end
+	end
+end)
+
+H.test("zone circles sit on the plateau with forest round them", function()
+	H.ok(Zones.ZONE_D - Zones.ZONE_R >= Zones.CLIFF_OUT + 100, "forest between the cliff and each zone")
+	H.ok(Zones.ZONE_D + Zones.ZONE_R <= Zones.WORLD_R - 100, "forest between each zone and the edge")
+	local a, b = Zones.toWorld(Zones.list[1], Zones.ZONE_D, 0), Zones.toWorld(Zones.list[2], Zones.ZONE_D, 0)
+	H.ok((a - b).Magnitude >= 2 * Zones.ZONE_R + 300, "zones far apart")
+	H.ok(Zones.CAMP_R < Zones.GATE_D and Zones.GATE_D < Zones.CLIFF_IN, "camp, then lowland")
+end)
+
+local function angleGap(a: number, b: number): number
+	return math.abs((a - b + math.pi) % (2 * math.pi) - math.pi)
+end
+
+H.test("parkour ledges are hard but reachable (JumpHeight 7.2)", function()
+	local routes = Zones.routes()
+	H.ok(#routes == 2 * #Zones.list, `{#routes} routes`)
+	local half = Zones.LEDGE_SIZE.X / 2
+	for n, route in routes do
+		local ledges = route.ledges
+		H.ok(ledges[1].Y - Zones.FLOOR_Y <= 5.5, `route {n} first ledge`)
+		H.ok(Zones.PLATEAU_Y - ledges[#ledges].Y <= 5.5, `route {n} last ledge to the top`)
+		for i = 2, #ledges do
+			local a, b = ledges[i - 1], ledges[i]
+			local rise = b.Y - a.Y
+			local flat = Vector3.new(b.X - a.X, 0, b.Z - a.Z).Magnitude - 2 * half
+			H.ok(rise > 0 and rise <= 5.5, `route {n} ledge {i} rise {rise}`)
+			H.ok(flat >= 1 and flat <= 4, `route {n} ledge {i} gap {flat}`)
+		end
+		for _, ledge in ledges do
+			local r = Vector3.new(ledge.X, 0, ledge.Z).Magnitude
+			H.ok(r >= Zones.CLIFF_IN - 5 and r <= Zones.CLIFF_OUT, `route {n} ledge on the cliff at r{r}`)
+		end
+	end
+end)
+
+H.test("raider camp sites sit in the lowland, apart and off the routes", function()
+	local sites = Zones.campSites()
+	H.ok(#sites >= 8, `{#sites} camp sites`)
+	local ledges = #Zones.routes()[1].ledges
+	local spread = (ledges - 1) * Zones.LEDGE_STEP / Zones.CLIFF_IN -- a route's sideways span
+	H.ok(spread < Zones.ROUTE_OFFSET, "routes stay their side of the zone angle")
+	for i, site in Zones.CAMP_SITES do
+		H.ok(site.r - Zones.CAMP_SITE_R >= Zones.GATE_D + 30, `site {i} outside the camp ring`)
+		H.ok(site.r + Zones.CAMP_SITE_R <= Zones.CLIFF_IN - 20, `site {i} before the cliff`)
+		local width = math.asin(Zones.CAMP_SITE_R / site.r)
+		for _, zone in Zones.list do
+			for _, side in { -1, 1 } do
+				local route = zone.angle + side * Zones.ROUTE_OFFSET
+				local gap = angleGap(site.angle, route) - width
+				H.ok(gap >= math.rad(15), `site {i} clear of {zone.id} route ({math.deg(gap)}°)`)
+			end
+		end
+		for j, other in sites do
+			if j > i then
+				local d = (sites[i] - other).Magnitude
+				H.ok(d >= 2 * Zones.CAMP_SITE_R + 40, `sites {i},{j} {d}`)
+			end
+		end
+		for _, raider in Zones.RAIDERS do
+			local d = (sites[i] - Zones.polar(raider.angle, raider.r)).Magnitude
+			H.ok(d >= Zones.CAMP_SITE_R + Zones.RAIDER_WANDER + 20, `site {i} clear of roaming raiders`)
+		end
+	end
+	for _, raider in Zones.RAIDERS do
+		H.ok(raider.r + Zones.RAIDER_WANDER <= Zones.CLIFF_IN, "raiders roam the lowland")
 	end
 end)
 
