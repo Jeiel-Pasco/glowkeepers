@@ -1,0 +1,43 @@
+-- Status effects (Shared.Status): slow, root, knockback and pull, line telegraphs.
+local H = require("./harness")
+local Status = require("../src/shared/Status")
+local Vector3 = (require("@lune/roblox") :: any).Vector3
+
+H.test("slow scales speed until it ends; root stops it", function()
+	H.ok(Status.speedFactor({}, 10) == 1, "no effects")
+	H.ok(Status.speedFactor({ SlowUntil = 12, SlowFactor = 0.5 }, 10) == 0.5, "slowed")
+	H.ok(Status.speedFactor({ SlowUntil = 9, SlowFactor = 0.5 }, 10) == 1, "slow over")
+	H.ok(Status.speedFactor({ SlowUntil = 12, SlowFactor = 0.05 }, 10) == Status.MIN_SLOW, "slow floor")
+	H.ok(Status.speedFactor({ SlowUntil = 12, SlowFactor = 0.5, RootUntil = 11 }, 10) == 0, "rooted")
+	H.ok(Status.rooted({ RootUntil = 11 }, 10) and not Status.rooted({ RootUntil = 9 }, 10), "root ends")
+end)
+
+H.test("a second slow keeps the stronger factor and the later end", function()
+	local f, untilT = Status.addSlow({ SlowUntil = 14, SlowFactor = 0.5 }, 10, 0.7, 2)
+	H.ok(f == 0.5 and untilT == 14, `{f} {untilT}`)
+	f, untilT = Status.addSlow({ SlowUntil = 11, SlowFactor = 0.7 }, 10, 0.4, 3)
+	H.ok(f == 0.4 and untilT == 13, `{f} {untilT}`)
+	f, untilT = Status.addSlow({ SlowUntil = 5, SlowFactor = 0.3 }, 10, 0.8, 2)
+	H.ok(f == 0.8 and untilT == 12, `expired slow ignored: {f} {untilT}`)
+end)
+
+H.test("knockback pushes away, pull draws in", function()
+	local from, target = Vector3.new(0, 0, 0), Vector3.new(10, 3, 0)
+	local away = Status.pushVelocity(from, target, 40, 12)
+	H.ok(away.X > 39 and math.abs(away.Z) < 0.01 and away.Y == 12, `{away}`)
+	local pull = Status.pushVelocity(from, target, -30, 0)
+	H.ok(pull.X < -29, `{pull}`)
+	local onTop = Status.pushVelocity(from, from, 40, 0)
+	H.ok(onTop.Magnitude > 39, "standing on the source still moves")
+end)
+
+H.test("line telegraphs cover a strip, not what's behind or beside it", function()
+	local origin, dir = Vector3.new(0, 0, 0), Vector3.new(0, 0, -1)
+	H.ok(Status.inLine(origin, dir, 40, 8, Vector3.new(0, 5, -20)), "middle")
+	H.ok(Status.inLine(origin, dir, 40, 8, Vector3.new(3.9, 0, -39)), "edge")
+	H.ok(not Status.inLine(origin, dir, 40, 8, Vector3.new(0, 0, 5)), "behind")
+	H.ok(not Status.inLine(origin, dir, 40, 8, Vector3.new(0, 0, -45)), "past the end")
+	H.ok(not Status.inLine(origin, dir, 40, 8, Vector3.new(5, 0, -10)), "beside")
+end)
+
+H.finish("status")

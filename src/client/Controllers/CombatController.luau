@@ -22,6 +22,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Client = script.Parent.Parent
 local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
 local Spells = require(Shared:WaitForChild("Spells")) :: any
+local Status = require(Shared:WaitForChild("Status")) :: any
 local Element = require(Shared:WaitForChild("Element")) :: any
 local NetClient = require(Client:WaitForChild("Net"):WaitForChild("NetClient"))
 local StateController = require(script.Parent:WaitForChild("StateController"))
@@ -271,6 +272,21 @@ local function telegraph(at: Vector3, radius: number, delay: number, color: Colo
 	Debris:AddItem(fill, delay)
 end
 
+-- A line telegraph: a faint strip on the ground whose bright core fills from the start over
+-- `delay`, the way `telegraph` fills a disc.
+local function lineTelegraph(origin: Vector3, dir: Vector3, length: number, width: number, delay: number, color: Color3)
+	local flat = if dir.Magnitude > 0.01 then dir.Unit else Vector3.zAxis
+	local base = CFrame.lookAt(origin, origin + flat) + Vector3.new(0, 0.15, 0)
+	local strip = fxPart(Vector3.new(width, 0.2, length), base * CFrame.new(0, 0, -length / 2), color, nil, 0.75)
+	local fill = fxPart(Vector3.new(width * 0.6, 0.25, 0.5), base * CFrame.new(0, 0.02, -0.25), color, nil, 0.4)
+	TweenService:Create(fill, TweenInfo.new(delay, Enum.EasingStyle.Linear), {
+		Size = Vector3.new(width * 0.6, 0.25, length),
+		CFrame = base * CFrame.new(0, 0.02, -length / 2),
+	}):Play()
+	Debris:AddItem(strip, delay)
+	Debris:AddItem(fill, delay)
+end
+
 local function characterOf(userId: number): Model?
 	local who = Players:GetPlayerByUserId(userId)
 	return who and who.Character
@@ -351,6 +367,23 @@ local function dashTrail(userId: number, color: Color3)
 	Debris:AddItem(a1, 0.5)
 end
 
+local function push(direction: Vector3, speed: number, seconds: number)
+	local r = root()
+	if r == nil then
+		return
+	end
+	local attachment = Instance.new("Attachment")
+	attachment.Parent = r
+	local velocity = Instance.new("LinearVelocity")
+	velocity.Attachment0 = attachment
+	velocity.MaxForce = math.huge
+	velocity.RelativeTo = Enum.ActuatorRelativeTo.World
+	velocity.VectorVelocity = direction * speed
+	velocity.Parent = r
+	Debris:AddItem(velocity, seconds)
+	Debris:AddItem(attachment, seconds)
+end
+
 local function onFx(kind: string, ...: any)
 	local a = { ... }
 	if kind == "bolt" then
@@ -395,6 +428,16 @@ local function onFx(kind: string, ...: any)
 		blast(Vector3.new(a[1], a[2], a[3]), a[4], typeColor(a[5]))
 	elseif kind == "ring" then
 		telegraph(Vector3.new(a[1], a[2], a[3]), a[4], a[5], Color3.fromRGB(255, 70, 40))
+	elseif kind == "line" then
+		lineTelegraph(Vector3.new(a[1], a[2], a[3]), Vector3.new(a[4], 0, a[5]), a[6], a[7], a[8], typeColor(a[9]))
+	elseif kind == "push" then
+		local v = Vector3.new(a[1], a[2], a[3])
+		if v.Magnitude > 0.1 then
+			push(v.Unit, v.Magnitude, a[4])
+		end
+	elseif kind == "status" then
+		local color = if a[2] == "root" then Color3.fromRGB(120, 170, 80) else Color3.fromRGB(120, 170, 220)
+		aura(a[1], color, a[3], if a[2] == "root" then "RootAura" else "SlowAura")
 	elseif kind == "beam" then
 		local from, to = Vector3.new(a[1], a[2], a[3]), Vector3.new(a[4], a[5], a[6])
 		local length = (to - from).Magnitude
@@ -520,23 +563,6 @@ end
 
 -- Movement spells --------------------------------------------------------------------------
 
-local function push(direction: Vector3, speed: number, seconds: number)
-	local r = root()
-	if r == nil then
-		return
-	end
-	local attachment = Instance.new("Attachment")
-	attachment.Parent = r
-	local velocity = Instance.new("LinearVelocity")
-	velocity.Attachment0 = attachment
-	velocity.MaxForce = math.huge
-	velocity.RelativeTo = Enum.ActuatorRelativeTo.World
-	velocity.VectorVelocity = direction * speed
-	velocity.Parent = r
-	Debris:AddItem(velocity, seconds)
-	Debris:AddItem(attachment, seconds)
-end
-
 local function flatAim(): Vector3
 	local r = root() :: BasePart
 	local d = aimPoint() - r.Position
@@ -606,6 +632,13 @@ local function basic()
 	sound("cast", nil, 0.25)
 end
 
+-- Rooted (Shared.Status): no dash, dash spell or blink.
+local function rooted(): boolean
+	local character = player.Character
+	return character ~= nil
+		and Status.rooted({ RootUntil = character:GetAttribute("RootUntil") }, workspace:GetServerTimeNow())
+end
+
 local function cast(slot: number)
 	local r = root()
 	local book = activeBook()
@@ -631,15 +664,15 @@ local function cast(slot: number)
 		local dir = (target - origin).Unit
 		dir = Vector3.new(dir.X, math.clamp(dir.Y, -0.35, 0.35), dir.Z).Unit
 		drawBolt(player.UserId, origin + dir * 1.5, dir, spell.speed, spell.range, spell.type, spell.radius)
-	elseif spell.kind == "dash" then
+	elseif spell.kind == "dash" and not rooted() then
 		push(flatAim(), spell.distance / 0.3, 0.3)
-	elseif spell.kind == "blink" then
+	elseif spell.kind == "blink" and not rooted() then
 		blink(spell.distance)
 	end
 end
 
 local function dash()
-	if humanoid() == nil or not tryReady("dash", CombatController.DASH_COOLDOWN) then
+	if humanoid() == nil or rooted() or not tryReady("dash", CombatController.DASH_COOLDOWN) then
 		return
 	end
 	NetClient.send("Dash")

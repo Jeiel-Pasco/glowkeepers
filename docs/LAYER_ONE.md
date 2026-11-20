@@ -50,7 +50,7 @@ r ~1150      sheer outer cliff + invisible wall (future layer 2; unclimbable for
 | 3 | Fix-ups for the new map: `EnemyService.groundAt` raycast start height, HUD guide hints and quest guide positions, spawn heights on the plateau. | DONE |
 | 2b | Playtest rework: ramps replace the ledges, lantern trails to the zones, a mixed and thinner forest with floor decor all through it, mushrooms and lanterns glow at night, camp floor decor removed. | DONE |
 | 4 | Raider camps: 3 random sites from ~8 candidates, built at runtime (palisade, tents, fire, chest). New guards `raider_brute` (melee) and `raider_archer` (bolt) that attack anyone inside and drop XP and coins. The chest stays locked while guards live; on clear it has a low chance of random-type ink (otherwise coins) into carried, once per player per clear. Guards respawn after ~90 s. | DONE |
-| 5 | Player status effects: slow/root via character attributes that `MovementController` respects; knockback/pull via an Fx applied by the owning client (LinearVelocity); poison reuses `burnPlayer`; a new "line" telegraph Fx. | TODO |
+| 5 | Player status effects: slow/root via character attributes that `MovementController` respects; knockback/pull via an Fx applied by the owning client (LinearVelocity); poison reuses `burnPlayer`; a new "line" telegraph Fx. | DONE |
 | 6 | Distinct element abilities (uses step 5). **Fire:** imp hits burn, caster fireball burns, Golem keeps slam/volley/eruption. **Water:** crab knockback (tanky), Mist Caller bolt slows, Tide Warden does a tidal-wave line (knockback), a whirlpool (pull + slow) and a bubble volley. **Leaf:** sprout lunge + poison, Spore Puff spore cloud (telegraphed poison), Elder Treant does root-snare circles, a thorn line, and summons sprouts + heals. Rebalance in the spec. | TODO |
 | 7 | Playtest pass in DEV, tune numbers, save the place, and close this doc's open questions. | TODO |
 | — | Layer 2 (twice as big, higher, three new elements + enhanced old ones, binding enemies) | FUTURE, not now |
@@ -131,6 +131,30 @@ r ~1150      sheer outer cliff + invisible wall (future layer 2; unclimbable for
 - Playtest: 3 camps with 4 guards each. Guards ignored a player outside and hit one inside (140 → 68 HP in
   5 s, then killed them). After the clear, the chest gave 38 coins once and refused a second open. The 90 s
   respawn was not waited out in the playtest.
+
+### Step 5 notes (status effects)
+
+- The rules are in `Shared.Status` (pure, tested in `tests/status.spec.luau`). The server API is in `CombatService`:
+  - `slowPlayer(player, factor, duration)` sets the character attributes `SlowFactor` and `SlowUntil`. The
+    stronger factor and the later end win, and a slow never goes below 0.3×.
+  - `rootPlayer(player, duration)` sets `RootUntil`.
+  - `pushPlayer(player, from, speed, lift, seconds)` handles knockback (positive speed) or pull (negative). It
+    sends a "push" Fx to the owning client, which applies a LinearVelocity, and does nothing while rooted.
+  - `poisonPlayer(player, dps, duration)` is a burn of the Leaf type. `burnPlayer` now takes an optional type.
+  - `telegraphLine(origin, dir, length, width, delay, type)` draws the "line" Fx, a ground strip that fills
+    over the delay. `playersInLine(...)` returns who is standing in it.
+- On the client:
+  - `MovementController` multiplies walk and run speed by `Status.speedFactor`. While rooted it also sets
+    JumpHeight to 0 and restores it afterwards.
+  - `CombatController` blocks dash, the dash spell and blink while rooted.
+  - A "status" Fx shows a short aura: blue for slow, green for root.
+- Times are in server time (`workspace:GetServerTimeNow()`), so the attributes replicate and expire the same
+  way on every client.
+- DEV playtest:
+  - root gave speed 0 and jump 0, the player didn't move, and the aura and line strip showed;
+  - a 0.5 slow gave 8 walk and 8 run;
+  - a push of (60, 15, 0) for 0.35 s moved the player about 34 studs.
+- No enemy uses these yet. Step 6 wires them in.
 
 ## Open questions (UNSURE)
 
