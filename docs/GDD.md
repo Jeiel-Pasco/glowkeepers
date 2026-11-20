@@ -217,6 +217,17 @@ bosses, so the game works with an empty server.
   - **Showing it:** a leaderboard, plus titles and badges at certain amounts. Status, not power.
 - **Level range:** kills outside ±25% of your level give no bounty and no bag bonus, so farming
   new players pays nothing.
+- **Leaving a Dark zone alive:** getting out with your loot is the thrill, and it must be
+  survivable.
+  - **No chokepoints:** the border is long and wide, with many ways out (ridges, paths, slopes),
+    so campers can't hold one exit.
+  - **Safe the moment you cross:** a camper standing just inside has to chase you back into the
+    danger.
+  - **Shimmer:** 2 s of protection on crossing, so nobody can one-shot you on the line.
+  - **Recall works inside:** 5 s and cancelled by damage, so break line of sight first. Movement
+    spells and the dash matter here.
+  - **Kept in reserve:** shrines on the far side of the Peaks where you could bank part of your
+    loot for a fee. Only if the playtest shows camping at the border is a real problem.
 
 ## Quests and the first 5 minutes
 
