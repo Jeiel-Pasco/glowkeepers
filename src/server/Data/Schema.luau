@@ -1,5 +1,5 @@
 --!strict
--- Save data: the v1 template, migrations, and load-time repair (TECH_SPEC §5).
+-- Save data: the template (GDD v2, the grimoire slice), migrations, and load-time repair.
 --
 -- Pure (no requires, no engine calls), so the Lune tests can feed it broken and old saves.
 -- Rules:
@@ -8,21 +8,18 @@
 --   * Migrations only ever add or fill fields (TECH_SPEC §12). An older build that loads a newer
 --     save leaves its version alone and runs only the non-destructive repairs, so a rollback
 --     can't delete anything the newer build wrote.
---   * Saved maps never use sparse number keys (see Types.luau); slot maps use "1", "2", ...
+--   * Saved maps never use sparse number keys; lists are dense arrays.
 
 local Schema = {}
 
 Schema.VERSION = 1
 
 local MAX_RECEIPTS = 200
-local FTUE_ALL = 1023 -- ftue.step is a bitmask of the 10 finished steps (Shared.Ftue)
+local MAX_BOOKS = 30
+local PAGES = 4
 
 -- Keys whose numbers may hold fractions. Every other number in the template is whole.
 local FRACTIONAL = {
-	glow = true,
-	glowSinceRebirth = true,
-	lifetimeGlow = true,
-	lastIncomePerSec = true,
 	music = true,
 	sfx = true,
 	playSeconds = true,
@@ -56,57 +53,31 @@ local function isWhole(value: any, low: number, high: number): boolean
 	return isFiniteNumber(value) and value % 1 == 0 and value >= low and value <= high
 end
 
+local function bag(): any
+	return { coins = 0, ink = {}, frag = {} }
+end
+
 function Schema.template(): any
 	return {
 		v = Schema.VERSION,
-		glow = 0,
-		glowSinceRebirth = 0,
-		lifetimeGlow = 0,
-		embers = 0,
-		embersBoughtLifetime = 0,
+		level = 1,
+		xp = 0,
+		stats = { health = 0, power = 0, defense = 0 }, -- stat points spent
+		books = { { type = "Neutral", pages = {} } }, -- grimoires; pages = { { sp, lv } }
+		equipped = { 1, 0, 0 }, -- book index per equipped slot (0 = empty)
+		active = 1, -- the equipped slot in hand
+		bank = { coins = 0, ink = { Neutral = 1 }, frag = {} }, -- one free ink for the first write
+		carried = bag(), -- picked up on this trip; banked at camp
 		stars = 0,
-		up = { lantern = 0, boots = 0, slots = 0 },
-		lockCharges = 0,
-		shop = { window = 0, bought = { 0, 0, 0, 0 } }, -- lures bought this restock window (§8)
-		glowlings = {},
-		display = {},
-		vault = {},
-		pity = { sinceLegendary = 0 },
-		dex = {},
-		dexClaimed = {},
-		decor = { owned = {}, placed = {} },
-		baseName = { a = 0, n = 0 },
-		companion = "", -- the Night Companion: a vault Glowling id, or "" (D23)
-		quests = { day = 0, daily = {}, week = 0, weekly = {}, rerollDay = 0 },
-		gift = { claimed = 0, lastDay = 0 },
-		pass = { season = 0, xp = 0, premium = false, free = {}, prem = {} },
+		element = "", -- the starter element, once picked
+		quest = { step = 1, n = 0 }, -- the tutorial chain (Shared.Quests); step past the end = done
+		counts = { kills = 0, deaths = 0, bosses = 0, writes = 0 },
 		firstJoin = 0,
 		lastSeen = 0,
-		lastIncomePerSec = 0,
-		playDays = 0,
-		lastPlayDay = 0,
-		shield = { active = true, playSeconds = 0 }, -- new players start shielded (§11)
-		ftue = { step = 0, done = false },
-		stats = {
-			catches = 0,
-			steals = 0,
-			stolenFrom = 0,
-			revives = 0,
-			nightsSurvived = 0,
-			firesLost = 0,
-			rebirths = 0,
-			trades = 0,
-			piecesFed = 0,
-			fireSaves = 0, -- fed the fire below fire.saveBelow (a badge)
-		},
-		daily = { day = 0, buys = {} },
+		playSeconds = 0,
 		receipts = {},
 		settings = { calm = false, reducedFlash = false, music = 0.8, sfx = 1, breakReminder = true },
-		notifyOptIn = false,
 		flags = {},
-		cosmetics = {}, -- cosmetic id → 1 (Night Pass premium rewards; equipped later)
-		badges = {}, -- badge key → true once awarded (BadgeService)
-		lb = { week = "", revives = 0, nights = 0 }, -- this ISO week's board counts
 	}
 end
 
@@ -151,6 +122,25 @@ function Schema.reconcile(data: any, template: any)
 	end
 end
 
+-- A loot bag: whole, non-negative counts under string keys.
+local function cleanBag(value: any): any
+	local out = bag()
+	local function count(n: any): number
+		return if isFiniteNumber(n) and n > 0 then math.floor(n) else 0
+	end
+	out.coins = count(value.coins)
+	for _, field in { "ink", "frag" } do
+		if type(value[field]) == "table" then
+			for key, n in value[field] do
+				if type(key) == "string" and count(n) > 0 then
+					out[field][key] = count(n)
+				end
+			end
+		end
+	end
+	return out
+end
+
 -- Types and numbers, for every key the template defines.
 local function repairShape(data: any, template: any, path: string, notes: { string })
 	for key, default in template do
@@ -178,169 +168,73 @@ local function repairShape(data: any, template: any, path: string, notes: { stri
 	end
 end
 
-local function clampTo(tbl: any, key: string, max: number, label: string, notes: { string })
-	if tbl[key] > max then
-		table.insert(notes, `{label}: {tbl[key]} → {max}`)
-		tbl[key] = max
-	end
-end
-
-local function repairGlowlings(data: any, cfg: any, notes: { string })
-	local rarities, mutations = #cfg.rarities, #cfg.mutations
-	for key, record in data.glowlings do
-		local valid = type(key) == "string"
-			and type(record) == "table"
-			and type(record.sp) == "string"
-			and isWhole(record.r, 1, rarities)
-			and isWhole(record.m, 0, mutations)
-			and isFiniteNumber(record.s)
-		if not valid then
-			data.glowlings[key] = nil
-			table.insert(notes, `glowling {tostring(key)}: invalid record removed`)
-			continue
-		end
-		if record.id ~= key then
-			record.id = key
-			table.insert(notes, `glowling {key}: id fixed`)
-		end
-		local size = math.clamp(math.floor(record.s * 100 + 0.5) / 100, cfg.size.min, cfg.size.max)
-		if size ~= record.s then
-			record.s = size
-			table.insert(notes, `glowling {key}: size fixed`)
-		end
-		if type(record.src) ~= "string" then
-			record.src = "unknown"
-		end
-		if not isFiniteNumber(record.at) then
-			record.at = 0
-		end
-		if not isFiniteNumber(record.by) then
-			record.by = 0
-		end
-		if record.tradeLockUntil ~= nil and not isFiniteNumber(record.tradeLockUntil) then
-			record.tradeLockUntil = nil
-		end
-	end
-end
-
--- Slot keys must be "1".."slotCount", point at an owned Glowling, and hold each id once
--- (the vault wins over display). Exact vault and display counts depend on passes, which
--- PlotService checks at runtime; here an index only has to fit the total slot count.
--- A Glowling dropped from a slot stays owned and goes back to storage.
-local function repairSlots(
-	data: any,
-	map: any,
-	label: string,
-	slotCount: number,
-	placed: { [string]: boolean },
-	notes: { string }
-)
-	local keys = {}
-	for key in map do
-		table.insert(keys, key)
-	end
-	table.sort(keys, function(a, b)
-		return tostring(a) < tostring(b)
-	end)
-	for _, key in keys do
-		local id = map[key]
-		map[key] = nil
-		local index = tonumber(key)
-		local ok = index ~= nil
-			and index % 1 == 0
-			and index >= 1
-			and index <= slotCount
-			and type(id) == "string"
-			and data.glowlings[id] ~= nil
-			and not placed[id]
-		if ok then
-			local canonical = tostring(index)
-			if map[canonical] ~= nil then
-				ok = false
-			else
-				map[canonical] = id
-				placed[id] = true
-				if canonical ~= key then
-					table.insert(notes, `{label}[{tostring(key)}]: key fixed`)
-				end
-			end
-		end
-		if not ok then
-			table.insert(notes, `{label}[{tostring(key)}]: removed`)
-		end
-	end
-end
-
-local function repairReceipts(data: any, notes: { string })
-	local ids = {}
-	for id, at in data.receipts do
-		if type(id) ~= "string" or not isFiniteNumber(at) then
-			data.receipts[id] = nil
-		else
-			table.insert(ids, id)
-		end
-	end
-	if #ids > MAX_RECEIPTS then
-		table.sort(ids, function(a, b)
-			return data.receipts[a] > data.receipts[b]
-		end)
-		for i = MAX_RECEIPTS + 1, #ids do
-			data.receipts[ids[i]] = nil
-		end
-		table.insert(notes, `receipts: kept the newest {MAX_RECEIPTS} of {#ids}`)
-	end
-end
-
--- Repairs a loaded save in place. `cfg` is config/economy.json. Returns notes for the log.
-function Schema.repair(data: any, cfg: any): { string }
+function Schema.repair(data: any): { string }
 	local notes = {}
 	repairShape(data, Schema.template(), "", notes)
-
-	-- Optional fields.
-	if data.ftue.path ~= nil and type(data.ftue.path) ~= "string" then
-		data.ftue.path = nil
-	end
-	if data.crewId ~= nil and type(data.crewId) ~= "string" then
-		data.crewId = nil
-	end
-
-	if data.v > Schema.VERSION then
-		return notes -- a newer build wrote this save: no clamps or removals (see the header)
-	end
-
-	clampTo(data.up, "lantern", cfg.upgrades.lantern.max, "up.lantern", notes)
-	clampTo(data.up, "boots", cfg.upgrades.boots.max, "up.boots", notes)
-	clampTo(data.up, "slots", cfg.upgrades.slots.max - cfg.upgrades.slots.start, "up.slots", notes)
-	clampTo(data, "lockCharges", cfg.lock.maxCharges, "lockCharges", notes)
-	clampTo(data.pity, "sinceLegendary", cfg.pity.legendaryAfterNightCatches, "pity.sinceLegendary", notes)
-	clampTo(data.settings, "music", 1, "settings.music", notes)
-	clampTo(data.settings, "sfx", 1, "settings.sfx", notes)
-	clampTo(data.shield, "playSeconds", cfg.shield.maxPlaySeconds, "shield.playSeconds", notes)
-	clampTo(data.ftue, "step", FTUE_ALL, "ftue.step", notes)
-
-	repairGlowlings(data, cfg, notes)
-	local slotCount = cfg.upgrades.slots.start + data.up.slots
-	local placed = {}
-	repairSlots(data, data.vault, "vault", slotCount, placed, notes)
-	repairSlots(data, data.display, "display", slotCount, placed, notes)
-
-	for species, entry in data.dex do
-		if
-			type(species) ~= "string"
-			or type(entry) ~= "table"
-			or not isWhole(entry.r, 0, 2 ^ 31)
-			or not isWhole(entry.m, 0, 2 ^ 31)
-		then
-			data.dex[species] = nil
-			table.insert(notes, `dex {tostring(species)}: removed`)
+	data.level = math.clamp(data.level, 1, 60)
+	data.bank = cleanBag(data.bank)
+	data.carried = cleanBag(data.carried)
+	-- Books: a known type and at most 4 well-formed pages each.
+	local books = {}
+	for _, book in data.books do
+		if type(book) == "table" and type(book.type) == "string" and type(book.pages) == "table" then
+			local pages = {}
+			for _, page in book.pages do
+				if
+					#pages < PAGES
+					and type(page) == "table"
+					and type(page.sp) == "string"
+					and isWhole(page.lv, 1, 5)
+				then
+					table.insert(pages, { sp = page.sp, lv = page.lv })
+				end
+			end
+			table.insert(books, { type = book.type, pages = pages })
+		end
+		if #books >= MAX_BOOKS then
+			break
 		end
 	end
-	repairReceipts(data, notes)
+	if #books == 0 then
+		books = { { type = "Neutral", pages = {} } }
+		table.insert(notes, "books: none left, reset to a Neutral grimoire")
+	end
+	data.books = books
+	local equipped = {}
+	for i = 1, 3 do
+		local index = data.equipped[i]
+		equipped[i] = if isWhole(index, 1, #books) and table.find(equipped, index) == nil then index else 0
+	end
+	if equipped[1] == 0 and equipped[2] == 0 and equipped[3] == 0 then
+		equipped[1] = 1
+	end
+	data.equipped = equipped
+	if not isWhole(data.active, 1, 3) or equipped[data.active] == 0 then
+		data.active = if equipped[1] ~= 0 then 1 elseif equipped[2] ~= 0 then 2 else 3
+	end
+	-- Stat points can't exceed what the level earned.
+	local spent = data.stats.health + data.stats.power + data.stats.defense
+	if spent > (data.level - 1) * 3 then
+		data.stats = { health = 0, power = 0, defense = 0 }
+		table.insert(notes, "stats: more points spent than earned, reset")
+	end
+	-- Receipts: keep the newest.
+	local receipts = {}
+	for key, value in data.receipts do
+		if type(key) == "string" and isFiniteNumber(value) then
+			table.insert(receipts, { key, value })
+		end
+	end
+	table.sort(receipts, function(a, b)
+		return a[2] > b[2]
+	end)
+	data.receipts = {}
+	for i = 1, math.min(#receipts, MAX_RECEIPTS) do
+		data.receipts[receipts[i][1]] = receipts[i][2]
+	end
 	return notes
 end
 
--- Join bookkeeping, before any gameplay. Returns the seconds away (0 for a first join, or a
--- missing or future lastSeen, so a bad clock never pays) and whether this is the first session.
 function Schema.onJoin(data: any, now: number): (number, boolean)
 	local firstSession = data.firstJoin == 0
 	local away = 0
@@ -350,11 +244,6 @@ function Schema.onJoin(data: any, now: number): (number, boolean)
 		away = now - data.lastSeen
 	end
 	data.lastSeen = now
-	local day = now // 86400 -- UTC day
-	if data.lastPlayDay ~= day then
-		data.playDays += 1
-		data.lastPlayDay = day
-	end
 	return away, firstSession
 end
 

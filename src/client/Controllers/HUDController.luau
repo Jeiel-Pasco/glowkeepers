@@ -1,403 +1,467 @@
 --!strict
--- HUD skeleton (Phase 1): the Glow counter (extrapolated from the Wallet), Embers, the cycle
--- ring with its countdown, the phase banner, and a loading cover until the first PlayerState.
--- Phase 2: the fire meter and catches left at night (workspace `Fire`, Player `CatchesLeft`),
--- and banners for rolls, the dawn result, server Toasts and Announcements.
---
--- If the place has StarterGui.HUD (laid out by artists in Studio; set ResetOnSpawn off), this
--- binds to its descendants by name: Glow, Embers, FireMeter, Ring (with Dot1..DotN children),
--- Countdown, PhaseLabel, Banner, Loading. Any of them may be missing. Without a StarterGui.HUD it builds
--- a plain placeholder with the same names.
+-- The slice's HUD: health and XP, the book tabs and spell bar with cooldowns, carried and
+-- banked loot, the quest tracker with a guide line to where it happens, Recall's channel bar,
+-- toasts, and a controls card.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local StarterGui = game:GetService("StarterGui")
+local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Config = Shared:WaitForChild("Config")
-local Cycle = require(Shared:WaitForChild("Cycle"))
-local EconomyMath = require(Shared:WaitForChild("EconomyMath"))
-local Roll = require(Shared:WaitForChild("Roll"))
-local economy = require(Config:WaitForChild("economy")) :: any
-local speciesConfig = require(Config:WaitForChild("species")) :: any
-local NetClient = require(script.Parent.Parent:WaitForChild("Net"):WaitForChild("NetClient"))
+local Client = script.Parent.Parent
+local Spells = require(Shared:WaitForChild("Spells")) :: any
+local Element = require(Shared:WaitForChild("Element")) :: any
+local Level = require(Shared:WaitForChild("Level")) :: any
+local NetClient = require(Client:WaitForChild("Net"):WaitForChild("NetClient"))
+local Kit = require(Client:WaitForChild("Ui"):WaitForChild("Kit"))
 local StateController = require(script.Parent:WaitForChild("StateController"))
-local CycleFXController = require(script.Parent:WaitForChild("CycleFXController"))
-
-local RING_DOTS = 48
-local REFRESH_SECONDS = 0.1
-local BANNER_SECONDS = 4
-
-local DAY_DOT = Color3.fromRGB(255, 205, 110)
-local NIGHT_DOT = Color3.fromRGB(120, 150, 255)
-local PANEL = Color3.fromRGB(16, 18, 32)
-local FIRE_OK = Color3.fromRGB(255, 170, 90)
-local FIRE_LOW = Color3.fromRGB(255, 70, 60)
-local FIRE_LOW_BELOW = 0.25 -- the meter pulses red below 25% (§12)
-
-local MODIFIER_NAMES = {
-	Fog = "Fog",
-	FireflyBloom = "Firefly Bloom",
-	Gusty = "Gusty Night",
-	Starfall = "Starfall",
-}
-
-local BANNERS = {
-	Day = "Dawn! Your Glowlings are safe.",
-	Dusk = "Night is coming. Head for the fire!",
-	Night = "Night has fallen. Feed the fire and catch Glowlings.",
-}
-
-type Parts = {
-	glow: TextLabel?,
-	embers: TextLabel?,
-	fire: TextLabel?,
-	pity: TextLabel?,
-	dots: { GuiObject },
-	countdown: TextLabel?,
-	phaseLabel: TextLabel?,
-	banner: TextLabel?,
-	loading: GuiObject?,
-}
-
-local HudLayout = require(script.Parent:WaitForChild("HudLayout"))
+local CombatController = require(script.Parent:WaitForChild("CombatController"))
 
 local HUDController = {}
 
-local parts: Parts = { dots = {} }
-local bannerToken = 0
+local player = Players.LocalPlayer
+local gui: ScreenGui
+local hpFill: Frame
+local hpText: TextLabel
+local xpFill: Frame
+local levelText: TextLabel
+local tabs: Frame
+local slots: { { frame: TextButton, name: TextLabel, cd: Frame, cdText: TextLabel, key: string } } = {}
+local dashCd: Frame
+local lootText: TextLabel
+local questTitle: TextLabel
+local questText: TextLabel
+local questFrame: Frame
+local recallFrame: Frame
+local recallFill: Frame
+local toastList: Frame
+local recallEnds: number? = nil
+local quest: any = nil
 
-local function corner(parent: Instance, radius: UDim)
-	local c = Instance.new("UICorner")
-	c.CornerRadius = radius
-	c.Parent = parent
+local KEYS = { "Z", "X", "C", "V" }
+
+local function typeColor(kind: string): Color3
+	return Kit.rgb(Element.COLOR[kind] or Element.COLOR.Neutral)
 end
 
-local function makeLabel(name: string, parent: Instance, textSize: number, color: Color3): TextLabel
-	local text = Instance.new("TextLabel")
-	text.Name = name
-	text.AutomaticSize = Enum.AutomaticSize.X
-	text.Size = UDim2.fromOffset(0, 36)
-	text.BackgroundColor3 = PANEL
-	text.BackgroundTransparency = 0.35
-	text.Font = Enum.Font.GothamBold
-	text.TextSize = textSize
-	text.TextColor3 = color
-	text.Text = ""
-	corner(text, UDim.new(0, 10))
-	local padding = Instance.new("UIPadding")
-	padding.PaddingLeft = UDim.new(0, 12)
-	padding.PaddingRight = UDim.new(0, 12)
-	padding.Parent = text
-	text.Parent = parent
-	return text
+local function bar(parent: Instance, size: UDim2, position: UDim2, color: Color3): (Frame, Frame)
+	local track = Kit.frame(parent, size, position, Color3.fromRGB(24, 20, 30))
+	track:SetAttribute("NoSkin", true)
+	local fill = Kit.frame(track, UDim2.fromScale(1, 1), UDim2.new(), color)
+	fill:SetAttribute("NoSkin", true)
+	return track, fill
 end
 
-local function buildPlaceholder(playerGui: PlayerGui): ScreenGui
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "HUD"
-	gui.ResetOnSpawn = false
-	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-	gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
+-- Toasts -------------------------------------------------------------------------------------
 
-	local top = Instance.new("Frame")
-	top.Name = "TopBar"
-	top.AnchorPoint = Vector2.new(0.5, 0)
-	top.Position = UDim2.new(0.5, 0, 0, 8)
-	top.Size = UDim2.fromOffset(0, 36)
-	top.AutomaticSize = Enum.AutomaticSize.X
-	top.BackgroundTransparency = 1
-	local list = Instance.new("UIListLayout")
-	list.FillDirection = Enum.FillDirection.Horizontal
-	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	list.VerticalAlignment = Enum.VerticalAlignment.Center
-	list.SortOrder = Enum.SortOrder.LayoutOrder
-	list.Padding = UDim.new(0, 10)
-	list.Parent = top
-	top.Parent = gui
-	HudLayout.fitWidth(top, 12 + 96 + 8) -- clear of the cycle ring on both sides
-	makeLabel("Glow", top, 22, Color3.fromRGB(255, 221, 120)).LayoutOrder = 1
-	makeLabel("Embers", top, 22, Color3.fromRGB(255, 150, 90)).LayoutOrder = 2
-	local fireMeter = makeLabel("FireMeter", top, 22, FIRE_OK)
-	fireMeter.LayoutOrder = 3
-	fireMeter.Visible = false
-	makeLabel("Pity", top, 16, Color3.fromRGB(200, 170, 255)).LayoutOrder = 4
+local TOAST_COLORS = {
+	loot = Color3.fromRGB(70, 60, 40),
+	bank = Color3.fromRGB(46, 80, 56),
+	warn = Color3.fromRGB(110, 46, 40),
+	quest = Color3.fromRGB(90, 70, 30),
+	level = Color3.fromRGB(96, 80, 30),
+} :: { [string]: Color3 }
 
-	-- Cycle ring: dots around a circle. Day dots are warm and night dots blue; passed dots dim.
-	local ring = Instance.new("Frame")
-	ring.Name = "Ring"
-	ring.AnchorPoint = Vector2.new(1, 0)
-	ring.Position = UDim2.new(1, -12, 0, 8)
-	ring.Size = UDim2.fromOffset(96, 96)
-	ring.BackgroundColor3 = PANEL
-	ring.BackgroundTransparency = 0.5
-	corner(ring, UDim.new(1, 0))
-	ring.Parent = gui
-	for i = 1, RING_DOTS do
-		local angle = (i - 0.5) / RING_DOTS * 2 * math.pi
-		local dot = Instance.new("Frame")
-		dot.Name = `Dot{i}`
-		dot.AnchorPoint = Vector2.new(0.5, 0.5)
-		dot.Position = UDim2.fromScale(0.5 + 0.42 * math.sin(angle), 0.5 - 0.42 * math.cos(angle))
-		dot.Size = UDim2.fromOffset(6, 6)
-		dot.BorderSizePixel = 0
-		corner(dot, UDim.new(1, 0))
-		dot.Parent = ring
+local function toast(text: string, kind: string?)
+	local f = Kit.frame(toastList, UDim2.fromOffset(380, 34), UDim2.new(), TOAST_COLORS[kind or ""] or Kit.PANEL)
+	f.LayoutOrder = -math.floor(os.clock() * 100)
+	f.BackgroundTransparency = 0.1
+	Kit.label(f, text, UDim2.new(1, -16, 1, 0), UDim2.fromOffset(8, 0), 15)
+	task.delay(3.2, function()
+		TweenService:Create(f, TweenInfo.new(0.3), { BackgroundTransparency = 1 }):Play()
+		for _, d in f:GetDescendants() do
+			if d:IsA("TextLabel") then
+				TweenService:Create(d, TweenInfo.new(0.3), { TextTransparency = 1 }):Play()
+			end
+		end
+		task.wait(0.35)
+		f:Destroy()
+	end)
+	local count = 0
+	for _, child in toastList:GetChildren() do
+		if child:IsA("Frame") then
+			count += 1
+		end
 	end
+	if count > 4 then
+		local oldest, order = nil, -math.huge
+		for _, child in toastList:GetChildren() do
+			if child:IsA("Frame") and child.LayoutOrder > order then
+				oldest, order = child, child.LayoutOrder
+			end
+		end
+		if oldest then
+			oldest:Destroy()
+		end
+	end
+end
+HUDController.toast = toast
 
-	local phaseLabel = Instance.new("TextLabel")
-	phaseLabel.Name = "PhaseLabel"
-	phaseLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-	phaseLabel.Position = UDim2.fromScale(0.5, 0.36)
-	phaseLabel.Size = UDim2.fromOffset(70, 14)
-	phaseLabel.BackgroundTransparency = 1
-	phaseLabel.Font = Enum.Font.GothamMedium
-	phaseLabel.TextSize = 12
-	phaseLabel.TextColor3 = Color3.fromRGB(210, 210, 230)
-	phaseLabel.Text = "" -- not Roblox's default "Label" before the first refresh
-	phaseLabel.Parent = ring
+-- Book tabs and the spell bar ----------------------------------------------------------------
 
-	local countdown = Instance.new("TextLabel")
-	countdown.Name = "Countdown"
-	countdown.AnchorPoint = Vector2.new(0.5, 0.5)
-	countdown.Position = UDim2.fromScale(0.5, 0.58)
-	countdown.Size = UDim2.fromOffset(70, 24)
-	countdown.BackgroundTransparency = 1
-	countdown.Font = Enum.Font.GothamBold
-	countdown.TextSize = 20
-	countdown.TextColor3 = Color3.new(1, 1, 1)
-	countdown.Text = ""
-	countdown.Parent = ring
-
-	local banner = makeLabel("Banner", gui, 22, Color3.new(1, 1, 1))
-	banner.AnchorPoint = Vector2.new(0.5, 0)
-	banner.Position = UDim2.new(0.5, 0, 0, 56)
-	banner.Size = UDim2.fromOffset(0, 44)
-	banner.Visible = false
-
-	local cover = Instance.new("ScreenGui")
-	cover.Name = "LoadingCover"
-	cover.ResetOnSpawn = false
-	cover.IgnoreGuiInset = true
-	cover.DisplayOrder = 100
-	local loading = Instance.new("TextLabel")
-	loading.Name = "Loading"
-	loading.Size = UDim2.fromScale(1, 1)
-	loading.BackgroundColor3 = Color3.fromRGB(8, 10, 20)
-	loading.Font = Enum.Font.GothamBold
-	loading.TextSize = 24
-	loading.TextColor3 = Color3.fromRGB(255, 221, 120)
-	loading.Text = "Lighting the lanterns…"
-	loading.Parent = cover
-	cover.Parent = playerGui
-
-	gui.Parent = playerGui
-	return gui
+local function refreshBooks()
+	local data = StateController.get()
+	if data == nil then
+		return
+	end
+	Kit.clear(tabs)
+	Kit.list(tabs, 6, true)
+	for slot, index in data.equipped do
+		local book = data.books[index]
+		if book then
+			local active = data.active == slot
+			local b = Kit.button(
+				tabs,
+				`{slot}  {book.type}`,
+				UDim2.fromOffset(110, 28),
+				UDim2.new(),
+				if active then typeColor(book.type) else Kit.PANEL,
+				function()
+					NetClient.send("SwapBook", slot)
+				end
+			)
+			b.TextSize = 14
+			b.LayoutOrder = slot
+			if active then
+				b.TextColor3 = Color3.fromRGB(30, 24, 30)
+			end
+		end
+	end
+	local book = data.books[data.equipped[data.active]]
+	for i, s in slots do
+		local page = book and book.pages[i]
+		local spell = page and Spells.get(page.sp)
+		if spell then
+			s.name.Text = `<b>{spell.name}</b>\n<font size="11">Lv {page.lv}</font>`
+			s.frame.BackgroundColor3 = Kit.rgb(Spells.RARITY_COLOR[spell.rarity]):Lerp(Kit.PANEL, 0.55)
+			s.key = `{book.type}:{spell.id}:{i}`
+		else
+			s.name.Text = '<font color="#8a8296">empty page</font>'
+			s.frame.BackgroundColor3 = Kit.PANEL
+			s.key = ""
+		end
+	end
 end
 
-local function find(root: Instance, name: string, className: string): any
-	local found = root:FindFirstChild(name, true)
-	if found ~= nil and found:IsA(className) then
-		return found
+local function refreshLoot()
+	local data = StateController.get()
+	if data == nil then
+		return
+	end
+	local function line(bag: any): string
+		local parts = { `Coins {bag.coins}` }
+		for kind, n in bag.ink do
+			if n > 0 then
+				table.insert(parts, `{kind} ink {n}`)
+			end
+		end
+		for kind, n in bag.frag do
+			if n > 0 then
+				table.insert(parts, `{kind} frag {n}`)
+			end
+		end
+		return table.concat(parts, "  ·  ")
+	end
+	lootText.Text =
+		`<b>Carrying</b>  {line(data.carried)}\n<font color="#9fd6a4"><b>Banked</b>  {line(data.bank)}   ★ {data.stars}</font>`
+end
+
+local function refreshLevel()
+	local data = StateController.get()
+	if data == nil then
+		return
+	end
+	local need = Level.xpToNext(data.level)
+	levelText.Text = if data.level >= Level.CAP
+		then `Lv {data.level} (max)`
+		else `Lv {data.level}   {data.xp} / {need} XP`
+	xpFill.Size = UDim2.fromScale(if data.level >= Level.CAP then 1 else math.clamp(data.xp / need, 0, 1), 1)
+end
+
+local function refreshQuest()
+	if quest == nil then
+		questFrame.Visible = false
+		return
+	end
+	questFrame.Visible = true
+	questTitle.Text = if quest.tutorial then `Tutorial {quest.index}/6` else "Quest"
+	questText.Text = if quest.n > 1 then `{quest.text}  ({quest.progress}/{quest.n})` else quest.text
+end
+
+-- Guide line -----------------------------------------------------------------------------------
+
+local guideBeam: Beam
+local guideFrom: Attachment
+local guideTo: Attachment
+local guidePart: Part
+
+local function hintTarget(): Vector3?
+	if quest == nil or quest.hint == nil then
+		return nil
+	end
+	local hint = quest.hint
+	local plotId = player:GetAttribute("PlotId")
+	if hint == "desk" or hint == "camp" then
+		local plots = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Plots")
+		if plots then
+			for _, plot in plots:GetChildren() do
+				if plot:GetAttribute("PlotId") == plotId then
+					local camp = plot:FindFirstChild("Camp")
+					local desk = camp and camp:FindFirstChild("Desk")
+					if hint == "desk" and desk and desk:IsA("BasePart") then
+						return desk.Position
+					end
+					local floor = plot:FindFirstChild("Floor")
+					return if floor and floor:IsA("BasePart") then floor.Position else nil
+				end
+			end
+		end
+		return nil
+	end
+	local enemies = workspace:FindFirstChild("Enemies")
+	local function nearest(kind: string): Vector3?
+		local me = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if enemies == nil or me == nil or not me:IsA("BasePart") then
+			return nil
+		end
+		local best, bestD = nil, math.huge
+		for _, model in enemies:GetChildren() do
+			if model:GetAttribute("Kind") == kind and model:IsA("Model") and model.PrimaryPart then
+				local d = (model.PrimaryPart.Position - me.Position).Magnitude
+				if d < bestD then
+					best, bestD = model.PrimaryPart.Position, d
+				end
+			end
+		end
+		return best
+	end
+	if hint == "trail" then
+		return nearest("ember_imp") or Vector3.new(190, 2, 0)
+	elseif hint == "ashling" then
+		return nearest("ashling") or Vector3.new(238, 2, 0)
+	elseif hint == "raider" then
+		return nearest("raider")
+	elseif hint == "emberfall" then
+		return Vector3.new(300, 2, 0)
+	elseif hint == "golem" then
+		return nearest("cinder_golem") or Vector3.new(600, 2, 0)
 	end
 	return nil
 end
 
-local function bind(playerGui: PlayerGui)
-	local root: Instance
-	if StarterGui:FindFirstChild("HUD") ~= nil then
-		root = playerGui:WaitForChild("HUD")
-	else
-		root = buildPlaceholder(playerGui)
-	end
-
-	parts.glow = find(root, "Glow", "TextLabel")
-	parts.embers = find(root, "Embers", "TextLabel")
-	parts.fire = find(root, "FireMeter", "TextLabel")
-	parts.pity = find(root, "Pity", "TextLabel")
-	parts.countdown = find(root, "Countdown", "TextLabel")
-	parts.phaseLabel = find(root, "PhaseLabel", "TextLabel")
-	parts.banner = find(root, "Banner", "TextLabel")
-	parts.loading = find(root, "Loading", "GuiObject") or find(playerGui, "Loading", "GuiObject")
-
-	local ring = find(root, "Ring", "GuiObject")
-	if ring ~= nil then
-		for i = 1, math.huge do
-			local dot = ring:FindFirstChild(`Dot{i}`)
-			if dot == nil or not dot:IsA("GuiObject") then
-				break
-			end
-			table.insert(parts.dots, dot)
-		end
-	end
-end
-
-local function showBanner(text: string)
-	local banner = parts.banner
-	if banner == nil then
+local function updateGuide()
+	local me = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	local target = hintTarget()
+	if me == nil or not me:IsA("BasePart") or target == nil or (target - me.Position).Magnitude < 12 then
+		guideBeam.Enabled = false
 		return
 	end
-	bannerToken += 1
-	local token = bannerToken
-	banner.Text = text
-	banner.Visible = true
-	task.delay(BANNER_SECONDS, function()
-		if token == bannerToken then
-			banner.Visible = false
+	if guideFrom.Parent ~= me then
+		guideFrom.Parent = me
+	end
+	guidePart.Position = target + Vector3.new(0, 1, 0)
+	guideBeam.Enabled = true
+end
+
+-- Build ------------------------------------------------------------------------------------
+
+local function build()
+	gui = Kit.screen("HUD", 1)
+
+	-- Bottom centre: health, XP, tabs, spells.
+	local bottom = Instance.new("Frame")
+	bottom.BackgroundTransparency = 1
+	bottom.Size = UDim2.fromOffset(520, 170)
+	bottom.Position = UDim2.new(0.5, 0, 1, -12)
+	bottom.AnchorPoint = Vector2.new(0.5, 1)
+	bottom.Parent = gui
+	local scale = Instance.new("UIScale")
+	scale.Parent = bottom
+	local function fit()
+		scale.Scale = math.min(1, (workspace.CurrentCamera.ViewportSize.X - 24) / 520)
+	end
+	fit()
+	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fit)
+
+	tabs = Instance.new("Frame")
+	tabs.BackgroundTransparency = 1
+	tabs.Size = UDim2.new(1, 0, 0, 28)
+	tabs.Position = UDim2.fromOffset(0, 0)
+	tabs.Parent = bottom
+
+	for i = 1, 4 do
+		local frame = Kit.button(
+			bottom,
+			"",
+			UDim2.fromOffset(122, 58),
+			UDim2.fromOffset((i - 1) * 130, 36),
+			Kit.PANEL,
+			function()
+				CombatController.cast(i)
+			end
+		)
+		local key = Kit.label(frame, KEYS[i], UDim2.fromOffset(22, 22), UDim2.fromOffset(4, 3), 14, Kit.GOLD)
+		key.TextXAlignment = Enum.TextXAlignment.Left
+		local name = Kit.label(frame, "", UDim2.new(1, -8, 1, -6), UDim2.fromOffset(4, 4), 14)
+		local cd =
+			Kit.frame(frame, UDim2.fromScale(1, 0), UDim2.fromScale(0, 1), Color3.new(0, 0, 0), Vector2.new(0, 1))
+		cd.BackgroundTransparency = 0.4
+		cd:SetAttribute("NoSkin", true)
+		local cdText = Kit.label(frame, "", UDim2.fromScale(1, 1), UDim2.new(), 20, Kit.TEXT)
+		cdText.ZIndex = 3
+		slots[i] = { frame = frame, name = name, cd = cd, cdText = cdText, key = "" }
+	end
+
+	local hpTrack
+	hpTrack, hpFill = bar(bottom, UDim2.fromOffset(392, 22), UDim2.fromOffset(0, 102), Color3.fromRGB(200, 70, 60))
+	hpText = Kit.label(hpTrack, "", UDim2.fromScale(1, 1), UDim2.new(), 14)
+	hpText.ZIndex = 3
+	local _xpTrack
+	_xpTrack, xpFill = bar(bottom, UDim2.fromOffset(392, 10), UDim2.fromOffset(0, 128), Color3.fromRGB(236, 190, 96))
+	levelText = Kit.label(bottom, "", UDim2.fromOffset(392, 18), UDim2.fromOffset(0, 140), 13, Kit.MUTED)
+	local dash = Kit.frame(bottom, UDim2.fromOffset(122, 36), UDim2.fromOffset(398, 102), Kit.PANEL)
+	Kit.label(dash, "Q  Dash", UDim2.fromScale(1, 1), UDim2.new(), 14)
+	dashCd = Kit.frame(dash, UDim2.fromScale(0, 1), UDim2.new(), Color3.new(0, 0, 0))
+	dashCd.BackgroundTransparency = 0.4
+	dashCd:SetAttribute("NoSkin", true)
+
+	-- Top left: loot.
+	local loot = Kit.frame(gui, UDim2.fromOffset(330, 52), UDim2.fromOffset(12, 12), Kit.PANEL)
+	loot.BackgroundTransparency = 0.15
+	lootText = Kit.label(loot, "", UDim2.new(1, -16, 1, -6), UDim2.fromOffset(8, 3), 14)
+	lootText.TextXAlignment = Enum.TextXAlignment.Left
+
+	-- Top right: quest.
+	questFrame = Kit.frame(gui, UDim2.fromOffset(300, 70), UDim2.new(1, -12, 0, 12), Kit.PANEL, Vector2.new(1, 0))
+	questFrame.BackgroundTransparency = 0.15
+	questTitle = Kit.label(questFrame, "", UDim2.new(1, -16, 0, 20), UDim2.fromOffset(8, 4), 14, Kit.GOLD)
+	questTitle.TextXAlignment = Enum.TextXAlignment.Left
+	questText = Kit.label(questFrame, "", UDim2.new(1, -16, 1, -28), UDim2.fromOffset(8, 24), 15)
+	questText.TextXAlignment = Enum.TextXAlignment.Left
+	questText.TextYAlignment = Enum.TextYAlignment.Top
+
+	-- Toasts under the boss bar.
+	toastList = Instance.new("Frame")
+	toastList.BackgroundTransparency = 1
+	toastList.Size = UDim2.fromOffset(380, 200)
+	toastList.Position = UDim2.new(0.5, 0, 0, 70)
+	toastList.AnchorPoint = Vector2.new(0.5, 0)
+	toastList.Parent = gui
+	Kit.list(toastList, 6)
+
+	-- Recall bar.
+	recallFrame =
+		Kit.frame(gui, UDim2.fromOffset(260, 40), UDim2.new(0.5, 0, 0.62, 0), Kit.PANEL, Vector2.new(0.5, 0.5))
+	recallFrame.Visible = false
+	Kit.label(recallFrame, "Recalling to camp…  (R to cancel)", UDim2.new(1, 0, 0, 20), UDim2.fromOffset(0, 2), 14)
+	local _recallTrack
+	_recallTrack, recallFill =
+		bar(recallFrame, UDim2.new(1, -20, 0, 8), UDim2.fromOffset(10, 25), Color3.fromRGB(140, 190, 255))
+
+	-- Controls card, bottom left.
+	local help = Kit.frame(gui, UDim2.fromOffset(210, 118), UDim2.new(0, 12, 1, -12), Kit.PANEL, Vector2.new(0, 1))
+	help.BackgroundTransparency = 0.25
+	local helpText = Kit.label(
+		help,
+		"<b>Click</b> attack\n<b>Z X C V</b> spells\n<b>Q</b> dash   <b>1 2 3</b> books\n<b>R</b> recall   <b>E</b> use\nWalk into camp to bank",
+		UDim2.new(1, -16, 1, -8),
+		UDim2.fromOffset(8, 4),
+		13,
+		Kit.MUTED
+	)
+	helpText.TextXAlignment = Enum.TextXAlignment.Left
+
+	-- Guide line.
+	guidePart = Instance.new("Part")
+	guidePart.Anchored = true
+	guidePart.CanCollide = false
+	guidePart.CanQuery = false
+	guidePart.Transparency = 1
+	guidePart.Size = Vector3.one
+	guidePart.Parent = workspace
+	guideTo = Instance.new("Attachment")
+	guideTo.Parent = guidePart
+	guideFrom = Instance.new("Attachment")
+	guideFrom.Position = Vector3.new(0, -2.4, 0)
+	guideBeam = Instance.new("Beam")
+	guideBeam.Attachment0 = guideFrom
+	guideBeam.Attachment1 = guideTo
+	guideBeam.Color = ColorSequence.new(Color3.fromRGB(255, 220, 140))
+	guideBeam.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.9),
+		NumberSequenceKeypoint.new(0.15, 0.45),
+		NumberSequenceKeypoint.new(1, 0.6),
+	})
+	guideBeam.LightEmission = 0.6
+	guideBeam.Width0 = 0.6
+	guideBeam.Width1 = 0.6
+	guideBeam.FaceCamera = true
+	guideBeam.Segments = 20
+	guideBeam.Enabled = false
+	guideBeam.Parent = guidePart
+end
+
+function HUDController.Init()
+	build()
+	StateController.Changed:Connect(function(key: string)
+		if key == "books" or key == "equipped" or key == "active" then
+			refreshBooks()
+		elseif key == "carried" or key == "bank" or key == "stars" then
+			refreshLoot()
+		elseif key == "level" or key == "xp" then
+			refreshLevel()
 		end
 	end)
-end
-
--- Placeholder roll reveal until RollRevealController (GS): "You got a Rare Golden Mothlet!"
-local function rollText(record: any): string
-	local name = record.sp
-	for _, species in speciesConfig.species do
-		if species.id == record.sp then
-			name = species.name
-			break
-		end
-	end
-	local rarity = economy.rarities[record.r]
-	local mutation = if record.m > 0 then economy.mutations[record.m] else nil
-	local words = { if rarity then rarity.id else "?" }
-	if mutation then
-		table.insert(words, mutation.id)
-	end
-	table.insert(words, name)
-	return `You got a {table.concat(words, " ")}!`
-end
-
-local function dawnText(result: any): string
-	if result.survived then
-		local revives = tonumber(result.revives) or 0
-		local saved = if revives == 1 then " (1 revive)" elseif revives > 1 then ` ({revives} revives)` else ""
-		return `The fire survived the night! +{result.embers} Embers{saved}`
-	end
-	return `The fire went out. -{EconomyMath.formatNumber(result.glowLost)} Glow, +{result.embers} Embers`
-end
-
-local function refreshFire(now: number)
-	local meter = parts.fire
-	if meter == nil then
-		return
-	end
-	local level = workspace:GetAttribute("Fire")
-	meter.Visible = type(level) == "number"
-	if type(level) ~= "number" then
-		return
-	end
-	local character = Players.LocalPlayer.Character
-	local carrying = character ~= nil and character:GetAttribute("CarryFuel") ~= nil
-	local text = if level <= 0 then "Fire out" else `Fire {math.floor(level * 100 + 0.5)}%`
-	local catches = Players.LocalPlayer:GetAttribute("CatchesLeft")
-	if type(catches) == "number" then
-		text = `{text} · {catches} {if catches == 1 then "catch" else "catches"} left`
-	end
-	meter.Text = if carrying then `{text} · carrying wood` else text
-	local low = level < FIRE_LOW_BELOW
-	meter.TextColor3 = if low then FIRE_LOW else FIRE_OK
-	meter.TextTransparency = if low and level > 0 then 0.35 + 0.35 * math.sin(now * 6) else 0
-end
-
-local function duskText(): string
-	local id = workspace:GetAttribute("NightModifier")
-	local name = if type(id) == "string" then MODIFIER_NAMES[id] or id else nil
-	return if name ~= nil then `{BANNERS.Dusk}  Tonight: {name}` else BANNERS.Dusk
-end
-
-local function refresh()
-	local now = workspace:GetServerTimeNow()
-	if parts.glow ~= nil then
-		parts.glow.Text = `Glow {EconomyMath.formatNumber(StateController.glowAt(now))}`
-	end
-	if parts.embers ~= nil then
-		parts.embers.Text = `Embers {EconomyMath.formatNumber(StateController.wallet().embers)}`
-	end
-	refreshFire(now)
-	local data = StateController.get()
-	if parts.pity ~= nil and data ~= nil and data.pity ~= nil then
-		local left = Roll.pityLeft(economy, data.pity.sinceLegendary or 0)
-		parts.pity.Text = if left == 1
-			then "Next catch: Legendary guaranteed"
-			else `Legendary guaranteed within {left} catches`
-	end
-
-	local state = CycleFXController.state()
-	if state == nil then
-		return
-	end
-	local atNight = state.phase == "Night"
-	if parts.phaseLabel ~= nil then
-		parts.phaseLabel.Text = if atNight then "Dawn in" else "Night in"
-	end
-	if parts.countdown ~= nil then
-		parts.countdown.Text = Cycle.formatClock(if atNight then state.untilDawn else state.untilNight)
-	end
-
-	local count = #parts.dots
-	if count > 0 then
-		local c = CycleFXController.cycleConfig()
-		local dayShare = c.daySeconds / state.length
-		local progress = state.t / state.length
-		for i, dot in parts.dots do
-			local f = (i - 0.5) / count
-			dot.BackgroundColor3 = if f < dayShare then DAY_DOT else NIGHT_DOT
-			dot.BackgroundTransparency = if f < progress then 0.75 else 0
-		end
-	end
+	NetClient.on("Toast", toast)
+	NetClient.on("Quest", function(view: any)
+		quest = view
+		refreshQuest()
+	end)
+	NetClient.on("RecallState", function(endsAt: number?)
+		recallEnds = endsAt
+		recallFrame.Visible = endsAt ~= nil
+	end)
 end
 
 function HUDController.Start()
-	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui") :: PlayerGui
-	bind(playerGui)
-
-	local function hideLoading()
-		if parts.loading ~= nil then
-			parts.loading.Visible = false
+	RunService.RenderStepped:Connect(function()
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			hpFill.Size = UDim2.fromScale(math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1), 1)
+			hpText.Text = `{math.ceil(humanoid.Health)} / {math.ceil(humanoid.MaxHealth)}`
 		end
+		local now = os.clock()
+		for _, s in slots do
+			local readyAt, duration = CombatController.readyAt(s.key)
+			local left = if s.key ~= "" then readyAt - now else 0
+			if left > 0 then
+				s.cd.Size = UDim2.fromScale(1, math.clamp(left / duration, 0.05, 1))
+				s.cdText.Text = string.format("%.1f", left)
+			else
+				s.cd.Size = UDim2.fromScale(1, 0)
+				s.cdText.Text = ""
+			end
+		end
+		local dashReady = CombatController.readyAt("dash")
+		local dashLeft = dashReady - now
+		dashCd.Size = UDim2.fromScale(math.clamp(dashLeft / CombatController.DASH_COOLDOWN, 0, 1), 1)
+		if recallEnds then
+			local left = recallEnds - workspace:GetServerTimeNow()
+			recallFill.Size = UDim2.fromScale(math.clamp(1 - left / 5, 0, 1), 1)
+		end
+		updateGuide()
+	end)
+	local function all()
+		refreshBooks()
+		refreshLoot()
+		refreshLevel()
 	end
 	if StateController.isLoaded() then
-		hideLoading()
-	else
-		StateController.Loaded:Connect(hideLoading)
+		all()
 	end
-
-	CycleFXController.PhaseChanged:Connect(function(phase: string, _state: Cycle.State, initial: boolean)
-		if initial then
-			return
-		end
-		showBanner(if phase == "Dusk" then duskText() else BANNERS[phase])
-	end)
-
-	NetClient.on("RollResult", function(record: any)
-		showBanner(rollText(record))
-	end)
-	NetClient.on("Announce", function(text: string)
-		showBanner(text) -- placeholder until GS gives server announcements their own style
-	end)
-	NetClient.on("Toast", function(text: string, _kind: string?)
-		showBanner(text) -- placeholder until GS styles toasts by kind ("alarm", "good", "bad")
-	end)
-	NetClient.on("DawnResult", function(result: any)
-		task.delay(BANNER_SECONDS, showBanner, dawnText(result)) -- after the "Dawn!" phase banner
-	end)
-
-	workspace:GetAttributeChangedSignal("NightModifier"):Connect(function()
-		local state = CycleFXController.state()
-		if state ~= nil and state.phase == "Dusk" and workspace:GetAttribute("NightModifier") ~= nil then
-			showBanner(duskText())
-		end
-	end)
-
-	local elapsed = REFRESH_SECONDS
-	RunService.Heartbeat:Connect(function(dt: number)
-		elapsed += dt
-		if elapsed >= REFRESH_SECONDS then
-			elapsed = 0
-			refresh()
-		end
-	end)
+	StateController.Loaded:Connect(all)
 end
 
 return HUDController
