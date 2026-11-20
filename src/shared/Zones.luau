@@ -1,11 +1,16 @@
 --!strict
--- The world layout (GDD "World"): the camp in the middle, three element zones around it, open
--- wilds between them, and the world edge. Pure geometry plus the spawn table, shared by the map
--- builder (tools/BuildZones.luau), EnemyService and the client's quest guide.
+-- The world layout (Layer One, docs/LAYER_ONE.md). Rings out from the campfire:
+--   r 0–260      the camp clearing, forest ring and ring wall (gates at GATE_D)
+--   r 260–510    the LOWLAND: forest at FLOOR_Y, raider camps, roaming raiders
+--   r 510–530    the CLIFF up to the plateau, climbed by parkour ledge routes
+--   r 530–1150   the PLATEAU at PLATEAU_Y: forest and the three circle zones
+--   r 1150       the sheer outer cliff and invisible wall (WORLD_R; layer two later)
+-- Pure geometry plus the spawn table, shared by the map builder (tools/BuildZones.luau),
+-- EnemyService and the client's quest guide.
 --
 -- Each zone is described in its own frame: `d` is the distance out from the campfire along the
--- zone's angle, `s` is sideways. A zone runs from its gate in the camp ring (d ≈ 262) out to its
--- boss arena (d ≈ 610).
+-- zone's angle, `s` is sideways. A zone is a circle of ZONE_R round (ZONE_D, 0); its boss stands
+-- at the centre (BOSS_D = ZONE_D).
 
 -- Vector3 is a Roblox global; under Lune (tests) it comes from @lune/roblox.
 -- selene: allow(incorrect_standard_library_use, shadowing)
@@ -23,11 +28,38 @@ export type Zone = {
 	boss: string,
 }
 
+Zones.FLOOR_Y = -1 -- the camp and the lowland
 Zones.GATE_D = 262 -- the camp ring
-Zones.BOSS_D = 610
-Zones.WORLD_R = 700 -- invisible wall; the tree wall stands just past it
-Zones.FLOOR_Y = -1
 Zones.GATE_HALF_ANGLE = math.rad(15) -- camp ring walls removed within this of a zone's angle
+Zones.CAMP_R = 255 -- the builder leaves the camp terrain alone inside this
+
+Zones.CLIFF_IN = 510 -- the lowland ends at the cliff foot
+Zones.CLIFF_OUT = 530 -- the plateau starts at the cliff top
+Zones.CLIFF_HEIGHT = 60
+Zones.PLATEAU_Y = Zones.FLOOR_Y + Zones.CLIFF_HEIGHT
+Zones.WORLD_R = 1150 -- the outer cliff and invisible wall
+Zones.OUTER_CLIFF_HEIGHT = 80 -- sheer, unclimbable until layer two
+
+Zones.ZONE_D = 820 -- zone circle centre
+Zones.ZONE_R = 180
+Zones.BOSS_D = Zones.ZONE_D
+
+-- Parkour: two ledge routes per zone, at its angle ±ROUTE_OFFSET. Each route is a staircase of
+-- rock ledges along the cliff face, LEDGE_RISE up and LEDGE_STEP sideways each (JumpHeight 7.2).
+Zones.ROUTE_OFFSET = math.rad(20)
+Zones.LEDGE_RISE = 5
+Zones.LEDGE_STEP = 7
+Zones.LEDGE_SIZE = Vector3.new(4, 1, 4)
+
+-- Raider camps: a few of these sites are used per server (step 4). All in the lowland, between
+-- the zones and clear of the ledge routes.
+Zones.CAMP_SITE_R = 30
+Zones.CAMP_SITES = {} :: { { angle: number, r: number } }
+for _, gap in { 60, 180, 300 } do
+	table.insert(Zones.CAMP_SITES, { angle = math.rad(gap - 18), r = 380 })
+	table.insert(Zones.CAMP_SITES, { angle = math.rad(gap), r = 330 })
+	table.insert(Zones.CAMP_SITES, { angle = math.rad(gap + 18), r = 440 })
+end
 
 Zones.list = {
 	{
@@ -59,32 +91,28 @@ Zones.list = {
 	},
 } :: { Zone }
 
--- The zone's floor: centre points along it and their radius.
-Zones.PATH = {
-	{ d = 270, s = 0, r = 48 },
-	{ d = 320, s = 10, r = 70 },
-	{ d = 385, s = 12, r = 82 },
-	{ d = 455, s = -10, r = 80 },
-	{ d = 530, s = 0, r = 72 },
-	{ d = 610, s = 0, r = 70 },
-}
-
--- Four packs of enemies, each well apart, then the boss. Level grows with distance.
+-- Packs in rings round the zone centre: `ring` studs out, at `a` degrees (180 faces the camp,
+-- where players come in). Outer ring L2–5, middle L6–9, inner L10–11, the boss at the centre.
+-- `d`/`s` are filled in below from `ring`/`a`.
 Zones.PACKS = {
-	{ role = "minion", d = 305, s = -16, level = 2 },
-	{ role = "minion", d = 318, s = 18, level = 3 },
-	{ role = "minion", d = 378, s = 34, level = 4 },
-	{ role = "minion", d = 392, s = -8, level = 5 },
-	{ role = "caster", d = 404, s = 40, level = 5 },
-	{ role = "minion", d = 448, s = -38, level = 7 },
-	{ role = "caster", d = 466, s = -16, level = 7 },
-	{ role = "minion", d = 470, s = 30, level = 8 },
-	{ role = "minion", d = 524, s = 12, level = 9 },
-	{ role = "caster", d = 540, s = -30, level = 10 },
-	{ role = "caster", d = 548, s = 34, level = 10 },
-	{ role = "minion", d = 556, s = -2, level = 11 },
-	{ role = "boss", d = Zones.BOSS_D, s = 0, level = 12 },
-}
+	{ role = "minion", ring = 145, a = 180, level = 2 },
+	{ role = "minion", ring = 145, a = 140, level = 3 },
+	{ role = "minion", ring = 145, a = 220, level = 4 },
+	{ role = "minion", ring = 145, a = 100, level = 5 },
+	{ role = "caster", ring = 145, a = 260, level = 5 },
+	{ role = "minion", ring = 100, a = 150, level = 6 },
+	{ role = "caster", ring = 100, a = 210, level = 7 },
+	{ role = "minion", ring = 100, a = 90, level = 8 },
+	{ role = "minion", ring = 100, a = 270, level = 9 },
+	{ role = "caster", ring = 45, a = 120, level = 10 },
+	{ role = "caster", ring = 45, a = 240, level = 10 },
+	{ role = "minion", ring = 45, a = 0, level = 11 },
+	{ role = "boss", ring = 0, a = 0, level = 12 },
+} :: { { role: string, ring: number, a: number, level: number, d: number, s: number } }
+for _, pack in Zones.PACKS do
+	pack.d = Zones.ZONE_D + pack.ring * math.cos(math.rad(pack.a))
+	pack.s = pack.ring * math.sin(math.rad(pack.a))
+end
 
 -- The tutorial trail, east of the campfire inside the camp ring (before your element pick).
 Zones.TRAIL = {
@@ -94,16 +122,30 @@ Zones.TRAIL = {
 	{ kind = "ashling", x = 238, z = 0, level = 3, wander = 6 },
 }
 
--- Raiders roam the wilds between the zones.
+-- Raiders roam the lowland between the zones, outside the camp sites.
+Zones.RAIDER_WANDER = 40
 Zones.RAIDERS = {
-	{ angle = math.rad(60), r = 340, level = 3 },
-	{ angle = math.rad(180), r = 360, level = 6 },
-	{ angle = math.rad(300), r = 380, level = 9 },
+	{ angle = math.rad(60), r = 470, level = 3 },
+	{ angle = math.rad(180), r = 470, level = 6 },
+	{ angle = math.rad(300), r = 470, level = 9 },
 }
+
+-- Ground height at a distance from the campfire (the cliff as a straight ramp; the builder adds
+-- noise on top).
+function Zones.groundY(r: number): number
+	local t = math.clamp((r - Zones.CLIFF_IN) / (Zones.CLIFF_OUT - Zones.CLIFF_IN), 0, 1)
+	return Zones.FLOOR_Y + t * Zones.CLIFF_HEIGHT
+end
+
+-- A point on the ground at an angle and distance from the campfire.
+function Zones.polar(angle: number, r: number): Vector3
+	return Vector3.new(math.cos(angle) * r, Zones.groundY(r), math.sin(angle) * r)
+end
 
 function Zones.toWorld(zone: Zone, d: number, s: number): Vector3
 	local c, n = math.cos(zone.angle), math.sin(zone.angle)
-	return Vector3.new(d * c - s * n, Zones.FLOOR_Y, d * n + s * c)
+	local x, z = d * c - s * n, d * n + s * c
+	return Vector3.new(x, Zones.groundY(math.sqrt(x * x + z * z)), z)
 end
 
 function Zones.byType(kind: string): Zone?
@@ -118,6 +160,41 @@ end
 -- The zone a player's quests point at: their element's, or Emberfall before the pick.
 function Zones.forElement(element: string): Zone
 	return Zones.byType(element) or Zones.list[1]
+end
+
+export type Route = { zone: Zone, angle: number, ledges: { Vector3 } }
+
+-- The parkour routes up the cliff. Each ledge is the centre of its TOP face (the builder puts a
+-- LEDGE_SIZE rock just below it), sticking out of the face where the cliff is that high.
+function Zones.routes(): { Route }
+	local out: { Route } = {}
+	local count = math.ceil(Zones.CLIFF_HEIGHT / Zones.LEDGE_RISE) - 1
+	for _, zone in Zones.list do
+		for _, side in { -1, 1 } do
+			local angle = zone.angle + side * Zones.ROUTE_OFFSET
+			local ledges = {}
+			for i = 1, count do
+				local h = i * Zones.LEDGE_RISE
+				local face = Zones.CLIFF_IN + (Zones.CLIFF_OUT - Zones.CLIFF_IN) * h / Zones.CLIFF_HEIGHT
+				local r = face - Zones.LEDGE_SIZE.Z / 2
+				-- climb toward the zone's angle, away from the raider camps
+				local along = -side * (i - 1) * Zones.LEDGE_STEP
+				local a = angle + along / r
+				table.insert(ledges, Vector3.new(math.cos(a) * r, Zones.FLOOR_Y + h, math.sin(a) * r))
+			end
+			table.insert(out, { zone = zone, angle = angle, ledges = ledges })
+		end
+	end
+	return out
+end
+
+-- Raider camp candidate centres, on the ground.
+function Zones.campSites(): { Vector3 }
+	local out = {}
+	for _, site in Zones.CAMP_SITES do
+		table.insert(out, Zones.polar(site.angle, site.r))
+	end
+	return out
 end
 
 export type Spawn = { kind: string, pos: Vector3, level: number, wander: number? }
@@ -144,9 +221,9 @@ function Zones.spawns(): { Spawn }
 	for _, raider in Zones.RAIDERS do
 		table.insert(out, {
 			kind = "raider",
-			pos = Vector3.new(math.cos(raider.angle) * raider.r, 0, math.sin(raider.angle) * raider.r),
+			pos = Zones.polar(raider.angle, raider.r),
 			level = raider.level,
-			wander = 50,
+			wander = Zones.RAIDER_WANDER,
 		})
 	end
 	return out
