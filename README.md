@@ -1,15 +1,13 @@
 # Glowkeepers
 
-A Roblox game: collect Glowlings by day and steal them from other players' bases, then keep the campfire alive together at night.
+A Roblox real-time Grimoire Action RPG: venture out from the Wizard Camp Courtyard into the wild forest and elemental valleys, fight creatures and bosses, counter elements with 4-page spellbooks, and carry your loot home to bank it before raiders take it.
 
 | Doc | What it covers |
 | --- | --- |
-| [docs/GDD.md](docs/GDD.md) | The original design |
-| [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | Scope, decisions, schedule and phases |
-| [docs/GAME_SYSTEMS.md](docs/GAME_SYSTEMS.md) | Rules and numbers for each system |
+| [docs/GDD.md](docs/GDD.md) | Grimoire Action RPG design (v2) |
+| [docs/LAYER_ONE.md](docs/LAYER_ONE.md) | Layer One world layout, unified builder and combat status |
+| [docs/ART_DIRECTION.md](docs/ART_DIRECTION.md) | Low-poly forest palette and prop rules |
 | [docs/TECH_SPEC.md](docs/TECH_SPEC.md) | Architecture, data, remotes and security |
-| [docs/CONTENT_AND_LIVEOPS.md](docs/CONTENT_AND_LIVEOPS.md) | Map, species, retention and live ops |
-| [sim/README.md](sim/README.md) | The economy sim and its results |
 
 ## Setup (once)
 
@@ -26,7 +24,7 @@ A Roblox game: collect Glowlings by day and steal them from other players' bases
    rojo plugin install
    ```
 
-4. `config/environments.json` holds the DEV, BETA and PROD ids (filled in 18 Nov 2026). A place id or a game id both work. An unknown id runs as DEV.
+4. `config/environments.json` holds the DEV, BETA and PROD ids. An unknown id runs as DEV.
 
 ## Working
 
@@ -34,43 +32,29 @@ A Roblox game: collect Glowlings by day and steal them from other players' bases
 rojo serve
 ```
 
-In Studio, open the Rojo plugin and connect. Code and `config/*.json` sync live. The map, UI templates and models stay in the Team Create place.
+In Studio, open the Rojo plugin and connect. Code and `config/*.json` sync live.
 
-- **Rebuild the greybox map:** paste `tools/BuildGreybox.luau` into Studio's command bar in Edit mode. Change the numbers in its `LAYOUT` table to try another layout. Once the map has been edited by hand, it refuses to overwrite it (TECH_SPEC §6a).
-- **Skip to the next phase** (DEV and BETA only): in Studio's server view, set the Workspace attribute `DebugSkipPhase` to true.
-- **Give everyone a Glowling** (DEV and BETA only): in Studio's server view, set the Workspace attribute `DebugRoll` to a lure floor (1 Common … 4 Epic). Each player gets one lure roll, then "Place best" runs for them.
+- **Build or rebuild the world map (`r = 0..650`):** copy `tools/BuildZones.luau` to `src/server/_tmp/BuildZones.luau`, then in Studio Edit mode's command bar run:
+  ```luau
+  task.spawn(loadstring(game.ServerScriptService.Server._tmp.BuildZones.Source))
+  ```
+  Watch Workspace's `BuildProgress` attribute until `done`, delete `src/server/_tmp`, and save the place.
+- **Test a Grimoire in Studio:** in a Clients and Servers test, set a test player's `DebugGrimoire` attribute (server side) to a type such as `Frost`. They get that Grimoire with all four pages, in hand. It only works in Studio, for local test players.
+- **PvP:** War Mode (switched in camp) and the Duel Arena Ring south of camp. Rules are in [docs/LAYER_ONE.md](docs/LAYER_ONE.md#combat--pvp).
 - **New remote:** declare it in `src/shared/Net/init.luau` first, with its argument schema and rate limit.
 - **New service or controller:** add it to `ORDER` in `src/server/Main.server.luau` or `src/client/Main.client.luau`.
-- **HUD:** a `StarterGui.HUD` made in Studio replaces the placeholder. Set ResetOnSpawn off, and keep the element names listed at the top of `HUDController.luau`.
 
 ## Checks
 
-Run these from the repo root. CI runs the same ones.
-
-Run every Lune spec. Each prints a summary line and exits 1 on failure:
+Run every Lune spec:
 
 ```powershell
 Get-ChildItem tests -Filter *.spec.luau | ForEach-Object { lune run $_.FullName }
-```
-
-Run one spec:
-
-```powershell
-lune run tests/roll.spec.luau
-```
-
-After any change to `config/economy.json`, regenerate the golden values that the specs compare against:
-
-```powershell
-python sim/golden_odds.py
 ```
 
 Format, then lint:
 
 ```powershell
 stylua src tests tools
-```
-
-```powershell
 selene src tools
 ```

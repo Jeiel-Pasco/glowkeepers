@@ -1,16 +1,14 @@
 --!strict
--- The world layout (Layer One, docs/LAYER_ONE.md). Rings out from the campfire:
---   r 0–260      the camp clearing, forest ring and ring wall (gates at GATE_D)
---   r 260–510    the LOWLAND: forest at FLOOR_Y, raider camps, roaming raiders
---   r 510–530    the CLIFF up to the plateau, climbed by a ramp cut into it toward each zone
---   r 530–1150   the PLATEAU at PLATEAU_Y: forest and the three circle zones
---   r 1150       the sheer outer cliff and invisible wall (WORLD_R; layer two later)
--- Pure geometry plus the spawn table, shared by the map builder (tools/BuildZones.luau),
--- EnemyService and the client's quest guide.
---
--- Each zone is described in its own frame: `d` is the distance out from the campfire along the
--- zone's angle, `s` is sideways. A zone is a circle of ZONE_R round (ZONE_D, 0); its boss stands
--- at the centre (BOSS_D = ZONE_D).
+-- The world layout: Compact Wizard Hub + 3 Black Clover Level-Tiered Areas (Lv 1–50).
+--   r 0–80       WIZARD CAMP COURTYARD (safe hub at y=-1: campfire, desk, shelf, bank, gear shop)
+--   r 82         three courtyard gates at 0° (Area 1), 120° (Area 2), 240° (Area 3)
+--   r 82–270     LOWLAND WILD FOREST: random Neutral Forest Wisps, Raider Camps, Quest Giver 1
+--   r 270–290    VALLEY THRESHOLD (~28 studs high) with smooth lantern trail ramps
+--   r 290–620    THREE LEVEL-TIERED AREAS (all cohesive Forest & Ancient Ruins):
+--                  * Area 1 (0°):   Whispering Woods (Lv 1–15, Boss: Runestone Brute)
+--                  * Area 2 (120°): Raider Wilds (Lv 15–30, Boss: Elder Treant)
+--                  * Area 3 (240°): Highland Ruins (Lv 30–50, Boss: Ancient Mineral Golem)
+--   r 700        outer mountain rim and invisible wall (WORLD_R)
 
 -- Vector3 is a Roblox global; under Lune (tests) it comes from @lune/roblox.
 -- selene: allow(incorrect_standard_library_use, shadowing)
@@ -20,124 +18,150 @@ local Zones = {}
 
 export type Zone = {
 	id: string,
+	areaId: string,
 	name: string,
 	type: string,
+	levelRange: string,
+	minLevel: number,
+	maxLevel: number,
 	angle: number, -- radians, from +X toward +Z
 	minion: string,
 	caster: string,
 	boss: string,
 }
 
-Zones.FLOOR_Y = -1 -- the camp and the lowland
-Zones.GATE_D = 262 -- the camp ring
-Zones.GATE_HALF_ANGLE = math.rad(15) -- camp ring walls removed within this of a zone's angle
-Zones.CAMP_R = 255 -- the builder leaves the camp terrain alone inside this
+Zones.FLOOR_Y = -1
+Zones.CAMP_R = 80
+Zones.GATE_D = 82
+Zones.GATE_HALF_ANGLE = math.rad(16)
 
-Zones.CLIFF_IN = 510 -- the lowland ends at the cliff foot
-Zones.CLIFF_OUT = 530 -- the plateau starts at the cliff top
-Zones.CLIFF_HEIGHT = 60
+-- South Duel Arena Ring, just outside the courtyard: anyone inside may duel anyone else inside.
+Zones.ARENA_X = 0
+Zones.ARENA_Z = 114
+Zones.ARENA_R = 24
+
+function Zones.inArena(pos: Vector3): boolean
+	local dx, dz = pos.X - Zones.ARENA_X, pos.Z - Zones.ARENA_Z
+	return dx * dx + dz * dz < Zones.ARENA_R * Zones.ARENA_R
+end
+
+-- Shared station positions inside the Wizard Camp Courtyard (r < CAMP_R).
+Zones.DESK_POS = Vector3.new(-24, Zones.FLOOR_Y, -16)
+Zones.SHELF_POS = Vector3.new(-14, Zones.FLOOR_Y, -24)
+Zones.BANK_POS = Vector3.new(0, Zones.FLOOR_Y, -28)
+Zones.SHOP_POS = Vector3.new(24, Zones.FLOOR_Y, -16)
+
+Zones.CLIFF_IN = 270
+Zones.CLIFF_OUT = 290
+Zones.CLIFF_HEIGHT = 28
 Zones.PLATEAU_Y = Zones.FLOOR_Y + Zones.CLIFF_HEIGHT
-Zones.WORLD_R = 1150 -- the outer cliff and invisible wall
-Zones.OUTER_CLIFF_HEIGHT = 80 -- sheer, unclimbable until layer two
+Zones.WORLD_R = 700
+Zones.OUTER_CLIFF_HEIGHT = 65
 
-Zones.ZONE_D = 820 -- zone circle centre
-Zones.ZONE_R = 180
-Zones.BOSS_D = Zones.ZONE_D
+Zones.ZONE_D = 460
+Zones.ZONE_R = 160
+Zones.BOSS_D = 565
 
--- One ramp per zone, cut diagonally across the cliff face: it climbs from the lowland at
--- zone.angle - RAMP_SPAN/2 to the plateau at zone.angle + RAMP_SPAN/2 (about 20 degrees steep).
-Zones.RAMP_SPAN = math.rad(18)
-Zones.RAMP_WIDTH = 12
-Zones.RAMP_R0 = Zones.CLIFF_IN - 4 -- the ramp's centre line, bottom to top
+Zones.RAMP_SPAN = math.rad(16)
+Zones.RAMP_WIDTH = 16
+Zones.RAMP_R0 = Zones.CLIFF_IN - 4
 Zones.RAMP_R1 = Zones.CLIFF_OUT + 4
 
--- Raider camps: a few of these sites are used per server (step 4). All in the lowland, between
--- the zones and clear of the ramps and trails.
-Zones.CAMP_SITE_R = 30
+-- Raider camps sit in the 3 wild forest wedges between the valleys (60°, 180°, 300°).
+Zones.CAMP_SITE_R = 24
 Zones.CAMP_SITES = {} :: { { angle: number, r: number } }
 for _, gap in { 60, 180, 300 } do
-	table.insert(Zones.CAMP_SITES, { angle = math.rad(gap - 18), r = 380 })
-	table.insert(Zones.CAMP_SITES, { angle = math.rad(gap), r = 330 })
-	table.insert(Zones.CAMP_SITES, { angle = math.rad(gap + 18), r = 440 })
+	table.insert(Zones.CAMP_SITES, { angle = math.rad(gap - 19), r = 185 })
+	table.insert(Zones.CAMP_SITES, { angle = math.rad(gap), r = 135 })
+	table.insert(Zones.CAMP_SITES, { angle = math.rad(gap + 19), r = 225 })
 end
 
 Zones.list = {
 	{
 		id = "emberfall",
-		name = "Emberfall Ridge",
-		type = "Fire",
+		areaId = "area1",
+		name = "Whispering Woods",
+		type = "Leaf",
+		levelRange = "Lv 1–15",
+		minLevel = 1,
+		maxLevel = 15,
 		angle = 0,
+		minion = "thorn_sprout",
+		caster = "spore_caster",
+		boss = "ashling",
+	},
+	{
+		id = "mistfall",
+		areaId = "area2",
+		name = "Raider Wilds",
+		type = "Water",
+		levelRange = "Lv 15–30",
+		minLevel = 15,
+		maxLevel = 30,
+		angle = math.rad(120),
+		minion = "raider_brute",
+		caster = "mist_caster",
+		boss = "elder_treant",
+	},
+	{
+		id = "elderwood",
+		areaId = "area3",
+		name = "Highland Ruins",
+		type = "Fire",
+		levelRange = "Lv 30–50",
+		minLevel = 30,
+		maxLevel = 50,
+		angle = math.rad(240),
 		minion = "ember_imp",
 		caster = "cinder_caster",
 		boss = "cinder_golem",
 	},
-	{
-		id = "mistfall",
-		name = "Mistfall Basin",
-		type = "Water",
-		angle = math.rad(120),
-		minion = "tide_crab",
-		caster = "mist_caster",
-		boss = "tide_warden",
-	},
-	{
-		id = "elderwood",
-		name = "Elderwood",
-		type = "Leaf",
-		angle = math.rad(240),
-		minion = "thorn_sprout",
-		caster = "spore_caster",
-		boss = "elder_treant",
-	},
 } :: { Zone }
 
--- Packs in rings round the zone centre: `ring` studs out, at `a` degrees (180 faces the camp,
--- where players come in). Outer ring L2–5, middle L6–9, inner L10–11, the boss at the centre.
--- `d`/`s` are filled in below from `ring`/`a`.
+-- Quest Giver NPC locations at the entrance of each Area.
+Zones.QUEST_GIVERS = {
+	{ areaId = "area1", npcName = "Elder Orsi", angle = 0, r = 104 },
+	{ areaId = "area2", npcName = "Scout Captain", angle = math.rad(120), r = 304 },
+	{ areaId = "area3", npcName = "Knight Envoy", angle = math.rad(240), r = 304 },
+}
+
+-- Relative pack layout front-to-back up each valley (`t` in 0..1 scales from zone.minLevel..maxLevel).
 Zones.PACKS = {
-	{ role = "minion", ring = 145, a = 180, level = 2 },
-	{ role = "minion", ring = 145, a = 140, level = 3 },
-	{ role = "minion", ring = 145, a = 220, level = 4 },
-	{ role = "minion", ring = 145, a = 100, level = 5 },
-	{ role = "caster", ring = 145, a = 260, level = 5 },
-	{ role = "minion", ring = 100, a = 150, level = 6 },
-	{ role = "caster", ring = 100, a = 210, level = 7 },
-	{ role = "minion", ring = 100, a = 90, level = 8 },
-	{ role = "minion", ring = 100, a = 270, level = 9 },
-	{ role = "caster", ring = 45, a = 120, level = 10 },
-	{ role = "caster", ring = 45, a = 240, level = 10 },
-	{ role = "minion", ring = 45, a = 0, level = 11 },
-	{ role = "boss", ring = 0, a = 0, level = 12 },
-} :: { { role: string, ring: number, a: number, level: number, d: number, s: number } }
-for _, pack in Zones.PACKS do
-	pack.d = Zones.ZONE_D + pack.ring * math.cos(math.rad(pack.a))
-	pack.s = pack.ring * math.sin(math.rad(pack.a))
-end
+	{ role = "minion", d = 345, s = 0, t = 0.25 },
+	{ role = "minion", d = 360, s = -55, t = 0.30 },
+	{ role = "minion", d = 360, s = 55, t = 0.35 },
+	{ role = "minion", d = 395, s = -95, t = 0.42 },
+	{ role = "caster", d = 395, s = 95, t = 0.45 },
+	{ role = "minion", d = 425, s = -35, t = 0.55 },
+	{ role = "caster", d = 425, s = 35, t = 0.60 },
+	{ role = "minion", d = 465, s = -85, t = 0.70 },
+	{ role = "minion", d = 465, s = 85, t = 0.75 },
+	{ role = "caster", d = 505, s = -50, t = 0.82 },
+	{ role = "caster", d = 505, s = 50, t = 0.86 },
+	{ role = "minion", d = 515, s = 0, t = 0.90 },
+	{ role = "boss", d = Zones.BOSS_D, s = 0, t = 1.0 },
+} :: { { role: string, d: number, s: number, t: number } }
 
--- The tutorial trail, east of the campfire inside the camp ring (before your element pick).
-Zones.TRAIL = {
-	{ kind = "ember_imp", x = 172, z = 22, level = 1 },
-	{ kind = "ember_imp", x = 190, z = -22, level = 1 },
-	{ kind = "ember_imp", x = 212, z = 16, level = 2 },
-	{ kind = "ashling", x = 238, z = 0, level = 3, wander = 6 },
+-- Wild Neutral creatures in the lowland forest outside the gates (Area 1: Lv 1–5).
+Zones.WILD_COUNTS = {
+	{ kind = "forest_wisp", level = 1, count = 4, wander = 18 },
+	{ kind = "forest_wisp", level = 3, count = 3, wander = 18 },
+	{ kind = "ashling", level = 5, count = 1, wander = 14 },
 }
 
--- Raiders roam the lowland between the zones, outside the camp sites.
-Zones.RAIDER_WANDER = 40
+-- Raiders roam the outer lowland forest wedges between the valleys.
+Zones.RAIDER_WANDER = 16
 Zones.RAIDERS = {
-	{ angle = math.rad(60), r = 470, level = 3 },
-	{ angle = math.rad(180), r = 470, level = 6 },
-	{ angle = math.rad(300), r = 470, level = 9 },
+	{ angle = math.rad(60), r = 248, level = 15 },
+	{ angle = math.rad(180), r = 248, level = 18 },
+	{ angle = math.rad(300), r = 248, level = 22 },
 }
 
--- Ground height at a distance from the campfire (the cliff as a straight ramp; the builder adds
--- noise on top).
 function Zones.groundY(r: number): number
 	local t = math.clamp((r - Zones.CLIFF_IN) / (Zones.CLIFF_OUT - Zones.CLIFF_IN), 0, 1)
 	return Zones.FLOOR_Y + t * Zones.CLIFF_HEIGHT
 end
 
--- A point on the ground at an angle and distance from the campfire.
 function Zones.polar(angle: number, r: number): Vector3
 	return Vector3.new(math.cos(angle) * r, Zones.groundY(r), math.sin(angle) * r)
 end
@@ -157,20 +181,16 @@ function Zones.byType(kind: string): Zone?
 	return nil
 end
 
--- The zone a player's quests point at: their element's, or Emberfall before the pick.
 function Zones.forElement(element: string): Zone
 	return Zones.byType(element) or Zones.list[1]
 end
 
--- A point on a zone's ramp centre line, `t` from 0 (bottom) to 1 (top).
 function Zones.rampAt(zone: Zone, t: number): Vector3
 	local a = zone.angle + (t - 0.5) * Zones.RAMP_SPAN
 	local r = Zones.RAMP_R0 + (Zones.RAMP_R1 - Zones.RAMP_R0) * t
 	return Vector3.new(math.cos(a) * r, Zones.FLOOR_Y + Zones.CLIFF_HEIGHT * t, math.sin(a) * r)
 end
 
--- Where (x, z) is relative to a zone's ramp: `t` along it (outside 0..1 past its ends) and the
--- signed sideways distance from its centre line (+ toward the plateau).
 function Zones.rampFrame(zone: Zone, x: number, z: number): (number, number)
 	local gap = (math.atan2(z, x) - zone.angle + math.pi) % (2 * math.pi) - math.pi
 	local t = gap / Zones.RAMP_SPAN + 0.5
@@ -189,25 +209,22 @@ local function wiggle(from: Vector3, to: Vector3, steps: number, amp: number, ph
 	end
 end
 
--- A zone's lantern trail: from its camp gate, winding through the lowland forest, up its ramp and
--- through the plateau forest to the zone's entry. Points about 25-40 studs apart.
 function Zones.trail(zone: Zone): { Vector3 }
 	local phase = zone.angle * 3
 	local out = { Zones.polar(zone.angle, Zones.GATE_D + 6) }
 	local bottom = Zones.rampAt(zone, 0)
-	local foot = Vector3.new(bottom.X, 0, bottom.Z).Unit * (Zones.RAMP_R0 - 10)
-	wiggle(out[1], foot, 7, 12, phase, out)
+	local foot = Vector3.new(bottom.X, 0, bottom.Z).Unit * (Zones.RAMP_R0 - 12)
+	wiggle(out[1], foot, 6, 8, phase, out)
 	for i = 0, 6 do
 		table.insert(out, Zones.rampAt(zone, i / 6))
 	end
 	local top = Zones.rampAt(zone, 1)
-	local rim = Vector3.new(top.X, 0, top.Z).Unit * (Zones.RAMP_R1 + 10)
+	local rim = Vector3.new(top.X, 0, top.Z).Unit * (Zones.RAMP_R1 + 12)
 	table.insert(out, Zones.polar(math.atan2(rim.Z, rim.X), rim.Magnitude))
-	wiggle(out[#out], Zones.entry(zone), 5, 14, phase + 1, out)
+	wiggle(out[#out], Zones.entry(zone), 2, 5, phase + 1, out)
 	return out
 end
 
--- Raider camp candidate centres, on the ground.
 function Zones.campSites(): { Vector3 }
 	local out = {}
 	for _, site in Zones.CAMP_SITES do
@@ -216,16 +233,35 @@ function Zones.campSites(): { Vector3 }
 	return out
 end
 
--- Where a player heading for a zone walks in: just inside the circle, on the side facing camp.
 function Zones.entry(zone: Zone): Vector3
 	return Zones.toWorld(zone, Zones.ZONE_D - Zones.ZONE_R + 25, 0)
+end
+
+function Zones.randomWildPos(rand: (() -> number)?): Vector3
+	local nextNum = rand or math.random
+	local sites = Zones.campSites()
+	for _ = 1, 30 do
+		local angle = nextNum() * math.pi * 2
+		local r = Zones.GATE_D + 22 + nextNum() * (Zones.CLIFF_IN - Zones.GATE_D - 34)
+		local p = Zones.polar(angle, r)
+		local ok = true
+		for _, site in sites do
+			if (p - site).Magnitude < Zones.CAMP_SITE_R + 12 then
+				ok = false
+				break
+			end
+		end
+		if ok then
+			return p
+		end
+	end
+	return Zones.polar(nextNum() * math.pi * 2, (Zones.GATE_D + Zones.CLIFF_IN) * 0.5)
 end
 
 local function flatR(v: Vector3): number
 	return math.sqrt(v.X * v.X + v.Z * v.Z)
 end
 
--- The nearest camp ring gate to an angle, just past the ring on the inside or outside.
 local function gateToward(angle: number, outside: boolean): Vector3
 	local best, bestGap = Zones.list[1], math.huge
 	for _, zone in Zones.list do
@@ -237,9 +273,7 @@ local function gateToward(angle: number, outside: boolean): Vector3
 	return Zones.polar(best.angle, Zones.GATE_D + (if outside then 16 else -16))
 end
 
--- The next point for the quest guide on the way from `from` (a HumanoidRootPart position) to
--- `target`: through a camp ring gate, then along the nearest zone trail and up its ramp.
-local guideTrails: { { Vector3 } }? = nil -- built once; the guide runs every frame
+local guideTrails: { { Vector3 } }? = nil
 function Zones.guide(from: Vector3, target: Vector3): Vector3
 	local fromR, targetR = flatR(from), flatR(target)
 	local point = target
@@ -280,23 +314,37 @@ function Zones.guide(from: Vector3, target: Vector3): Vector3
 	return point
 end
 
-export type Spawn = { kind: string, pos: Vector3, level: number, wander: number? }
+export type Spawn = { kind: string, pos: Vector3, level: number, wander: number?, wild: boolean? }
 
 function Zones.spawns(): { Spawn }
 	local out: { Spawn } = {}
-	for _, t in Zones.TRAIL do
-		table.insert(
-			out,
-			{ kind = t.kind, pos = Vector3.new(t.x, 0, t.z), level = t.level, wander = (t :: any).wander }
-		)
+	local i = 0
+	local totalWild = 0
+	for _, group in Zones.WILD_COUNTS do
+		totalWild += group.count
+	end
+	for _, group in Zones.WILD_COUNTS do
+		for _ = 1, group.count do
+			i += 1
+			local a = (i - 0.5) / totalWild * math.pi * 2 + 0.35
+			local r = Zones.GATE_D + 26 + ((i * 37) % 60)
+			table.insert(out, {
+				kind = group.kind,
+				pos = Zones.polar(a, r),
+				level = group.level,
+				wander = group.wander,
+				wild = true,
+			})
+		end
 	end
 	for _, zone in Zones.list do
 		for _, pack in Zones.PACKS do
 			local kind = (zone :: any)[pack.role]
+			local lv = math.floor(zone.minLevel + (zone.maxLevel - zone.minLevel) * pack.t + 0.5)
 			table.insert(out, {
 				kind = kind,
 				pos = Zones.toWorld(zone, pack.d, pack.s),
-				level = pack.level,
+				level = lv,
 				wander = if pack.role == "boss" then 0 else nil,
 			})
 		end

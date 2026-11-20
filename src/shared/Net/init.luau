@@ -62,12 +62,18 @@ Net.remotes = {
 	Dash = { dir = "c2s", args = {}, rate = { perSecond = 2, burst = 3 } },
 	SwapBook = { dir = "c2s", args = { { type = "integer", min = 1, max = 4 } }, rate = { perSecond = 4, burst = 4 } },
 	Recall = { dir = "c2s", args = {}, rate = { perSecond = 1, burst = 2 } },
-	-- Grimoires (at your camp desk).
+	-- Grimoires & Gears (at your camp desk and shop).
 	Write = { dir = "c2s", args = { BOOK, { type = "boolean" } }, rate = { perSecond = 3, burst = 4 } },
 	WriteResolve = {
 		dir = "c2s",
 		args = { { type = "integer", min = 0, max = 4 } },
 		rate = { perSecond = 3, burst = 4 },
+	},
+	RollGrimoire = { dir = "c2s", args = {}, rate = { perSecond = 2, burst = 4 } },
+	UpgradeSkill = {
+		dir = "c2s",
+		args = { BOOK, { type = "integer", min = 1, max = 4 } },
+		rate = { perSecond = 4, burst = 6 },
 	},
 	EquipBook = {
 		dir = "c2s",
@@ -88,6 +94,17 @@ Net.remotes = {
 		dir = "c2s",
 		args = { { type = "enum", values = { "ink_Neutral", "ink_Fire", "ink_Water", "ink_Leaf" } } },
 		rate = { perSecond = 3, burst = 5 },
+	},
+	BuyGear = {
+		dir = "c2s",
+		args = { { type = "enum", values = { "backpack", "robe", "hat", "boots" } } },
+		rate = { perSecond = 3, burst = 5 },
+	},
+	TogglePvp = { dir = "c2s", args = {}, rate = { perSecond = 1, burst = 2 } },
+	AcceptQuest = {
+		dir = "c2s",
+		args = { { type = "string", maxLen = 32 } },
+		rate = { perSecond = 2, burst = 4 },
 	},
 	ResetStats = { dir = "c2s", args = {}, rate = { perSecond = 0.5, burst = 1 } },
 

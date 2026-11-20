@@ -1,29 +1,24 @@
 --!strict
--- Your camp plot (GDD "Loot, camp and risk"): assigns each player the lowest free plot, spawns
--- them there, and builds its desk (write spells, pick an element), shelf (equip grimoires) and
--- bank chest. The camp clearing is safe: enemies never follow you in.
---
--- Plots are the place's Map.Plots models: a `PlotId` attribute, a `Floor` part facing the
--- campfire and a `Zone` volume. The client opens the right screen from a prompt's `Action`
--- attribute, and only shows prompts on the plot whose `OwnerId` is its own.
+-- The shared Wizard Camp Courtyard (r < Zones.CAMP_R): everyone spawns round the central
+-- campfire, shares the Scriptorium Desk (write spells, pick an element), Grimoire Shelf (equip
+-- books & stats), Bank Vault chest, and Ink Merchant stall. Stepping anywhere inside the
+-- courtyard banks carried loot; enemies never follow you in.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Signal = require(Shared:WaitForChild("Util"):WaitForChild("Signal"))
+local Zones = require(Shared:WaitForChild("Zones")) :: any
 local DataService = require(script.Parent:WaitForChild("DataService"))
 
 local CampService = {}
-CampService.Assigned = Signal.new() -- (player, plotId)
+CampService.Assigned = Signal.new() -- (player, slotId)
 
-CampService.SAFE_RADIUS = 150 -- the camp clearing round the campfire: no enemies, no combat
+CampService.SAFE_RADIUS = Zones.CAMP_R -- the Wizard Camp Courtyard: no enemies, no combat
 
-type Plot = { id: number, model: Model, floor: BasePart, zone: BasePart }
-
-local plots: { Plot } = {}
-local owners: { [number]: Player } = {}
-local plotOf: { [Player]: number } = {}
+local slotOf: { [Player]: number } = {}
+local nextSlot = 0
 
 local function part(
 	parent: Instance,
@@ -47,12 +42,16 @@ local function part(
 end
 
 local function prompt(parent: BasePart, action: string, text: string, object: string)
+	local existing = parent:FindFirstChildOfClass("ProximityPrompt")
+	if existing then
+		existing:Destroy()
+	end
 	local pp = Instance.new("ProximityPrompt")
 	pp.ActionText = text
 	pp.ObjectText = object
 	pp.KeyboardKeyCode = Enum.KeyCode.E
 	pp.HoldDuration = 0
-	pp.MaxActivationDistance = 10
+	pp.MaxActivationDistance = 12
 	pp.RequiresLineOfSight = false
 	pp:SetAttribute("Action", action)
 	pp.Parent = parent
@@ -60,47 +59,65 @@ end
 
 local WOOD = Color3.fromRGB(120, 84, 56)
 local WOOD_DARK = Color3.fromRGB(86, 60, 42)
+local STONE = Color3.fromRGB(118, 114, 112)
+local CLOTH_EMBER = Color3.fromRGB(168, 102, 70)
 
--- The desk, shelf and bank chest, laid out on the plot's floor (local space: -Z faces camp).
-local function furnish(plot: Plot)
-	local old = plot.model:FindFirstChild("Camp")
-	if old then
-		old:Destroy()
+-- Builds (or refreshes) the shared stations in workspace.Map.Sanctuary so the hub always works
+-- even before running tools/BuildZones.luau.
+local function buildSanctuary()
+	local map = workspace:FindFirstChild("Map")
+	if map == nil then
+		local f = Instance.new("Folder")
+		f.Name = "Map"
+		f.Parent = workspace
+		map = f
 	end
-	local folder = Instance.new("Model")
-	folder.Name = "Camp"
-	local base = plot.floor.CFrame * CFrame.new(0, plot.floor.Size.Y / 2, 0)
+	assert(map ~= nil, "Map folder missing")
+	-- Remove any legacy v1 plot/station folders if still present in an old place save.
+	for _, oldName in { "Plots", "Stations" } do
+		local old = map:FindFirstChild(oldName)
+		if old then
+			old:Destroy()
+		end
+	end
+	local oldSanctuary = map:FindFirstChild("Sanctuary")
+	if oldSanctuary then
+		oldSanctuary:Destroy()
+	end
 
-	-- Desk: a chunky writing table, an open book and a candle.
-	local desk = base * CFrame.new(-8, 0, 4)
-	local top = part(folder, "Desk", Vector3.new(7, 0.8, 4), desk * CFrame.new(0, 3.2, 0), WOOD)
-	for _, x in { -3, 3 } do
-		for _, z in { -1.5, 1.5 } do
-			part(folder, "Leg", Vector3.new(0.8, 2.8, 0.8), desk * CFrame.new(x, 1.4, z), WOOD_DARK)
+	local folder = Instance.new("Model")
+	folder.Name = "Sanctuary"
+
+	-- Desk: chunky writing table, open grimoire pages and a lit candle.
+	local deskBase = CFrame.lookAt(Zones.DESK_POS, Vector3.new(0, Zones.FLOOR_Y, 0))
+	local top = part(folder, "Desk", Vector3.new(8, 0.8, 4.4), deskBase * CFrame.new(0, 3.2, 0), WOOD)
+	for _, x in { -3.4, 3.4 } do
+		for _, z in { -1.6, 1.6 } do
+			part(folder, "Leg", Vector3.new(0.8, 2.8, 0.8), deskBase * CFrame.new(x, 1.4, z), WOOD_DARK)
 		end
 	end
 	local pageColor = Color3.fromRGB(240, 228, 200)
 	part(
 		folder,
 		"Page",
-		Vector3.new(1.6, 0.2, 2.2),
-		desk * CFrame.new(-0.85, 3.7, 0) * CFrame.Angles(0, 0, 0.12),
+		Vector3.new(1.8, 0.2, 2.4),
+		deskBase * CFrame.new(-0.95, 3.7, 0) * CFrame.Angles(0, 0, 0.12),
 		pageColor,
 		Enum.Material.SmoothPlastic
 	)
 	part(
 		folder,
 		"Page",
-		Vector3.new(1.6, 0.2, 2.2),
-		desk * CFrame.new(0.85, 3.7, 0) * CFrame.Angles(0, 0, -0.12),
+		Vector3.new(1.8, 0.2, 2.4),
+		deskBase * CFrame.new(0.95, 3.7, 0) * CFrame.Angles(0, 0, -0.12),
 		pageColor,
 		Enum.Material.SmoothPlastic
 	)
 	local candle = part(
 		folder,
 		"Candle",
-		Vector3.new(0.5, 1, 0.5),
-		desk * CFrame.new(2.6, 4.1, -1),
+		Vector3.new(0.5, 1.1, 0.5),
+		deskBase * CFrame.new(3, 4.15, -1.1),
 		Color3.fromRGB(236, 224, 190),
 		Enum.Material.SmoothPlastic
 	)
@@ -108,173 +125,217 @@ local function furnish(plot: Plot)
 		folder,
 		"Flame",
 		Vector3.new(0.3, 0.5, 0.3),
-		candle.CFrame * CFrame.new(0, 0.75, 0),
+		candle.CFrame * CFrame.new(0, 0.8, 0),
 		Color3.fromRGB(255, 190, 90),
 		Enum.Material.Neon
 	)
 	flame.CanCollide = false
 	local light = Instance.new("PointLight")
 	light.Color = Color3.fromRGB(255, 190, 120)
-	light.Range = 12
+	light.Range = 16
 	light.Brightness = 1.2
 	light.Parent = flame
-	prompt(top, "desk", "Write spells", "Desk")
+	prompt(top, "desk", "Write spells", "Scriptorium Desk")
 
-	-- Shelf: three planks of books.
-	local shelf = base * CFrame.new(8, 0, 6)
-	local back = part(folder, "Shelf", Vector3.new(6, 7, 0.6), shelf * CFrame.new(0, 3.5, 1.2), WOOD_DARK)
+	-- Shelf: three planks of grimoires next to the desk.
+	local shelfBase = CFrame.lookAt(Zones.SHELF_POS, Vector3.new(0, Zones.FLOOR_Y, 0))
+	local back = part(folder, "Shelf", Vector3.new(7, 7.5, 0.7), shelfBase * CFrame.new(0, 3.75, -1.2), WOOD_DARK)
 	for i = 0, 2 do
-		part(folder, "Plank", Vector3.new(6, 0.4, 2.2), shelf * CFrame.new(0, 1 + i * 2.3, 0.2), WOOD)
+		part(folder, "Plank", Vector3.new(7, 0.4, 2.2), shelfBase * CFrame.new(0, 1 + i * 2.3, -0.2), WOOD)
 		for b = 0, 4 do
 			local hue = (b * 0.17 + i * 0.31) % 1
 			part(
 				folder,
 				"Book",
 				Vector3.new(0.7, 1.5, 1.6),
-				shelf
-					* CFrame.new(-2.2 + b * 1.05, 1.95 + i * 2.3, 0.2)
+				shelfBase
+					* CFrame.new(-2.2 + b * 1.1, 1.95 + i * 2.3, -0.2)
 					* CFrame.Angles(0, 0, if b == 3 then 0.25 else 0),
 				Color3.fromHSV(hue, 0.35, 0.6),
 				Enum.Material.SmoothPlastic
 			)
 		end
 	end
-	prompt(back, "shelf", "Grimoires & stats", "Shelf")
+	prompt(back, "shelf", "Grimoires & stats", "Grimoire Shelf")
 
-	-- Bank chest: banking happens by walking in; the chest is where you see it.
-	local chest = base * CFrame.new(0, 0, 10)
-	local box = part(folder, "Chest", Vector3.new(4.5, 2.4, 3), chest * CFrame.new(0, 1.2, 0), WOOD)
-	part(folder, "Lid", Vector3.new(4.7, 0.9, 3.2), chest * CFrame.new(0, 2.85, 0), WOOD_DARK)
+	-- Bank Vault chest: stepping into the courtyard banks automatically; the chest inspects it.
+	local bankBase = CFrame.lookAt(Zones.BANK_POS, Vector3.new(0, Zones.FLOOR_Y, 0))
+	part(folder, "Dais", Vector3.new(7, 0.6, 5), bankBase * CFrame.new(0, 0.3, 0), STONE, Enum.Material.Slate)
+	local box = part(folder, "Bank", Vector3.new(5, 2.6, 3.2), bankBase * CFrame.new(0, 1.9, 0), WOOD)
+	part(folder, "Lid", Vector3.new(5.2, 0.9, 3.4), bankBase * CFrame.new(0, 3.65, 0), WOOD_DARK)
+	for _, x in { -1.6, 1.6 } do
+		part(
+			folder,
+			"Band",
+			Vector3.new(0.5, 3.6, 3.5),
+			bankBase * CFrame.new(x, 2.35, 0),
+			Color3.fromRGB(196, 160, 80),
+			Enum.Material.Metal
+		)
+	end
+	prompt(box, "bank", "View bank", "Camp Bank")
+
+	-- Ink Merchant stall: counter, posts and ember awning.
+	local shopBase = CFrame.lookAt(Zones.SHOP_POS, Vector3.new(0, Zones.FLOOR_Y, 0))
+	local counter = part(folder, "InkMerchant", Vector3.new(9, 3.2, 2.4), shopBase * CFrame.new(0, 1.6, 1.8), WOOD)
+	part(folder, "CounterTop", Vector3.new(9.4, 0.35, 2.8), shopBase * CFrame.new(0, 3.35, 1.8), WOOD_DARK)
+	for _, x in { -4.2, 4.2 } do
+		for _, z in { -2.2, 2.2 } do
+			part(folder, "Post", Vector3.new(0.6, 8.5, 0.6), shopBase * CFrame.new(x, 4.25, z), WOOD_DARK)
+		end
+	end
 	part(
 		folder,
-		"Band",
-		Vector3.new(0.5, 3.4, 3.3),
-		chest * CFrame.new(-1.4, 1.65, 0),
-		Color3.fromRGB(196, 160, 80),
-		Enum.Material.Metal
+		"Awning",
+		Vector3.new(10, 1.2, 6),
+		shopBase * CFrame.new(0, 8.8, 0) * CFrame.Angles(0.12, 0, 0),
+		CLOTH_EMBER,
+		Enum.Material.Fabric
 	)
-	part(
+	prompt(counter, "shop", "Buy Gears & Ink", "Wizard Gear Shop")
+
+	-- Duel Arena Ring right outside the South Camp Courtyard (r = 114, radius 24): stepping inside
+	-- enables instant 1v1 / free-for-all dueling right in view of the Camp Hub!
+	local arenaCenter = Vector3.new(Zones.ARENA_X, Zones.FLOOR_Y, Zones.ARENA_Z)
+	local arenaR = Zones.ARENA_R
+	for k = 0, 23 do
+		local a = k / 24 * math.pi * 2
+		local nextA = (k + 1) / 24 * math.pi * 2
+		local p1 = arenaCenter + Vector3.new(math.cos(a) * arenaR, 0.4, math.sin(a) * arenaR)
+		local p2 = arenaCenter + Vector3.new(math.cos(nextA) * arenaR, 0.4, math.sin(nextA) * arenaR)
+		local seg = (p2 - p1).Magnitude + 0.4
+		part(
+			folder,
+			"ArenaRim",
+			Vector3.new(1.4, 0.8, seg),
+			CFrame.lookAt((p1 + p2) * 0.5, p2),
+			Color3.fromRGB(185, 75, 65),
+			Enum.Material.Slate
+		)
+	end
+	local arenaSign = part(
 		folder,
-		"Band",
-		Vector3.new(0.5, 3.4, 3.3),
-		chest * CFrame.new(1.4, 1.65, 0),
-		Color3.fromRGB(196, 160, 80),
-		Enum.Material.Metal
+		"ArenaSign",
+		Vector3.new(10, 3.2, 0.6),
+		CFrame.new(0, Zones.FLOOR_Y + 4.5, 88),
+		WOOD,
+		Enum.Material.Wood
 	)
-	prompt(box, "bank", "View bank", "Bank")
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Front
+	gui.PixelsPerStud = 30
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Text = "⚔ DUEL ARENA RING\nStep inside to PvP!"
+	label.TextScaled = true
+	label.Font = Enum.Font.FredokaOne
+	label.TextColor3 = Color3.fromRGB(255, 220, 140)
+	label.Parent = gui
+	gui.Parent = arenaSign
 
-	folder.Parent = plot.model
-end
+	-- 3 Black Clover Storyline Quest Giver NPCs at the entrance of each Level-Tiered Area.
+	local npcFolder = Instance.new("Folder")
+	npcFolder.Name = "QuestGivers"
+	npcFolder.Parent = folder
+	for _, qg in Zones.QUEST_GIVERS do
+		local pos = Zones.polar(qg.angle, qg.r)
+		local look = CFrame.lookAt(pos, Vector3.new(0, pos.Y, 0))
+		local npc = Instance.new("Model")
+		npc.Name = qg.npcName
+		npc.Parent = npcFolder
+		part(npc, "Pedestal", Vector3.new(4, 0.8, 4), look * CFrame.new(0, 0.4, 0), STONE, Enum.Material.Slate)
+		local torso = part(
+			npc,
+			"Torso",
+			Vector3.new(2.2, 2.6, 1.3),
+			look * CFrame.new(0, 2.4, 0),
+			Color3.fromRGB(66, 78, 120),
+			Enum.Material.Fabric
+		)
+		part(
+			npc,
+			"Head",
+			Vector3.new(1.5, 1.5, 1.5),
+			look * CFrame.new(0, 4.4, 0),
+			Color3.fromRGB(235, 200, 170),
+			Enum.Material.SmoothPlastic
+		)
+		part(
+			npc,
+			"Cloak",
+			Vector3.new(2.5, 2.4, 0.4),
+			look * CFrame.new(0, 2.3, 0.7),
+			CLOTH_EMBER,
+			Enum.Material.Fabric
+		)
+		local orb = part(
+			npc,
+			"QuestMark",
+			Vector3.new(0.8, 0.8, 0.8),
+			look * CFrame.new(0, 6.2, 0),
+			Color3.fromRGB(255, 215, 90),
+			Enum.Material.Neon
+		)
+		orb.CanCollide = false
+		local bb = Instance.new("BillboardGui")
+		bb.Size = UDim2.fromOffset(180, 40)
+		bb.StudsOffset = Vector3.new(0, 3.6, 0)
+		bb.AlwaysOnTop = true
+		bb.MaxDistance = 90
+		local lbl = Instance.new("TextLabel")
+		lbl.Size = UDim2.fromScale(1, 1)
+		lbl.BackgroundTransparency = 1
+		lbl.Font = Enum.Font.FredokaOne
+		lbl.TextScaled = true
+		lbl.TextColor3 = Color3.fromRGB(255, 225, 130)
+		lbl.TextStrokeTransparency = 0.3
+		lbl.Text = `! {qg.npcName}`
+		lbl.Parent = bb
+		bb.Parent = torso
+		local pp = Instance.new("ProximityPrompt")
+		pp.ActionText = "Area Quests"
+		pp.ObjectText = qg.npcName
+		pp.KeyboardKeyCode = Enum.KeyCode.E
+		pp.HoldDuration = 0
+		pp.MaxActivationDistance = 12
+		pp.RequiresLineOfSight = false
+		pp:SetAttribute("Action", "quest")
+		pp:SetAttribute("AreaId", qg.areaId)
+		pp.Parent = torso
+	end
 
-local function setSign(plot: Plot, text: string)
-	local sign = plot.model:FindFirstChild("Sign")
-	if sign == nil then
-		return
-	end
-	for _, d in sign:GetDescendants() do
-		if d:IsA("TextLabel") then
-			d.Text = text
-		end
-	end
-end
-
-local function discover()
-	local map = workspace:WaitForChild("Map")
-	for _, model in (map:WaitForChild("Plots") :: Instance):GetChildren() do
-		local id = model:GetAttribute("PlotId")
-		local floor = model:FindFirstChild("Floor")
-		local zone = model:FindFirstChild("Zone")
-		if
-			type(id) == "number"
-			and model:IsA("Model")
-			and floor
-			and floor:IsA("BasePart")
-			and zone
-			and zone:IsA("BasePart")
-		then
-			-- v1 leftovers: the Glowling pads and decor spots.
-			for _, name in { "Slots", "DecorZone" } do
-				local old = model:FindFirstChild(name)
-				if old then
-					old:Destroy()
-				end
-			end
-			table.insert(plots, { id = id, model = model, floor = floor, zone = zone })
-		end
-	end
-	table.sort(plots, function(a, b)
-		return a.id < b.id
-	end)
-	-- v1 camp stations with nothing behind them now.
-	local stations = map:FindFirstChild("Stations")
-	if stations then
-		for _, name in { "WispStash", "Leaderboards", "WhatsNew" } do
-			local old = stations:FindFirstChild(name)
-			if old then
-				old:Destroy()
-			end
-		end
-		local shop = stations:FindFirstChild("LanternShop")
-		if shop and shop:IsA("Model") then
-			shop.Name = "InkMerchant"
-			for _, d in shop:GetDescendants() do
-				if d:IsA("TextLabel") then
-					d.Text = "Ink Merchant"
-				end
-			end
-			local anchor = part(shop, "PromptAnchor", Vector3.new(4, 4, 4), shop:GetPivot() * CFrame.new(0, 3, 0), WOOD)
-			anchor.Transparency = 1
-			anchor.CanCollide = false
-			prompt(anchor, "shop", "Buy ink", "Ink Merchant")
-		end
-	end
-end
-
-local function byId(id: number): Plot?
-	for _, plot in plots do
-		if plot.id == id then
-			return plot
-		end
-	end
-	return nil
+	folder.Parent = map
 end
 
 function CampService.plotOf(player: Player): number?
-	return plotOf[player]
+	return slotOf[player]
 end
 
--- Where a player spawns: on their plot, facing the campfire.
+-- Where a player spawns: in a circle round the central campfire, facing the stations.
 function CampService.spawnCFrame(player: Player): CFrame
-	local plot = byId(plotOf[player] or 0)
-	if plot == nil then
-		return CFrame.new(18, 4, 0)
-	end
-	local pos = plot.floor.Position + Vector3.new(0, 4, 0)
-	return CFrame.lookAt(pos, Vector3.new(0, pos.Y, 0))
+	local slot = slotOf[player] or 1
+	local angle = ((slot - 1) % 8) / 8 * math.pi * 2
+	local r = 14
+	local pos = Vector3.new(math.cos(angle) * r, Zones.FLOOR_Y + 4, math.sin(angle) * r)
+	return CFrame.lookAt(pos, Vector3.new(0, pos.Y, -20))
 end
 
--- Is `position` on the player's own plot?
-function CampService.atHome(player: Player, position: Vector3): boolean
-	local plot = byId(plotOf[player] or 0)
-	if plot == nil then
-		return false
-	end
-	local rel = plot.zone.CFrame:PointToObjectSpace(position)
-	local half = plot.zone.Size / 2 + Vector3.new(2, 8, 2)
-	return math.abs(rel.X) <= half.X and math.abs(rel.Z) <= half.Z and math.abs(rel.Y) <= half.Y
+-- Anywhere inside the Wizard Camp Courtyard counts as home (banks carried loot).
+function CampService.atHome(_player: Player, position: Vector3): boolean
+	return CampService.isSafe(position)
 end
 
--- Near the player's own desk (writes and equips happen there).
-function CampService.atDesk(player: Player, position: Vector3): boolean
-	local plot = byId(plotOf[player] or 0)
-	return plot ~= nil and (plot.floor.Position - position).Magnitude < 34
+-- Inside the courtyard (near the shared desk and shelf).
+function CampService.atDesk(_player: Player, position: Vector3): boolean
+	return CampService.isSafe(position)
 end
 
 function CampService.isSafe(position: Vector3): boolean
 	return Vector2.new(position.X, position.Z).Magnitude < CampService.SAFE_RADIUS
 end
 
-local function spawnAtPlot(player: Player, character: Model)
+local function spawnAtHub(player: Player, character: Model)
 	task.defer(function()
 		if character.Parent ~= nil then
 			character:PivotTo(CampService.spawnCFrame(player))
@@ -283,58 +344,32 @@ local function spawnAtPlot(player: Player, character: Model)
 end
 
 local function assign(player: Player)
-	if plotOf[player] ~= nil then
+	if slotOf[player] ~= nil then
 		return
 	end
-	for _, plot in plots do
-		if owners[plot.id] == nil then
-			owners[plot.id] = player
-			plotOf[player] = plot.id
-			plot.model:SetAttribute("OwnerId", player.UserId)
-			furnish(plot)
-			setSign(plot, `{player.DisplayName}'s camp`)
-			player:SetAttribute("PlotId", plot.id)
-			if player.Character then
-				spawnAtPlot(player, player.Character)
-			end
-			CampService.Assigned:Fire(player, plot.id)
-			return
-		end
+	nextSlot += 1
+	slotOf[player] = nextSlot
+	player:SetAttribute("PlotId", nextSlot)
+	if player.Character then
+		spawnAtHub(player, player.Character)
 	end
-	warn(`[CampService] No free plot for {player.Name}`)
+	CampService.Assigned:Fire(player, nextSlot)
 end
 
 local function release(player: Player)
-	local id = plotOf[player]
-	if id == nil then
-		return
-	end
-	plotOf[player] = nil
-	owners[id] = nil
-	local plot = byId(id)
-	if plot then
-		plot.model:SetAttribute("OwnerId", nil)
-		local camp = plot.model:FindFirstChild("Camp")
-		if camp then
-			camp:Destroy()
-		end
-		setSign(plot, "Free camp")
-	end
+	slotOf[player] = nil
 end
 
 function CampService.Init()
 	Players.RespawnTime = 5
-	discover()
-	for _, plot in plots do
-		setSign(plot, "Free camp")
-	end
+	buildSanctuary()
 	DataService.PlayerReady:Connect(assign)
 	DataService.PlayerLeaving:Connect(release)
 	Players.PlayerRemoving:Connect(release)
 	Players.PlayerAdded:Connect(function(player)
 		player.CharacterAdded:Connect(function(character)
-			if plotOf[player] then
-				spawnAtPlot(player, character)
+			if slotOf[player] then
+				spawnAtHub(player, character)
 			end
 		end)
 	end)

@@ -1,7 +1,10 @@
 --!strict
--- The slice's HUD: health and XP, the book tabs and spell bar with cooldowns, carried and
--- banked loot, the quest tracker with a guide line to where it happens, Recall's channel bar,
--- toasts, and a controls card.
+-- The HUD:
+--   * Bottom bar: Grimoire tabs (showing 3-Leaf / 4-Leaf / 5-Leaf + Passive), 4 fixed skill slots
+--     (Z, X, C, V) with cooldowns, Health, XP, and Q Dash
+--   * Top-left card: Capped Backpack Bar (glows gold when FULL!), carried Coins & Ink, Banked
+--     Coins & Ink, ★ Stars, PvP Bounty, and the War Mode (PvP Toggle) button
+--   * Top-right card: Active Area Quest tracker + hub guide beam
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,7 +15,9 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Client = script.Parent.Parent
 local Spells = require(Shared:WaitForChild("Spells")) :: any
 local Element = require(Shared:WaitForChild("Element")) :: any
+local Gears = require(Shared:WaitForChild("Gears")) :: any
 local Level = require(Shared:WaitForChild("Level")) :: any
+local Loot = require(Shared:WaitForChild("Loot")) :: any
 local Zones = require(Shared:WaitForChild("Zones")) :: any
 local NetClient = require(Client:WaitForChild("Net"):WaitForChild("NetClient"))
 local Kit = require(Client:WaitForChild("Ui"):WaitForChild("Kit"))
@@ -30,7 +35,10 @@ local levelText: TextLabel
 local tabs: Frame
 local slots: { { frame: TextButton, name: TextLabel, cd: Frame, cdText: TextLabel, key: string } } = {}
 local dashCd: Frame
+local bagFill: Frame
+local bagText: TextLabel
 local lootText: TextLabel
+local warBtn: TextButton
 local questTitle: TextLabel
 local questText: TextLabel
 local questFrame: Frame
@@ -38,6 +46,7 @@ local recallFrame: Frame
 local recallFill: Frame
 local toastList: Frame
 local recallEnds: number? = nil
+local recallDuration = 5
 local quest: any = nil
 
 local KEYS = { "Z", "X", "C", "V" }
@@ -65,10 +74,10 @@ local TOAST_COLORS = {
 } :: { [string]: Color3 }
 
 local function toast(text: string, kind: string?)
-	local f = Kit.frame(toastList, UDim2.fromOffset(380, 34), UDim2.new(), TOAST_COLORS[kind or ""] or Kit.PANEL)
+	local f = Kit.frame(toastList, UDim2.fromOffset(400, 34), UDim2.new(), TOAST_COLORS[kind or ""] or Kit.PANEL)
 	f.LayoutOrder = -math.floor(os.clock() * 100)
 	f.BackgroundTransparency = 0.1
-	Kit.label(f, text, UDim2.new(1, -16, 1, 0), UDim2.fromOffset(8, 0), 15)
+	Kit.label(f, text, UDim2.new(1, -16, 1, 0), UDim2.fromOffset(8, 0), 14)
 	task.delay(3.2, function()
 		TweenService:Create(f, TweenInfo.new(0.3), { BackgroundTransparency = 1 }):Play()
 		for _, d in f:GetDescendants() do
@@ -112,17 +121,18 @@ local function refreshBooks()
 		local book = data.books[index]
 		if book then
 			local active = data.active == slot
+			local clovers = Element.clovers(book.type)
 			local b = Kit.button(
 				tabs,
-				`{slot}  {book.type}`,
-				UDim2.fromOffset(110, 28),
+				`{slot} · {clovers}♣ {book.type}`,
+				UDim2.fromOffset(128, 28),
 				UDim2.new(),
 				if active then typeColor(book.type) else Kit.PANEL,
 				function()
 					NetClient.send("SwapBook", slot)
 				end
 			)
-			b.TextSize = 14
+			b.TextSize = 13
 			b.LayoutOrder = slot
 			if active then
 				b.TextColor3 = Color3.fromRGB(30, 24, 30)
@@ -130,15 +140,18 @@ local function refreshBooks()
 		end
 	end
 	local book = data.books[data.equipped[data.active]]
+	local fixed = if book then Spells.fixedFor(book.type) else Spells.fixedFor("Neutral")
 	for i, s in slots do
 		local page = book and book.pages[i]
 		local spell = page and Spells.get(page.sp)
-		if spell then
+		local lockedSpell = Spells.get(fixed[i])
+		if spell and page then
 			s.name.Text = `<b>{spell.name}</b>\n<font size="11">Lv {page.lv}</font>`
 			s.frame.BackgroundColor3 = Kit.rgb(Spells.RARITY_COLOR[spell.rarity]):Lerp(Kit.PANEL, 0.55)
 			s.key = `{book.type}:{spell.id}:{i}`
 		else
-			s.name.Text = '<font color="#8a8296">empty page</font>'
+			local lockedName = if lockedSpell then lockedSpell.name else "Locked"
+			s.name.Text = `<font color="#8a8296">{lockedName}\n<font size="10">Unlock at Desk</font></font>`
 			s.frame.BackgroundColor3 = Kit.PANEL
 			s.key = ""
 		end
@@ -150,22 +163,23 @@ local function refreshLoot()
 	if data == nil then
 		return
 	end
-	local function line(bag: any): string
-		local parts = { `Coins {bag.coins}` }
-		for kind, n in bag.ink do
-			if n > 0 then
-				table.insert(parts, `{kind} ink {n}`)
-			end
-		end
-		for kind, n in bag.frag do
-			if n > 0 then
-				table.insert(parts, `{kind} frag {n}`)
-			end
-		end
-		return table.concat(parts, "  ·  ")
-	end
+	local gStats = Gears.stats(data.gears)
+	local cap = gStats.capacity
+	local weight = Loot.weight(data.carried)
+	local full = weight >= cap
+	bagFill.Size = UDim2.fromScale(math.clamp(weight / math.max(1, cap), 0, 1), 1)
+	bagFill.BackgroundColor3 = if full then Color3.fromRGB(255, 200, 70) else Color3.fromRGB(130, 185, 115)
+	bagText.Text = if full
+		then `BACKPACK FULL ({weight}/{cap}) — Walk to Camp for +15%!`
+		else `Backpack: {weight} / {cap}   ({data.carried.coins} Coins · {Loot.totalInk(data.carried)} Ink)`
 	lootText.Text =
-		`<b>Carrying</b>  {line(data.carried)}\n<font color="#9fd6a4"><b>Banked</b>  {line(data.bank)}   ★ {data.stars}</font>`
+		`<font color="#9fd6a4"><b>Banked</b>  Coins {data.bank.coins}  ·  Ink {Loot.totalInk(data.bank)}</font>   <font color="#ffd970"><b>★ {data.stars}</b></font>   <font color="#ff9d80">⚔ {data.bounty or 0}</font>`
+end
+
+local function refreshWarMode()
+	local on = player:GetAttribute("WarMode") == true
+	warBtn.Text = if on then "⚔ War Mode: ON (+25% Coins)" else "🛡 War Mode: OFF (Safe)"
+	warBtn.BackgroundColor3 = if on then Color3.fromRGB(175, 62, 54) else Kit.PANEL
 end
 
 local function refreshLevel()
@@ -186,11 +200,14 @@ local function refreshQuest()
 		return
 	end
 	questFrame.Visible = true
-	questTitle.Text = if quest.tutorial then `Tutorial {quest.index}/6` else "Quest"
+	questTitle.Text = if quest.title
+		then quest.title
+		elseif quest.tutorial then `Tutorial {quest.index}/6`
+		else "Area Quest (★ Stars + Coins)"
 	questText.Text = if quest.n > 1 then `{quest.text}  ({quest.progress}/{quest.n})` else quest.text
 end
 
--- Guide line -----------------------------------------------------------------------------------
+-- Guide line (inside the hub courtyard only, for tutorial desk/camp hints) -----------------
 
 local guideBeam: Beam
 local guideFrom: Attachment
@@ -202,54 +219,10 @@ local function hintTarget(): Vector3?
 		return nil
 	end
 	local hint = quest.hint
-	local plotId = player:GetAttribute("PlotId")
-	if hint == "desk" or hint == "camp" then
-		local plots = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Plots")
-		if plots then
-			for _, plot in plots:GetChildren() do
-				if plot:GetAttribute("PlotId") == plotId then
-					local camp = plot:FindFirstChild("Camp")
-					local desk = camp and camp:FindFirstChild("Desk")
-					if hint == "desk" and desk and desk:IsA("BasePart") then
-						return desk.Position
-					end
-					local floor = plot:FindFirstChild("Floor")
-					return if floor and floor:IsA("BasePart") then floor.Position else nil
-				end
-			end
-		end
-		return nil
-	end
-	local enemies = workspace:FindFirstChild("Enemies")
-	local function nearest(kind: string): Vector3?
-		local me = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-		if enemies == nil or me == nil or not me:IsA("BasePart") then
-			return nil
-		end
-		local best, bestD = nil, math.huge
-		for _, model in enemies:GetChildren() do
-			if model:GetAttribute("Kind") == kind and model:IsA("Model") and model.PrimaryPart then
-				local d = (model.PrimaryPart.Position - me.Position).Magnitude
-				if d < bestD then
-					best, bestD = model.PrimaryPart.Position, d
-				end
-			end
-		end
-		return best
-	end
-	if hint == "trail" then
-		return nearest("ember_imp") or Vector3.new(190, 2, 0)
-	elseif hint == "ashling" then
-		return nearest("ashling") or Vector3.new(238, 2, 0)
-	elseif hint == "raider" then
-		return nearest("raider")
-	elseif hint == "zone" or hint == "boss" then
-		local data = StateController.get()
-		local zone = Zones.forElement(if data then data.element else "")
-		if hint == "boss" then
-			return nearest(zone.boss) or Zones.toWorld(zone, Zones.BOSS_D, 0)
-		end
-		return Zones.entry(zone)
+	if hint == "desk" then
+		return Zones.DESK_POS + Vector3.new(0, 3, 0)
+	elseif hint == "camp" then
+		return Zones.BANK_POS + Vector3.new(0, 2, 0)
 	end
 	return nil
 end
@@ -257,15 +230,20 @@ end
 local function updateGuide()
 	local me = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 	local target = hintTarget()
-	if me == nil or not me:IsA("BasePart") or target == nil or (target - me.Position).Magnitude < 12 then
+	if
+		me == nil
+		or not me:IsA("BasePart")
+		or target == nil
+		or Vector2.new(me.Position.X, me.Position.Z).Magnitude > Zones.CAMP_R
+		or (target - me.Position).Magnitude < 8
+	then
 		guideBeam.Enabled = false
 		return
 	end
 	if guideFrom.Parent ~= me then
 		guideFrom.Parent = me
 	end
-	-- through the camp gate and along the trail up the ramp, not straight at it
-	guidePart.Position = Zones.guide(me.Position, target) + Vector3.new(0, 1, 0)
+	guidePart.Position = target
 	guideBeam.Enabled = true
 end
 
@@ -308,7 +286,7 @@ local function build()
 		)
 		local key = Kit.label(frame, KEYS[i], UDim2.fromOffset(22, 22), UDim2.fromOffset(4, 3), 14, Kit.GOLD)
 		key.TextXAlignment = Enum.TextXAlignment.Left
-		local name = Kit.label(frame, "", UDim2.new(1, -8, 1, -6), UDim2.fromOffset(4, 4), 14)
+		local name = Kit.label(frame, "", UDim2.new(1, -8, 1, -6), UDim2.fromOffset(4, 4), 13)
 		local cd =
 			Kit.frame(frame, UDim2.fromScale(1, 0), UDim2.fromScale(0, 1), Color3.new(0, 0, 0), Vector2.new(0, 1))
 		cd.BackgroundTransparency = 0.4
@@ -331,25 +309,40 @@ local function build()
 	dashCd.BackgroundTransparency = 0.4
 	dashCd:SetAttribute("NoSkin", true)
 
-	-- Top left: loot.
-	local loot = Kit.frame(gui, UDim2.fromOffset(330, 52), UDim2.fromOffset(12, 12), Kit.PANEL)
+	-- Top left: Backpack fullness bar, Banked currencies, Stars, Bounty & War Mode Toggle.
+	local loot = Kit.frame(gui, UDim2.fromOffset(365, 86), UDim2.fromOffset(12, 12), Kit.PANEL)
 	loot.BackgroundTransparency = 0.15
-	lootText = Kit.label(loot, "", UDim2.new(1, -16, 1, -6), UDim2.fromOffset(8, 3), 14)
+	local bagTrack
+	bagTrack, bagFill = bar(loot, UDim2.new(1, -16, 0, 20), UDim2.fromOffset(8, 8), Color3.fromRGB(130, 185, 115))
+	bagText = Kit.label(bagTrack, "", UDim2.fromScale(1, 1), UDim2.new(), 12)
+	bagText.ZIndex = 3
+	lootText = Kit.label(loot, "", UDim2.new(1, -16, 0, 22), UDim2.fromOffset(8, 32), 13)
 	lootText.TextXAlignment = Enum.TextXAlignment.Left
+	warBtn = Kit.button(
+		loot,
+		"🛡 War Mode: OFF (Safe)",
+		UDim2.fromOffset(210, 24),
+		UDim2.fromOffset(8, 56),
+		Kit.PANEL,
+		function()
+			NetClient.send("TogglePvp")
+		end
+	)
+	warBtn.TextSize = 12
 
 	-- Top right: quest.
-	questFrame = Kit.frame(gui, UDim2.fromOffset(300, 70), UDim2.new(1, -12, 0, 12), Kit.PANEL, Vector2.new(1, 0))
+	questFrame = Kit.frame(gui, UDim2.fromOffset(310, 74), UDim2.new(1, -12, 0, 12), Kit.PANEL, Vector2.new(1, 0))
 	questFrame.BackgroundTransparency = 0.15
 	questTitle = Kit.label(questFrame, "", UDim2.new(1, -16, 0, 20), UDim2.fromOffset(8, 4), 14, Kit.GOLD)
 	questTitle.TextXAlignment = Enum.TextXAlignment.Left
-	questText = Kit.label(questFrame, "", UDim2.new(1, -16, 1, -28), UDim2.fromOffset(8, 24), 15)
+	questText = Kit.label(questFrame, "", UDim2.new(1, -16, 1, -28), UDim2.fromOffset(8, 24), 14)
 	questText.TextXAlignment = Enum.TextXAlignment.Left
 	questText.TextYAlignment = Enum.TextYAlignment.Top
 
 	-- Toasts under the boss bar.
 	toastList = Instance.new("Frame")
 	toastList.BackgroundTransparency = 1
-	toastList.Size = UDim2.fromOffset(380, 200)
+	toastList.Size = UDim2.fromOffset(400, 200)
 	toastList.Position = UDim2.new(0.5, 0, 0, 70)
 	toastList.AnchorPoint = Vector2.new(0.5, 0)
 	toastList.Parent = gui
@@ -365,11 +358,11 @@ local function build()
 		bar(recallFrame, UDim2.new(1, -20, 0, 8), UDim2.fromOffset(10, 25), Color3.fromRGB(140, 190, 255))
 
 	-- Controls card, bottom left.
-	local help = Kit.frame(gui, UDim2.fromOffset(210, 118), UDim2.new(0, 12, 1, -12), Kit.PANEL, Vector2.new(0, 1))
+	local help = Kit.frame(gui, UDim2.fromOffset(216, 118), UDim2.new(0, 12, 1, -12), Kit.PANEL, Vector2.new(0, 1))
 	help.BackgroundTransparency = 0.25
 	local helpText = Kit.label(
 		help,
-		"<b>Click</b> attack\n<b>Z X C V</b> spells\n<b>Q</b> dash   <b>1 2 3</b> books\n<b>R</b> recall   <b>E</b> use\nWalk into camp to bank",
+		"<b>Click</b> 4-hit M1 combo\n<b>Z X C V</b> Grimoire skills\n<b>Q</b> dash   <b>1 2 3</b> swap books\n<b>R</b> recall   <b>E</b> interact\nWalk Full Bag to Camp: +15%",
 		UDim2.new(1, -16, 1, -8),
 		UDim2.fromOffset(8, 4),
 		13,
@@ -412,19 +405,21 @@ function HUDController.Init()
 	StateController.Changed:Connect(function(key: string)
 		if key == "books" or key == "equipped" or key == "active" then
 			refreshBooks()
-		elseif key == "carried" or key == "bank" or key == "stars" then
+		elseif key == "carried" or key == "bank" or key == "stars" or key == "gears" or key == "bounty" then
 			refreshLoot()
 		elseif key == "level" or key == "xp" then
 			refreshLevel()
 		end
 	end)
+	player:GetAttributeChangedSignal("WarMode"):Connect(refreshWarMode)
 	NetClient.on("Toast", toast)
 	NetClient.on("Quest", function(view: any)
 		quest = view
 		refreshQuest()
 	end)
-	NetClient.on("RecallState", function(endsAt: number?)
+	NetClient.on("RecallState", function(endsAt: number?, totalSec: number?)
 		recallEnds = endsAt
+		recallDuration = totalSec or 5
 		recallFrame.Visible = endsAt ~= nil
 	end)
 end
@@ -449,12 +444,12 @@ function HUDController.Start()
 				s.cdText.Text = ""
 			end
 		end
-		local dashReady = CombatController.readyAt("dash")
+		local dashReady, dashDur = CombatController.readyAt("dash")
 		local dashLeft = dashReady - now
-		dashCd.Size = UDim2.fromScale(math.clamp(dashLeft / CombatController.DASH_COOLDOWN, 0, 1), 1)
+		dashCd.Size = UDim2.fromScale(math.clamp(dashLeft / math.max(1, dashDur), 0, 1), 1)
 		if recallEnds then
 			local left = recallEnds - workspace:GetServerTimeNow()
-			recallFill.Size = UDim2.fromScale(math.clamp(1 - left / 5, 0, 1), 1)
+			recallFill.Size = UDim2.fromScale(math.clamp(1 - left / recallDuration, 0, 1), 1)
 		end
 		updateGuide()
 	end)
@@ -462,6 +457,7 @@ function HUDController.Start()
 		refreshBooks()
 		refreshLoot()
 		refreshLevel()
+		refreshWarMode()
 	end
 	if StateController.isLoaded() then
 		all()

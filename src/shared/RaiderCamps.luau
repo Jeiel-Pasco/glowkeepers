@@ -40,9 +40,9 @@ function RaiderCamps.pick(rng: (n: number) -> number): { number }
 	return out
 end
 
--- Guards are tougher further out: level 4 nearest the camp ring, up to 8 by the cliff.
+-- Guards are tougher further out: level 4 nearest the camp ring, up to 8 deeper in the wilds.
 function RaiderCamps.level(site: { r: number }): number
-	local t = math.clamp((site.r - 330) / (440 - 330), 0, 1)
+	local t = math.clamp((site.r - 135) / (225 - 135), 0, 1)
 	return 4 + math.floor(t * 4 + 0.5)
 end
 

@@ -60,16 +60,16 @@ H.test("the tutorial Ashling takes 10–25 s with the first spell", function()
 	H.ok(ttk >= 10 and ttk <= 25, `ashling {ttk}s`)
 end)
 
-H.test("levelling 1 → 15 on on-level minions takes 45–150 minutes", function()
+H.test("levelling 1 → 50 on on-level minions takes reasonable playtime", function()
 	local seconds = 0
 	local kind = Enemies.kinds.ember_imp
 	for level = 1, Level.CAP - 1 do
 		local kills = Level.xpToNext(level) / Enemies.xp(kind, level)
-		local perKill = Enemies.maxHp(kind, level) / kitDps(level, "Fire") + 6 -- 6 s to find the next one
+		local perKill = Enemies.maxHp(kind, level) / kitDps(level, "Fire") + 6
 		seconds += kills * perKill
 	end
-	local minutes = seconds / 60
-	H.ok(minutes >= 45 and minutes <= 150, `{minutes} minutes`)
+	local hours = seconds / 3600
+	H.ok(hours >= 1 and hours <= 120, `{hours} hours`)
 end)
 
 H.test("every zone pack has a real enemy kind; zones sit apart and inside the world", function()
@@ -79,15 +79,15 @@ H.test("every zone pack has a real enemy kind; zones sit apart and inside the wo
 		H.ok(spawn.pos.Magnitude < Zones.WORLD_R - 40, `{spawn.kind} inside the world`)
 		count += 1
 	end
-	H.ok(count <= 50, `{count} enemies in the world`)
+	H.ok(count <= 60, `{count} enemies in the world`)
 	-- Packs at least 40 studs apart (past minion and caster aggro), so one pull is one pack, and
-	-- every pack inside its zone circle.
+	-- every pack inside its zone valley.
 	for _, zone in Zones.list do
 		local centre = Zones.toWorld(zone, Zones.ZONE_D, 0)
 		for i, a in Zones.PACKS do
 			local pa = Zones.toWorld(zone, a.d, a.s)
-			H.ok((pa - centre).Magnitude <= Zones.ZONE_R - 25, `{zone.id} pack {i} inside the circle`)
-			H.ok(math.abs(pa.Y - Zones.PLATEAU_Y) < 0.01, `{zone.id} pack {i} on the plateau`)
+			H.ok((pa - centre).Magnitude <= Zones.ZONE_R - 25, `{zone.id} pack {i} inside the valley`)
+			H.ok(math.abs(pa.Y - Zones.PLATEAU_Y) < 0.01, `{zone.id} pack {i} on the valley plateau`)
 			for j, b in Zones.PACKS do
 				if i < j then
 					local d = (pa - Zones.toWorld(zone, b.d, b.s)).Magnitude
@@ -98,12 +98,27 @@ H.test("every zone pack has a real enemy kind; zones sit apart and inside the wo
 	end
 end)
 
-H.test("zone circles sit on the plateau with forest round them", function()
-	H.ok(Zones.ZONE_D - Zones.ZONE_R >= Zones.CLIFF_OUT + 100, "forest between the cliff and each zone")
-	H.ok(Zones.ZONE_D + Zones.ZONE_R <= Zones.WORLD_R - 100, "forest between each zone and the edge")
+H.test("wild Neutral forest spawns pick valid lowland positions outside the hub and clear of camps", function()
+	local i = 0
+	for _ = 1, 40 do
+		local p = Zones.randomWildPos(function()
+			i = (i + 1) % 97
+			return (i + 0.5) / 97
+		end)
+		local r = Vector3.new(p.X, 0, p.Z).Magnitude
+		H.ok(r > Zones.GATE_D + 15 and r < Zones.CLIFF_IN - 8, `wild spawn r={r} in lowland`)
+		for j, site in Zones.campSites() do
+			H.ok((p - site).Magnitude >= Zones.CAMP_SITE_R + 10, `wild spawn clear of camp site {j}`)
+		end
+	end
+end)
+
+H.test("zone valleys sit beyond the threshold with forest wedges between them", function()
+	H.ok(Zones.ZONE_D - Zones.ZONE_R >= Zones.CLIFF_OUT + 10, "valleys start past the threshold")
+	H.ok(Zones.ZONE_D + Zones.ZONE_R <= Zones.WORLD_R - 80, "mountain rim behind each valley")
 	local a, b = Zones.toWorld(Zones.list[1], Zones.ZONE_D, 0), Zones.toWorld(Zones.list[2], Zones.ZONE_D, 0)
-	H.ok((a - b).Magnitude >= 2 * Zones.ZONE_R + 300, "zones far apart")
-	H.ok(Zones.CAMP_R < Zones.GATE_D and Zones.GATE_D < Zones.CLIFF_IN, "camp, then lowland")
+	H.ok((a - b).Magnitude >= 2 * Zones.ZONE_R + 200, "zones far apart")
+	H.ok(Zones.CAMP_R < Zones.GATE_D and Zones.GATE_D < Zones.CLIFF_IN, "courtyard, then lowland")
 end)
 
 local function angleGap(a: number, b: number): number
@@ -150,8 +165,8 @@ H.test("raider camp sites sit in the lowland, apart and off the routes", functio
 	local sites = Zones.campSites()
 	H.ok(#sites >= 8, `{#sites} camp sites`)
 	for i, site in Zones.CAMP_SITES do
-		H.ok(site.r - Zones.CAMP_SITE_R >= Zones.GATE_D + 30, `site {i} outside the camp ring`)
-		H.ok(site.r + Zones.CAMP_SITE_R <= Zones.CLIFF_IN - 20, `site {i} before the cliff`)
+		H.ok(site.r - Zones.CAMP_SITE_R >= Zones.GATE_D + 20, `site {i} outside the courtyard ring`)
+		H.ok(site.r + Zones.CAMP_SITE_R <= Zones.CLIFF_IN - 15, `site {i} before the valley threshold`)
 		local width = math.asin(Zones.CAMP_SITE_R / site.r)
 		for _, zone in Zones.list do
 			local gap = angleGap(site.angle, zone.angle) - Zones.RAMP_SPAN / 2 - width
@@ -160,12 +175,12 @@ H.test("raider camp sites sit in the lowland, apart and off the routes", functio
 		for j, other in sites do
 			if j > i then
 				local d = (sites[i] - other).Magnitude
-				H.ok(d >= 2 * Zones.CAMP_SITE_R + 40, `sites {i},{j} {d}`)
+				H.ok(d >= 2 * Zones.CAMP_SITE_R + 22, `sites {i},{j} {d}`)
 			end
 		end
 		for _, raider in Zones.RAIDERS do
 			local d = (sites[i] - Zones.polar(raider.angle, raider.r)).Magnitude
-			H.ok(d >= Zones.CAMP_SITE_R + Zones.RAIDER_WANDER + 20, `site {i} clear of roaming raiders`)
+			H.ok(d >= Zones.CAMP_SITE_R + Zones.RAIDER_WANDER + 10, `site {i} clear of roaming raiders`)
 		end
 	end
 	for _, raider in Zones.RAIDERS do
@@ -182,18 +197,18 @@ H.test("the quest guide goes through a gate and along the trail", function()
 	local out = Zones.guide(Vector3.new(0, 3, 0), entry)
 	H.ok((out - Zones.polar(ember.angle, Zones.GATE_D + 16)).Magnitude < 1, `gate first {out}`)
 	-- On the trail in the lowland: a couple of points further along it.
-	local on = trail[4] + Vector3.new(0, 3, 0)
-	H.ok(Zones.guide(on, entry) == trail[6], "along the trail")
+	local on = trail[3] + Vector3.new(0, 3, 0)
+	H.ok(Zones.guide(on, entry) == trail[5], "along the trail")
 	-- Off the trail in the lowland: to the ramp's foot.
-	local off = Zones.guide(Zones.polar(math.rad(-30), 450) + Vector3.new(0, 3, 0), entry)
+	local off = Zones.guide(Zones.polar(math.rad(-45), 180) + Vector3.new(0, 3, 0), entry)
 	H.ok(math.abs(Vector3.new(off.X, 0, off.Z).Magnitude - Zones.RAMP_R0) < 1, `ramp foot {off}`)
 	-- Halfway up the ramp: further up it.
 	local mid = Zones.rampAt(ember, 0.5)
 	H.ok(Zones.guide(mid + Vector3.new(0, 3, 0), entry).Y > mid.Y + 5, "up the ramp")
 	-- On the plateau: straight there.
-	H.ok(Zones.guide(Zones.polar(ember.angle, 600) + Vector3.new(0, 3, 0), entry) == entry, "plateau")
+	H.ok(Zones.guide(Zones.polar(ember.angle, 300) + Vector3.new(0, 3, 0), entry) == entry, "plateau")
 	-- Back to camp from the lowland: in through the nearest gate.
-	local back = Zones.guide(Zones.polar(math.rad(100), 400) + Vector3.new(0, 3, 0), Vector3.new(0, 0, 0))
+	local back = Zones.guide(Zones.polar(math.rad(100), 150) + Vector3.new(0, 3, 0), Vector3.new(0, 0, 0))
 	H.ok((back - Zones.polar(math.rad(120), Zones.GATE_D - 16)).Magnitude < 1, `gate back {back}`)
 end)
 

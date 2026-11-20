@@ -1,12 +1,11 @@
 --!strict
--- Writing spells into grimoires (GDD "Spells"). Pure: the server passes the RNG.
+-- Grimoire fixed-page skill unlocking & upgrading with Universal Ink, plus legacy odds helpers.
 --
--- A write spends 1 ink of the book's type and draws a rarity from the odds table, then a spell
--- of that rarity from the type's pool (falling back to the nearest rarity the pool has).
--- What happens next:
---   "level"    the book already has the spell: it levels up (to MAX_LEVEL; past that it refunds)
---   "added"    a free page: it goes there
---   "choose"   the book is full: the player replaces a page or tears the spell out
+-- Fixed 4-page Black Clover / Blox Fruits model:
+--   Every Grimoire type has 4 fixed signature skills (Spells.fixedFor(book.type) = { Z, X, C, V }).
+--   Page 1 (Z) starts unlocked at Lv 1 when you acquire the book.
+--   Universal Ink unlocks X (2 Ink) → C (4 Ink) → V (6 Ink), and upgrades any unlocked skill
+--   from Lv 1 → Lv 5 (costing 1 → 2 → 3 → 4 Ink).
 
 -- In Roblox a sibling ModuleScript; under Lune (tests) a path.
 -- selene: allow(incorrect_standard_library_use)
@@ -15,19 +14,71 @@ local Spells = if script ~= nil then require(script.Parent:WaitForChild("Spells"
 local Writing = {}
 
 Writing.PAGES = 4
-Writing.STAR_COST = 10 -- stars for a boosted element write
-Writing.TEAR_REFUND = 0.5 -- of an ink, rounded down on the bank side
+Writing.STAR_COST = 5 -- Stars to roll a Grimoire at the Desk
+Writing.TEAR_REFUND = 0.5
 
 export type Page = { sp: string, lv: number }
 export type Book = { type: string, pages: { Page } }
 
--- Rarity odds per write.
+-- Rarity odds kept for spec compatibility.
 Writing.ODDS = {
 	element = { Common = 0.60, Rare = 0.30, Epic = 0.08, Legendary = 0.02 },
 	elementStars = { Common = 0.40, Rare = 0.35, Epic = 0.15, Legendary = 0.10 },
 	mythic = { Rare = 0.55, Epic = 0.33, Legendary = 0.10, Mythic = 0.02 },
 	mythicStars = { Rare = 0.35, Epic = 0.35, Legendary = 0.22, Mythic = 0.08 },
 } :: { [string]: { [string]: number } }
+
+-- Creates a new Grimoire of `bookType` with Page 1 (Z) already unlocked at Lv 1.
+function Writing.newBook(bookType: string): Book
+	local fixed = Spells.fixedFor(bookType)
+	return {
+		type = bookType,
+		pages = { { sp = fixed[1], lv = 1 } },
+	}
+end
+
+-- Cost in Universal Ink to unlock or upgrade fixed slot `slot` (1..4) on `book`.
+-- Returns (cost, action: "unlock" | "upgrade" | "locked_prev" | "maxed").
+function Writing.slotCost(book: Book, slot: number): (number?, string)
+	if slot < 1 or slot > Writing.PAGES or slot % 1 ~= 0 then
+		return nil, "invalid"
+	end
+	local fixed = Spells.fixedFor(book.type)
+	local targetId = fixed[slot]
+	if targetId == nil then
+		return nil, "invalid"
+	end
+	local page = book.pages[slot]
+	if page == nil then
+		if slot > #book.pages + 1 then
+			return nil, "locked_prev"
+		end
+		return Spells.UNLOCK_INK[slot] or 2, "unlock"
+	end
+	if page.lv >= Spells.MAX_LEVEL then
+		return nil, "maxed"
+	end
+	return Spells.UPGRADE_INK[page.lv] or page.lv, "upgrade"
+end
+
+-- Unlocks or upgrades fixed `slot` (1..4) on `book` in place. Returns ("unlocked" | "upgraded", spellId, newLv).
+function Writing.upgradeSlot(book: Book, slot: number): (string?, string?, number?)
+	local cost, action = Writing.slotCost(book, slot)
+	if cost == nil then
+		return nil, nil, nil
+	end
+	local fixed = Spells.fixedFor(book.type)
+	local spellId = fixed[slot]
+	if action == "unlock" then
+		book.pages[slot] = { sp = spellId, lv = 1 }
+		return "unlocked", spellId, 1
+	elseif action == "upgrade" then
+		book.pages[slot].sp = spellId
+		book.pages[slot].lv += 1
+		return "upgraded", spellId, book.pages[slot].lv
+	end
+	return nil, nil, nil
+end
 
 function Writing.oddsFor(bookType: string, stars: boolean): { [string]: number }
 	local mythic = bookType == "Light" or bookType == "Dark"
@@ -37,7 +88,6 @@ function Writing.oddsFor(bookType: string, stars: boolean): { [string]: number }
 	return if stars then Writing.ODDS.elementStars else Writing.ODDS.element
 end
 
--- Draws a rarity with `r` in [0, 1).
 function Writing.rarity(odds: { [string]: number }, r: number): string
 	local acc = 0
 	local last = "Common"
@@ -54,7 +104,6 @@ function Writing.rarity(odds: { [string]: number }, r: number): string
 	return last
 end
 
--- A spell of `rarity` from the type's pool, or the nearest rarity below (then above) it.
 function Writing.pick(bookType: string, rarity: string, r: number): string?
 	local pool = Spells.pools[bookType]
 	if pool == nil then
@@ -77,13 +126,11 @@ function Writing.pick(bookType: string, rarity: string, r: number): string?
 	return nil
 end
 
--- Rolls a spell for a book. `rng` returns numbers in [0, 1).
 function Writing.roll(bookType: string, stars: boolean, rng: () -> number): string?
 	local rarity = Writing.rarity(Writing.oddsFor(bookType, stars), rng())
 	return Writing.pick(bookType, rarity, rng())
 end
 
--- Applies a written spell to a book in place. Returns the outcome and the page it touched.
 function Writing.apply(book: Book, spellId: string): (string, number?)
 	for i, page in book.pages do
 		if page.sp == spellId then
@@ -101,7 +148,6 @@ function Writing.apply(book: Book, spellId: string): (string, number?)
 	return "choose", nil
 end
 
--- Resolves a "choose": page 1–4 replaces that page; 0 tears the new spell out.
 function Writing.resolve(book: Book, spellId: string, page: number): boolean
 	if page == 0 then
 		return true

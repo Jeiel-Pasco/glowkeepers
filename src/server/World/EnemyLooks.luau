@@ -52,6 +52,27 @@ end
 
 local BUILDERS: { [string]: (body: BasePart) -> () } = {}
 
+-- Forest Wisp: a hovering mossy stone sprite with a glowing spirit core and ear crests.
+BUILDERS.forest_wisp = function(body)
+	local stone = Color3.fromRGB(118, 114, 108)
+	local moss = Color3.fromRGB(88, 128, 76)
+	local rune = Color3.fromRGB(220, 210, 175)
+	piece(body, Vector3.new(1.8, 0.5, 1.8), CFrame.new(0, 0.75, 0), moss, M.Grass)
+	for _, x in { -0.65, 0.65 } do
+		piece(
+			body,
+			Vector3.new(0.35, 0.9, 0.45),
+			CFrame.new(x, 1.05, 0.1) * CFrame.Angles(0, 0, -x * 0.55),
+			stone,
+			M.Slate
+		)
+		piece(body, Vector3.new(0.45, 0.7, 0.45), CFrame.new(x * 1.15, -0.8, 0), stone, M.Slate)
+	end
+	eyes(body, 0.2, -0.82, 0.34, 0.34, rune)
+	glow(body, Vector3.new(0.7, 0.7, 0.7), CFrame.new(0, 0.1, 0), rune, Enum.PartType.Ball)
+	glow(body, Vector3.new(0.4, 0.6, 0.4), CFrame.new(0, 1.25, 0), rune)
+end
+
 -- Ember Imp: a squat ember-red body, stubby horns, glowing eyes and a flame tuft.
 BUILDERS.ember_imp = function(body)
 	local horn = Color3.fromRGB(58, 40, 36)
@@ -88,33 +109,32 @@ BUILDERS.cinder_caster = function(body)
 	glow(body, Vector3.new(2.62, 0.25, 2.42), CFrame.new(0, -1.9, 0), Color3.fromRGB(200, 80, 40))
 end
 
--- Ashling: a big ash-grey brute with ember cracks, the trail's mini-boss.
+-- Runestone Brute (id: ashling): a Neutral moss-and-stone forest brute with pale spirit runes.
 BUILDERS.ashling = function(body)
-	local ash = Color3.fromRGB(110, 104, 100)
-	piece(body, Vector3.new(4.2, 1.8, 3.4), CFrame.new(0, -1.7, 0), Color3.fromRGB(92, 86, 84))
+	local stone = Color3.fromRGB(116, 114, 110)
+	local darkStone = Color3.fromRGB(86, 84, 82)
+	local rune = Color3.fromRGB(190, 235, 225)
+	piece(body, Vector3.new(4.2, 1.8, 3.4), CFrame.new(0, -1.7, 0), darkStone, M.Slate)
 	for _, x in { -1, 1 } do
-		piece(body, Vector3.new(1.3, 2.6, 1.3), CFrame.new(x * 2.6, -0.6, -0.3) * CFrame.Angles(0, 0, x * 0.25), ash)
-		piece(body, Vector3.new(1.5, 1.2, 1.5), CFrame.new(x * 2.9, -2, -0.4), Color3.fromRGB(86, 80, 78))
+		piece(
+			body,
+			Vector3.new(1.3, 2.6, 1.3),
+			CFrame.new(x * 2.6, -0.6, -0.3) * CFrame.Angles(0, 0, x * 0.25),
+			stone,
+			M.Slate
+		)
+		piece(body, Vector3.new(1.5, 1.2, 1.5), CFrame.new(x * 2.9, -2, -0.4), darkStone, M.Slate)
 		piece(
 			body,
 			Vector3.new(0.7, 1.6, 0.7),
 			CFrame.new(x * 1.1, 2.2, 0) * CFrame.Angles(0, 0, -x * 0.5),
-			Color3.fromRGB(60, 54, 52)
+			Color3.fromRGB(82, 116, 72),
+			M.Grass
 		)
 	end
-	eyes(body, 0.7, -1.62, 0.7, 0.55, Color3.fromRGB(255, 200, 100))
-	glow(
-		body,
-		Vector3.new(0.35, 1.8, 0.2),
-		CFrame.new(-0.8, -0.2, -1.62) * CFrame.Angles(0, 0, 0.4),
-		Color3.fromRGB(255, 120, 40)
-	)
-	glow(
-		body,
-		Vector3.new(0.35, 1.4, 0.2),
-		CFrame.new(1.0, -0.6, -1.62) * CFrame.Angles(0, 0, -0.5),
-		Color3.fromRGB(255, 120, 40)
-	)
+	eyes(body, 0.7, -1.62, 0.7, 0.55, rune)
+	glow(body, Vector3.new(0.35, 1.8, 0.2), CFrame.new(-0.8, -0.2, -1.62) * CFrame.Angles(0, 0, 0.4), rune)
+	glow(body, Vector3.new(0.35, 1.4, 0.2), CFrame.new(1.0, -0.6, -1.62) * CFrame.Angles(0, 0, -0.5), rune)
 end
 
 -- Cinder Golem: a hulking basalt body with a molten core and lava seams.
@@ -389,6 +409,7 @@ BUILDERS.elder_treant = function(body)
 end
 
 local SPECS: { [string]: Spec } = {
+	forest_wisp = { hip = 1.2, body = Vector3.new(1.8, 1.6, 1.6) },
 	tide_crab = { hip = 0.2, body = Vector3.new(2.2, 1.6, 2) },
 	mist_caster = { hip = 2.6, body = Vector3.new(1.4, 1.4, 1.4) },
 	tide_warden = { hip = 4.1, body = Vector3.new(6, 4, 6) },
@@ -405,6 +426,7 @@ local SPECS: { [string]: Spec } = {
 }
 
 local BODY_COLORS: { [string]: Color3 } = {
+	forest_wisp = Color3.fromRGB(124, 120, 112),
 	tide_crab = Color3.fromRGB(60, 118, 134),
 	mist_caster = Color3.fromRGB(110, 170, 210),
 	tide_warden = Color3.fromRGB(52, 98, 116),

@@ -37,6 +37,12 @@ export type Kind = {
 	boss: boolean?,
 	raider: boolean?,
 	guard: boolean?, -- raider camp guards: attack anyone inside their camp (Shared.RaiderCamps)
+	wild: boolean?, -- wild Neutral forest creatures: respawn at a new random forest spot each kill
+	burn: { dps: number, duration: number }?,
+	poison: { dps: number, duration: number }?,
+	slow: { factor: number, duration: number }?,
+	knockback: { speed: number, lift: number, duration: number }?,
+	lunge: number?,
 }
 
 Enemies.GROWTH = 0.1 -- health and damage per level above 1
@@ -127,38 +133,72 @@ local function boss(id: string, name: string, kind: string, extra: { [string]: a
 end
 
 Enemies.kinds = {
-	-- Fire: Emberfall Ridge
-	ember_imp = minion("ember_imp", "Ember Imp", "Fire", {}),
-	cinder_caster = caster("cinder_caster", "Cinder Caster", "Fire", {}),
-	cinder_golem = boss("cinder_golem", "Cinder Golem", "Fire", {}),
-	-- Water: Mistfall Basin
-	tide_crab = minion("tide_crab", "Tide Crab", "Water", { hp = 72, damage = 6, speed = 13, size = 1.8 }),
-	mist_caster = caster("mist_caster", "Mist Caller", "Water", {}),
-	tide_warden = boss("tide_warden", "Tide Warden", "Water", {}),
-	-- Leaf: Elderwood
-	thorn_sprout = minion("thorn_sprout", "Thorn Sprout", "Leaf", { hp = 52, damage = 8, speed = 16 }),
-	spore_caster = caster("spore_caster", "Spore Puff", "Leaf", {}),
-	elder_treant = boss("elder_treant", "Elder Treant", "Leaf", {}),
-	-- The tutorial trail's mini-boss.
+	-- Area 1 (Lv 1–15 Whispering Woods): Neutral Forest Wisps & Runestone Brute mini-boss
+	forest_wisp = minion("forest_wisp", "Forest Wisp", "Neutral", {
+		hp = 56,
+		damage = 7,
+		speed = 15,
+		aggro = 26,
+		leash = 55,
+		coins = { 6, 12 },
+		ink = { { type = "Universal", chance = 0.4, count = 1 } },
+		wild = true,
+	}),
+	-- Area 1 Boss (Lv 15): Runestone Brute (keeps id "ashling" for save/quest compatibility)
 	ashling = {
 		id = "ashling",
-		name = "Ashling",
-		type = "Fire",
+		name = "Runestone Brute",
+		type = "Neutral",
 		role = "miniboss",
 		attack = "melee",
 		size = 3,
-		hp = 300,
+		hp = 340,
 		damage = 9,
 		speed = 13,
 		reach = 9,
 		cooldown = 1.8,
 		windup = 0.8,
-		aggro = 40,
+		aggro = 36,
 		leash = 60,
 		xp = 70,
-		coins = { 30, 40 },
-		ink = { { type = "Neutral", chance = 1, count = 1 } },
+		coins = { 45, 70 },
+		ink = { { type = "Universal", chance = 1, count = 2 } },
+		stars = 2,
+		wild = true,
 	},
+	-- Area 3 (Lv 30–50 Highland Dungeon Ruins): Ruin Sentinels, Midnight Sun Mages & Mineral Golem
+	ember_imp = minion("ember_imp", "Ruin Sentinel", "Fire", {
+		burn = { dps = 2, duration = 2 },
+	}),
+	cinder_caster = caster("cinder_caster", "Midnight Sun Mage", "Fire", {
+		burn = { dps = 3, duration = 2 },
+	}),
+	cinder_golem = boss("cinder_golem", "Ancient Mineral Golem", "Fire", { stars = 3 }),
+	-- Water: Mistfall / Raider Wilds
+	tide_crab = minion("tide_crab", "Tide Crab", "Water", {
+		hp = 72,
+		damage = 6,
+		speed = 13,
+		size = 1.8,
+		knockback = { speed = 38, lift = 10, duration = 0.25 },
+	}),
+	mist_caster = caster("mist_caster", "Mist Mage", "Water", {
+		slow = { factor = 0.6, duration = 2 },
+	}),
+	tide_warden = boss("tide_warden", "Tide Warden", "Water", {}),
+	-- Leaf: Whispering Woods & Raider Wilds
+	thorn_sprout = minion("thorn_sprout", "Thorn Sprout", "Leaf", {
+		hp = 52,
+		damage = 8,
+		speed = 16,
+		lunge = 10,
+		poison = { dps = 2, duration = 3 },
+	}),
+	spore_caster = caster("spore_caster", "Spore Puff", "Leaf", {
+		attack = "cloud",
+		poison = { dps = 3, duration = 3 },
+	}),
+	elder_treant = boss("elder_treant", "Elder Treant", "Leaf", { stars = 2 }),
 	-- Raiders roam the wilds and steal what you carry.
 	raider = {
 		id = "raider",

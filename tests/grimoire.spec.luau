@@ -3,13 +3,18 @@ local H = require("./harness")
 local Element = require("../src/shared/Element")
 local Spells = require("../src/shared/Spells")
 local Writing = require("../src/shared/Writing")
+local Gears = require("../src/shared/Gears")
 local Level = require("../src/shared/Level")
 local Loot = require("../src/shared/Loot")
 local Enemies = require("../src/shared/Enemies")
 local Quests = require("../src/shared/Quests")
 local Schema = require("../src/server/Data/Schema")
 
-H.test("type chart: Fire > Leaf > Water > Fire, Neutral even, Light/Dark mythic", function()
+H.test("type chart: Fire > Leaf > Water > Fire, Neutral even, Light/Dark mythic, 11 Black Clover types", function()
+	H.eq(#Element.TYPES, 11, "11 Black Clover Grimoire types")
+	H.eq(Element.clovers("Fire"), 3, "Fire is 3-Leaf")
+	H.eq(Element.clovers("Light"), 4, "Light is 4-Leaf")
+	H.eq(Element.clovers("Dark"), 5, "Dark is 5-Leaf")
 	H.eq(Element.mult("Fire", "Leaf"), 1.5, "fire beats leaf")
 	H.eq(Element.mult("Leaf", "Fire"), 0.67, "leaf weak to fire")
 	H.eq(Element.mult("Water", "Fire"), 1.5, "water beats fire")
@@ -18,6 +23,13 @@ H.test("type chart: Fire > Leaf > Water > Fire, Neutral even, Light/Dark mythic"
 	H.eq(Element.mult("Light", "Dark"), 1.5, "light beats dark")
 	H.eq(Element.mult("Dark", "Fire"), 1.25, "mythic vs element")
 	H.eq(Element.mult("Fire", "Dark"), 1, "element vs mythic")
+	H.eq(Element.mult("Fire", "Leaf", true), Element.PVP_STRONG, "pvp strong curve")
+	H.eq(Element.mult("Leaf", "Fire", true), Element.PVP_WEAK, "pvp weak curve")
+	for _, kind in Element.TYPES do
+		H.ok(Element.PASSIVE[kind] ~= nil, `{kind} passive`)
+		local fixed = Spells.fixedFor(kind)
+		H.eq(#fixed, 4, `{kind} has 4 fixed Z/X/C/V skills`)
+	end
 end)
 
 H.test("every spell has a known kind, rarity and a pool entry", function()
@@ -87,10 +99,10 @@ H.test("levels: XP curve, cap, points, health, damage", function()
 	H.eq(level, 2, "level up")
 	H.eq(xp, 5, "carry over")
 	H.eq(ups, 1, "ups")
-	level, xp = Level.addXp(14, 0, 1e9)
-	H.eq(level, Level.CAP, "capped")
+	level, xp = Level.addXp(49, 0, 1e9)
+	H.eq(level, Level.CAP, "capped at 50")
 	H.eq(xp, 0, "no xp at cap")
-	H.eq(Level.pointsEarned(15), 42, "points at cap")
+	H.eq(Level.pointsEarned(50), 147, "points at cap 50")
 	H.eq(Level.maxHealth(1, 0), 100, "base hp")
 	H.eq(Level.maxHealth(3, 2), 144, "hp")
 	H.near(Level.damage(10, 1, 0, 1.5, 0), 15, 1e-9, "type mult")
@@ -115,7 +127,7 @@ H.test("loot: take rounds down, recovered adds the bonus, repair cleans junk", f
 	H.ok(Loot.isEmpty(Loot.empty()), "empty")
 end)
 
-H.test("enemies: scaling, boss health per attacker, boss credit", function()
+H.test("enemies: scaling, boss health per attacker, boss credit, distinct element abilities", function()
 	local imp = Enemies.kinds.ember_imp
 	H.eq(Enemies.maxHp(imp, 1), 60, "imp hp")
 	H.eq(Enemies.maxHp(imp, 3), 72, "imp hp lv3")
@@ -125,18 +137,34 @@ H.test("enemies: scaling, boss health per attacker, boss credit", function()
 	H.ok(Enemies.earnsDrop(300, 3000, 12, 12), "10% dealt")
 	H.ok(not Enemies.earnsDrop(299, 3000, 12, 12), "under 10%")
 	H.ok(not Enemies.earnsDrop(3000, 3000, 28, 12), "over-levelled")
+	H.ok(Enemies.kinds.forest_wisp.wild and Enemies.kinds.forest_wisp.type == "Neutral", "wild neutral wisp")
+	H.ok(Enemies.kinds.ashling.wild and Enemies.kinds.ashling.type == "Neutral", "wild neutral ashling")
+	H.ok(Enemies.kinds.ember_imp.burn ~= nil and Enemies.kinds.cinder_caster.burn ~= nil, "fire enemies burn")
+	H.ok(Enemies.kinds.tide_crab.knockback ~= nil and Enemies.kinds.mist_caster.slow ~= nil, "water enemies cc")
+	H.ok(
+		Enemies.kinds.thorn_sprout.lunge ~= nil
+			and Enemies.kinds.thorn_sprout.poison ~= nil
+			and Enemies.kinds.spore_caster.attack == "cloud",
+		"leaf enemies lunge and poison"
+	)
 	for id, kind in Enemies.kinds do
 		H.eq(kind.id, id, `{id} id`)
 	end
 end)
 
-H.test("quests: tutorial chain, kills by kind, level steps, repeatables cycle", function()
+H.test("quests: tutorial chain, Black Clover Area Quest Board, kills by kind, repeatables", function()
 	local first = Quests.step(1)
 	H.eq(first.event, "write", "starts at the desk")
-	H.eq(Quests.advance(Quests.step(2), 0, "kill", "ember_imp"), 1, "imp counts")
+	H.eq(Quests.advance(Quests.step(2), 0, "kill", "forest_wisp"), 1, "wisp counts")
 	H.eq(Quests.advance(Quests.step(2), 0, "kill", "raider", "raider"), nil, "raider doesn't")
-	H.eq(Quests.advance(Quests.step(7), 0, "kill", "tide_crab", "minion"), 1, "any zone minion counts")
-	H.eq(Quests.advance(Quests.step(9), 3, "level", 7), 7, "level step uses the level")
+	H.eq(
+		Quests.advance(Quests.BOARD_BY_ID.a2_raiders, 0, "kill", "raider_brute", "guard"),
+		1,
+		"guard counts for raider quest"
+	)
+	H.eq(#Quests.forArea("area1"), 3, "area1 has 3 quests")
+	H.eq(#Quests.forArea("area2"), 3, "area2 has 3 quests")
+	H.eq(#Quests.forArea("area3"), 3, "area3 has 3 quests")
 	H.eq(Quests.step(6).event, "element", "element pick ends the tutorial")
 	H.ok(Quests.inTutorial(6) and not Quests.inTutorial(7), "tutorial range")
 	H.eq(Quests.step(#Quests.STEPS + 1), Quests.REPEAT[1], "repeat 1")
@@ -146,6 +174,12 @@ H.test("quests: tutorial chain, kills by kind, level steps, repeatables cycle", 
 		if step.event == "kill" then
 			local roles = { minion = true, caster = true, boss = true, raider = true }
 			H.ok(Enemies.kinds[step.target] or roles[step.target], `step {i} target`)
+		end
+	end
+	for _, q in Quests.BOARD do
+		if q.event == "kill" then
+			local roles = { minion = true, caster = true, boss = true, raider = true }
+			H.ok(Enemies.kinds[q.target] or roles[q.target], `board {q.id} target`)
 		end
 	end
 end)
@@ -173,6 +207,38 @@ H.test("save: template repairs clean and broken saves", function()
 	H.eq(bad.bank.ink.Fire, nil, "negative ink")
 	local view = Schema.clientView(bad)
 	H.eq(view.receipts, nil, "private")
+end)
+
+H.test("fixed Z/X/C/V skill unlocking & upgrading with Universal Ink, plus 4 Gears & Backpack cap", function()
+	local book = Writing.newBook("Lightning")
+	H.eq(book.type, "Lightning", "new Lightning book")
+	H.eq(#book.pages, 1, "starts with Page 1 (Z) unlocked")
+	H.eq(book.pages[1].sp, "thunderbolt_javelin", "Z is Thunderbolt Javelin")
+	local cost2, action2 = Writing.slotCost(book, 2)
+	H.eq(action2, "unlock", "slot 2 ready to unlock")
+	H.eq(cost2, 2, "slot 2 costs 2 Ink")
+	local cost3, action3 = Writing.slotCost(book, 3)
+	H.eq(cost3, nil, "slot 3 blocked until slot 2 unlocked")
+	H.eq(action3, "locked_prev", "locked_prev")
+	local outcome, sp, lv = Writing.upgradeSlot(book, 2)
+	H.eq(outcome, "unlocked", "unlocked X")
+	H.eq(sp, "lightning_blitz", "X is Lightning Blitz")
+	H.eq(lv, 1, "Lv 1")
+	local upOut, _, upLv = Writing.upgradeSlot(book, 2)
+	H.eq(upOut, "upgraded", "upgraded X")
+	H.eq(upLv, 2, "Lv 2")
+
+	local bag = { coins = 100, ink = { Universal = 5 }, frag = {} }
+	H.eq(Loot.totalInk(bag), 5, "5 universal ink")
+	H.eq(Loot.weight(bag), 10 + 10, "100 coins (10) + 5 ink (10) = 20 weight")
+	H.ok(Loot.spendInk(bag, 3), "spend 3 ink")
+	H.eq(Loot.totalInk(bag), 2, "2 ink left")
+
+	local gStats = Gears.stats({ backpack = 2, robe = 1, hat = 1, boots = 1 })
+	H.eq(gStats.capacity, 50, "Scout's Pack capacity 50")
+	H.eq(gStats.hp, 25, "Apprentice Mantle +25 HP")
+	H.near(gStats.power, 0.05, 1e-9, "Initiate Hood +5% power")
+	H.near(gStats.speed, 0.06, 1e-9, "Traveler's Boots +6% speed")
 end)
 
 H.finish("grimoire")
