@@ -11,6 +11,12 @@ Level.HEALTH_PER_LEVEL = 10
 Level.HEALTH_PER_POINT = 12
 Level.POWER_PER_POINT = 0.02
 Level.DEFENSE_PER_POINT = 0.02
+Level.GROWTH = 0.1 -- a player's damage grows 10% per level; enemies grow at the same rate
+
+-- The level part of a player's damage.
+function Level.power(level: number): number
+	return 1 + Level.GROWTH * (math.max(level, 1) - 1)
+end
 
 -- XP needed to go from `level` to `level + 1`.
 function Level.xpToNext(level: number): number

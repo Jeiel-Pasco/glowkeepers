@@ -18,6 +18,7 @@ local Server = script.Parent.Parent
 local Enemies = require(Shared:WaitForChild("Enemies")) :: any
 local Loot = require(Shared:WaitForChild("Loot")) :: any
 local Quests = require(Shared:WaitForChild("Quests")) :: any
+local Zones = require(Shared:WaitForChild("Zones")) :: any
 local EnemyLooks = require(Server:WaitForChild("World"):WaitForChild("EnemyLooks"))
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
@@ -25,7 +26,6 @@ local CampService = require(script.Parent:WaitForChild("CampService"))
 local CombatService = require(script.Parent:WaitForChild("CombatService"))
 local LootService = require(script.Parent:WaitForChild("LootService"))
 local ProgressionService = require(script.Parent:WaitForChild("ProgressionService"))
-local WorldService = require(script.Parent:WaitForChild("WorldService"))
 
 local EnemyService = {}
 
@@ -38,41 +38,7 @@ local RAIDER_STASH_SECONDS = 60 -- stolen loot is gone this long after the raide
 
 type Spawn = { kind: string, pos: Vector3, level: number, wander: number? }
 
--- The spawn table: the east trail, then the ridge from mouth to caldera.
-local SPAWNS: { Spawn } = {
-	-- East trail (inside the ring): tutorial imps and the Ashling.
-	{ kind = "ember_imp", pos = Vector3.new(172, 0, 22), level = 1 },
-	{ kind = "ember_imp", pos = Vector3.new(186, 0, -20), level = 1 },
-	{ kind = "ember_imp", pos = Vector3.new(204, 0, 14), level = 2 },
-	{ kind = "ember_imp", pos = Vector3.new(214, 0, -26), level = 2 },
-	{ kind = "ashling", pos = Vector3.new(238, 0, 0), level = 3, wander = 6 },
-	-- Ridge mouth.
-	{ kind = "ember_imp", pos = Vector3.new(290, 0, 24), level = 3 },
-	{ kind = "ember_imp", pos = Vector3.new(298, 0, -22), level = 3 },
-	{ kind = "ember_imp", pos = Vector3.new(318, 0, 40), level = 4 },
-	{ kind = "ember_imp", pos = Vector3.new(332, 0, -6), level = 4 },
-	{ kind = "ember_imp", pos = Vector3.new(350, 0, 52), level = 5 },
-	{ kind = "cinder_caster", pos = Vector3.new(360, 0, 6), level = 5 },
-	-- Ash fields.
-	{ kind = "cinder_caster", pos = Vector3.new(386, 0, 50), level = 6 },
-	{ kind = "cinder_caster", pos = Vector3.new(404, 0, -30), level = 6 },
-	{ kind = "ember_imp", pos = Vector3.new(396, 0, 14), level = 6 },
-	{ kind = "ember_imp", pos = Vector3.new(420, 0, 30), level = 7 },
-	{ kind = "cinder_caster", pos = Vector3.new(440, 0, -48), level = 7 },
-	{ kind = "ember_imp", pos = Vector3.new(452, 0, 4), level = 8 },
-	{ kind = "cinder_caster", pos = Vector3.new(470, 0, 30), level = 8 },
-	-- Cinder steps.
-	{ kind = "ember_imp", pos = Vector3.new(500, 0, -36), level = 9 },
-	{ kind = "cinder_caster", pos = Vector3.new(512, 0, 20), level = 9 },
-	{ kind = "ember_imp", pos = Vector3.new(526, 0, -10), level = 10 },
-	{ kind = "cinder_caster", pos = Vector3.new(540, 0, -40), level = 10 },
-	{ kind = "ember_imp", pos = Vector3.new(546, 0, 26), level = 11 },
-	-- The caldera.
-	{ kind = "cinder_golem", pos = WorldService.CALDERA, level = 12, wander = 0 },
-	-- Raiders roam the wilds between camp and ridge.
-	{ kind = "raider", pos = Vector3.new(196, 0, 70), level = 2, wander = 40 },
-	{ kind = "raider", pos = Vector3.new(330, 0, -60), level = 5, wander = 40 },
-}
+local SPAWNS: { Spawn } = Zones.spawns()
 
 type Enemy = {
 	info: any,
@@ -127,7 +93,7 @@ local function spawnEnemy(kindId: string, level: number, pos: Vector3, spawn: Sp
 	model:SetAttribute("Name", kind.name)
 	model:SetAttribute("Level", level)
 	model:SetAttribute("Type", kind.type)
-	model:SetAttribute("Boss", kind.boss == true or kindId == "ashling")
+	model:SetAttribute("Boss", kind.boss == true or kind.role == "miniboss")
 	local enemy: Enemy = {
 		info = {
 			kind = kind,
@@ -247,7 +213,7 @@ local function bolt(enemy: Enemy, target: Player, spread: number?)
 		radius = if info.kind.boss then 2.2 else 1.3,
 		damage = Enemies.damage(info.kind, info.level) * (if info.kind.boss then 0.6 else 1),
 		type = info.type,
-		burn = if info.kind.boss then { dps = 3, duration = 2 } else nil,
+		burn = if info.kind.boss and info.type == "Fire" then { dps = 3, duration = 2 } else nil,
 	})
 end
 
@@ -266,7 +232,7 @@ local function bossAttack(enemy: Enemy, target: Player)
 			if info.dead then
 				return
 			end
-			NetServer.sendAll("Fx", "blast", ground.X, ground.Y, ground.Z, radius, "Fire")
+			NetServer.sendAll("Fx", "blast", ground.X, ground.Y, ground.Z, radius, info.type)
 			for _, player in Players:GetPlayers() do
 				local root = rootOf(player)
 				if root and (root.Position - ground).Magnitude <= radius then
@@ -288,11 +254,13 @@ local function bossAttack(enemy: Enemy, target: Player)
 					if info.dead then
 						return
 					end
-					NetServer.sendAll("Fx", "blast", spot.X, spot.Y, spot.Z, 9, "Fire")
+					NetServer.sendAll("Fx", "blast", spot.X, spot.Y, spot.Z, 9, info.type)
 					local now = rootOf(player)
 					if now and (now.Position - spot).Magnitude <= 9 then
 						CombatService.hurtPlayer(player, damage, info.type, info.model)
-						CombatService.burnPlayer(player, 4, 3)
+						if info.type == "Fire" then
+							CombatService.burnPlayer(player, 4, 3)
+						end
 					end
 				end)
 			end
@@ -301,6 +269,14 @@ local function bossAttack(enemy: Enemy, target: Player)
 end
 
 -- The AI tick -------------------------------------------------------------------------------
+
+local function speedFactor(enemy: Enemy, now: number): number
+	local slow = enemy.info.slow
+	if slow and slow.untilT > now then
+		return 1 - slow.amount
+	end
+	return 1
+end
 
 local function think(enemy: Enemy, now: number)
 	local info = enemy.info
@@ -483,7 +459,7 @@ local function onKilled(model: Model, info: any)
 		if kind.boss then
 			data.counts.bosses += 1
 		end
-		ProgressionService.note(player, "kill", kind.id)
+		ProgressionService.note(player, "kill", kind.id, kind.role)
 		if kind.raider then
 			ProgressionService.note(player, "raider")
 		end
@@ -569,7 +545,6 @@ function EnemyService.Init()
 end
 
 function EnemyService.Start()
-	task.wait(1) -- WorldService carves the ridge first
 	for _, spawn in SPAWNS do
 		spawnEnemy(spawn.kind, spawn.level, spawn.pos, spawn)
 	end
@@ -582,6 +557,11 @@ function EnemyService.Start()
 				local ok, err = pcall(think, enemy, now)
 				if not ok then
 					warn("[EnemyService]", err)
+				end
+				local factor = speedFactor(enemy, now)
+				if factor < 1 then
+					local humanoid = enemy.info.humanoid
+					humanoid.WalkSpeed = math.min(humanoid.WalkSpeed, enemy.info.kind.speed * factor)
 				end
 			end
 		end

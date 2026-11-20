@@ -3,7 +3,8 @@
 --
 -- A step is done when its counter reaches `n`. Events the server reports:
 --   write            a spell was written
---   kill <kindId>    an enemy of that kind died with this player's credit
+--   kill <kindId>    an enemy died with this player's credit (counts by kind or by role)
+-- Reward ink keyed "element" is ink of the player's element. Text may hold {zone} and {boss}.
 --   raider           a raider that robbed this player was killed
 --   bank             loot was banked at camp
 --   element          the starter element was picked
@@ -68,60 +69,63 @@ Quests.STEPS = {
 		text = "Pick your element grimoire at your desk",
 		event = "element",
 		n = 1,
-		reward = { xp = 20, coins = 0, ink = { Fire = 1 } },
+		reward = { xp = 20, coins = 0, ink = { element = 1 } },
 		hint = "desk",
 		tutorial = true,
 	},
 	{
-		text = "Enter Emberfall Ridge and defeat Ember Imps",
+		text = "Defeat 8 monsters in {zone}",
 		event = "kill",
-		target = "ember_imp",
+		target = "minion",
 		n = 8,
-		reward = { xp = 120, coins = 40, ink = { Fire = 1 } },
-		hint = "emberfall",
+		reward = { xp = 120, coins = 40, ink = { element = 1 } },
+		hint = "zone",
 	},
 	{
-		text = "Defeat Cinder Casters deeper in the ridge",
+		text = "Defeat 5 casters deeper in {zone}",
 		event = "kill",
-		target = "cinder_caster",
-		n = 6,
-		reward = { xp = 200, coins = 60, ink = { Fire = 2 } },
-		hint = "emberfall",
+		target = "caster",
+		n = 5,
+		reward = { xp = 200, coins = 60, ink = { element = 2 } },
+		hint = "zone",
 	},
-	{ text = "Reach level 10", event = "level", n = 10, reward = { xp = 0, coins = 100 }, hint = "emberfall" },
+	{ text = "Reach level 10", event = "level", n = 10, reward = { xp = 0, coins = 100 }, hint = "zone" },
 	{
-		text = "Defeat the Cinder Golem",
+		text = "Defeat the {boss}",
 		event = "kill",
-		target = "cinder_golem",
+		target = "boss",
 		n = 1,
-		reward = { xp = 400, coins = 150, ink = { Fire = 2 } },
-		hint = "golem",
+		reward = { xp = 400, coins = 150, ink = { element = 2 } },
+		hint = "boss",
 	},
 } :: { Step }
 
 -- After the chain: bounties, round and round.
 Quests.REPEAT = {
 	{
-		text = "Bounty: defeat 12 Ember Imps",
+		text = "Bounty: defeat 12 monsters",
 		event = "kill",
-		target = "ember_imp",
+		target = "minion",
 		n = 12,
-		reward = { xp = 150, coins = 50, ink = { Fire = 1 } },
+		reward = { xp = 150, coins = 50, ink = { element = 1 } },
+		hint = "zone",
 	},
 	{
-		text = "Bounty: defeat 8 Cinder Casters",
+		text = "Bounty: defeat 8 casters",
 		event = "kill",
-		target = "cinder_caster",
+		target = "caster",
 		n = 8,
-		reward = { xp = 200, coins = 70, ink = { Fire = 1 } },
+		reward = { xp = 200, coins = 70, ink = { element = 1 } },
+		hint = "zone",
 	},
 	{ text = "Bounty: defeat 3 raiders", event = "kill", target = "raider", n = 3, reward = { xp = 120, coins = 60 } },
 	{
-		text = "Bounty: defeat the Cinder Golem",
+		text = "Bounty: defeat any zone boss",
 		event = "kill",
-		target = "cinder_golem",
+		target = "boss",
 		n = 1,
-		reward = { xp = 400, coins = 150, ink = { Fire = 2 } },
+		reward = { xp = 400, coins = 150, ink = { element = 2 } },
+		hint = "boss",
 	},
 } :: { Step }
 
@@ -134,13 +138,14 @@ function Quests.step(index: number): Step
 	return Quests.REPEAT[(index - #Quests.STEPS - 1) % #Quests.REPEAT + 1]
 end
 
--- New progress for `step` after an event, or nil if the event doesn't count.
-function Quests.advance(step: Step, progress: number, event: string, arg: any): number?
+-- New progress for `step` after an event, or nil if the event doesn't count. A kill matches the
+-- step's target by kind id or by role (minion, caster, boss, raider).
+function Quests.advance(step: Step, progress: number, event: string, arg: any, role: string?): number?
 	if step.event ~= event then
 		return nil
 	end
 	if event == "kill" then
-		return if arg == step.target then progress + 1 else nil
+		return if arg == step.target or (role ~= nil and role == step.target) then progress + 1 else nil
 	elseif event == "level" then
 		return math.max(progress, arg :: number)
 	end

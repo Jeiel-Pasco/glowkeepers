@@ -270,7 +270,7 @@ Blox Fruits.
 
 ## Servers
 
-12 players per server.
+8 players per server: one camp plot each. Few enough that shared bosses and raiders still feel busy on a small, early player base.
 
 ## First playable slice
 
@@ -279,8 +279,9 @@ Build this, play it, and decide before anything else gets built.
 - **The question:** is fighting, getting stronger and coming home with loot fun to you, playing
   alone?
 - **In:**
-  - **Places:** camp with your plot (bank, desk, shelf) and Emberfall Ridge.
-  - **Grimoires:** Neutral and Fire.
+  - **Places:** camp with your plot (bank, desk, shelf), and the three inner zones: Emberfall Ridge,
+    Mistfall Basin and Elderwood, on open meadow (no mountain ring).
+  - **Grimoires:** Neutral, Fire, Water and Leaf.
   - **Enemies:** 2 enemy kinds, the Cinder Golem boss and 1 raider.
   - **Loot loop:** ink and writing, fragment drops (binding comes later), carry and bank, death
     drop, Recall.

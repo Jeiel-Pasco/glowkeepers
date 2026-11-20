@@ -57,7 +57,8 @@ H.test("rarity draw walks the table; pick falls back to a rarity the pool has", 
 	H.eq(Writing.rarity(Writing.ODDS.element, 0.95), "Epic", "high roll")
 	H.eq(Writing.rarity(Writing.ODDS.element, 0.999), "Legendary", "top roll")
 	H.eq(Writing.pick("Fire", "Mythic", 0), "meteor_fall", "no Fire mythic: falls to legendary")
-	H.eq(Writing.pick("Water", "Common", 0), nil, "no Water spells in the slice")
+	H.eq(Writing.pick("Water", "Common", 0), "tide_bolt", "water pool")
+	H.eq(Writing.pick("Stone", "Common", 0), nil, "unknown type")
 end)
 
 H.test("apply: add, level, max, then choose when full; resolve replaces or tears", function()
@@ -116,7 +117,7 @@ end)
 
 H.test("enemies: scaling, boss health per attacker, boss credit", function()
 	local imp = Enemies.kinds.ember_imp
-	H.eq(Enemies.maxHp(imp, 1), 40, "imp hp")
+	H.eq(Enemies.maxHp(imp, 1), 60, "imp hp")
 	H.eq(Enemies.maxHp(imp, 3), 72, "imp hp lv3")
 	local golem = Enemies.kinds.cinder_golem
 	H.eq(Enemies.bossHp(golem, 12, 1), Enemies.maxHp(golem, 12), "solo")
@@ -133,7 +134,8 @@ H.test("quests: tutorial chain, kills by kind, level steps, repeatables cycle", 
 	local first = Quests.step(1)
 	H.eq(first.event, "write", "starts at the desk")
 	H.eq(Quests.advance(Quests.step(2), 0, "kill", "ember_imp"), 1, "imp counts")
-	H.eq(Quests.advance(Quests.step(2), 0, "kill", "raider"), nil, "raider doesn't")
+	H.eq(Quests.advance(Quests.step(2), 0, "kill", "raider", "raider"), nil, "raider doesn't")
+	H.eq(Quests.advance(Quests.step(7), 0, "kill", "tide_crab", "minion"), 1, "any zone minion counts")
 	H.eq(Quests.advance(Quests.step(9), 3, "level", 7), 7, "level step uses the level")
 	H.eq(Quests.step(6).event, "element", "element pick ends the tutorial")
 	H.ok(Quests.inTutorial(6) and not Quests.inTutorial(7), "tutorial range")
@@ -142,7 +144,8 @@ H.test("quests: tutorial chain, kills by kind, level steps, repeatables cycle", 
 	for i = 1, #Quests.STEPS do
 		local step = Quests.step(i)
 		if step.event == "kill" then
-			H.ok(Enemies.kinds[step.target], `step {i} target`)
+			local roles = { minion = true, caster = true, boss = true, raider = true }
+			H.ok(Enemies.kinds[step.target] or roles[step.target], `step {i} target`)
 		end
 	end
 end)

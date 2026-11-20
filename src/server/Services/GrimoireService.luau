@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Server = script.Parent.Parent
 local Writing = require(Shared:WaitForChild("Writing")) :: any
+local Spells = require(Shared:WaitForChild("Spells")) :: any
 local Quests = require(Shared:WaitForChild("Quests")) :: any
 local NetServer = require(Server:WaitForChild("Net"):WaitForChild("NetServer"))
 local DataService = require(script.Parent:WaitForChild("DataService"))
@@ -19,7 +20,7 @@ local ProgressionService = require(script.Parent:WaitForChild("ProgressionServic
 local GrimoireService = {}
 
 GrimoireService.TEAR_COINS = 15
-GrimoireService.SLICE_ELEMENTS = { Fire = "ember_shot" } -- element → its first written spell
+GrimoireService.STARTERS = { Fire = "ember_shot", Water = "tide_bolt", Leaf = "thorn_dart" } -- first written spell
 
 local pending: { [Player]: { book: number, spell: string } } = {}
 local rng = Random.new()
@@ -134,9 +135,8 @@ local function pickElement(player: Player, element: string)
 		toast(player, "Finish your first quest to pick an element")
 		return
 	end
-	local first = GrimoireService.SLICE_ELEMENTS[element]
+	local first = GrimoireService.STARTERS[element]
 	if first == nil then
-		toast(player, `{element} grimoires arrive in a later update. Fire is ready now!`)
 		return
 	end
 	data.element = element
@@ -150,7 +150,7 @@ local function pickElement(player: Player, element: string)
 		end
 	end
 	DataService.changed(player, "element", "books", "equipped", "active")
-	toast(player, `You got a {element} grimoire with Ember Shot written in it!`, "quest")
+	toast(player, `You got a {element} grimoire with {Spells.byId[first].name} written in it!`, "quest")
 	ProgressionService.note(player, "element")
 end
 
