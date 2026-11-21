@@ -198,11 +198,18 @@ local function buildSanctuary()
 	-- enables instant 1v1 / free-for-all dueling right in view of the Camp Hub!
 	local arenaCenter = Vector3.new(Zones.ARENA_X, Zones.FLOOR_Y, Zones.ARENA_Z)
 	local arenaR = Zones.ARENA_R
+	local terrainParams = RaycastParams.new()
+	terrainParams.FilterType = Enum.RaycastFilterType.Include
+	terrainParams.FilterDescendantsInstances = { workspace.Terrain }
+	local function onGround(p: Vector3): Vector3
+		local hit = workspace:Raycast(p + Vector3.new(0, 40, 0), Vector3.new(0, -100, 0), terrainParams)
+		return if hit then Vector3.new(p.X, hit.Position.Y + 0.4, p.Z) else p
+	end
 	for k = 0, 23 do
 		local a = k / 24 * math.pi * 2
 		local nextA = (k + 1) / 24 * math.pi * 2
-		local p1 = arenaCenter + Vector3.new(math.cos(a) * arenaR, 0.4, math.sin(a) * arenaR)
-		local p2 = arenaCenter + Vector3.new(math.cos(nextA) * arenaR, 0.4, math.sin(nextA) * arenaR)
+		local p1 = onGround(arenaCenter + Vector3.new(math.cos(a) * arenaR, 0, math.sin(a) * arenaR))
+		local p2 = onGround(arenaCenter + Vector3.new(math.cos(nextA) * arenaR, 0, math.sin(nextA) * arenaR))
 		local seg = (p2 - p1).Magnitude + 0.4
 		part(
 			folder,
@@ -238,8 +245,16 @@ local function buildSanctuary()
 	local npcFolder = Instance.new("Folder")
 	npcFolder.Name = "QuestGivers"
 	npcFolder.Parent = folder
+	-- Stand NPCs on the built terrain: its bumps sit above the Zones.groundY formula.
+	local groundParams = RaycastParams.new()
+	groundParams.FilterType = Enum.RaycastFilterType.Include
+	groundParams.FilterDescendantsInstances = { workspace.Terrain }
 	for _, qg in Zones.QUEST_GIVERS do
 		local pos = Zones.polar(qg.angle, qg.r)
+		local ground = workspace:Raycast(pos + Vector3.new(0, 60, 0), Vector3.new(0, -150, 0), groundParams)
+		if ground then
+			pos = Vector3.new(pos.X, ground.Position.Y, pos.Z)
+		end
 		local look = CFrame.lookAt(pos, Vector3.new(0, pos.Y, 0))
 		local npc = Instance.new("Model")
 		npc.Name = qg.npcName

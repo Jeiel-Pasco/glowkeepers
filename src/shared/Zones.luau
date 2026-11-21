@@ -126,18 +126,19 @@ Zones.QUEST_GIVERS = {
 }
 
 -- Relative pack layout front-to-back up each valley (`t` in 0..1 scales from zone.minLevel..maxLevel).
+-- The front pack sits near the area's entry level, so a player who just reached it has on-level foes.
 Zones.PACKS = {
-	{ role = "minion", d = 345, s = 0, t = 0.25 },
-	{ role = "minion", d = 360, s = -55, t = 0.30 },
-	{ role = "minion", d = 360, s = 55, t = 0.35 },
-	{ role = "minion", d = 395, s = -95, t = 0.42 },
-	{ role = "caster", d = 395, s = 95, t = 0.45 },
-	{ role = "minion", d = 425, s = -35, t = 0.55 },
-	{ role = "caster", d = 425, s = 35, t = 0.60 },
-	{ role = "minion", d = 465, s = -85, t = 0.70 },
-	{ role = "minion", d = 465, s = 85, t = 0.75 },
-	{ role = "caster", d = 505, s = -50, t = 0.82 },
-	{ role = "caster", d = 505, s = 50, t = 0.86 },
+	{ role = "minion", d = 345, s = 0, t = 0.05 },
+	{ role = "minion", d = 360, s = -55, t = 0.12 },
+	{ role = "minion", d = 360, s = 55, t = 0.18 },
+	{ role = "minion", d = 395, s = -95, t = 0.27 },
+	{ role = "caster", d = 395, s = 95, t = 0.31 },
+	{ role = "minion", d = 425, s = -35, t = 0.44 },
+	{ role = "caster", d = 425, s = 35, t = 0.51 },
+	{ role = "minion", d = 465, s = -85, t = 0.64 },
+	{ role = "minion", d = 465, s = 85, t = 0.70 },
+	{ role = "caster", d = 505, s = -50, t = 0.80 },
+	{ role = "caster", d = 505, s = 50, t = 0.85 },
 	{ role = "minion", d = 515, s = 0, t = 0.90 },
 	{ role = "boss", d = Zones.BOSS_D, s = 0, t = 1.0 },
 } :: { { role: string, d: number, s: number, t: number } }

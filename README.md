@@ -1,6 +1,6 @@
 # Glowkeepers
 
-A Roblox real-time Grimoire Action RPG: venture out from the Wizard Camp Courtyard into the wild forest and elemental valleys, fight creatures and bosses, counter elements with 4-page spellbooks, and carry your loot home to bank it before raiders take it.
+A Roblox real-time Grimoire Action RPG: venture out from the Wizard Camp Courtyard into the wild forest and three level-tiered areas (Lv 1–50), fight creatures and bosses, counter elements with your Grimoire's Z/X/C/V skills, duel in the arena or in War Mode, and carry your loot home to bank it before raiders take it.
 
 | Doc | What it covers |
 | --- | --- |
@@ -34,7 +34,7 @@ rojo serve
 
 In Studio, open the Rojo plugin and connect. Code and `config/*.json` sync live.
 
-- **Build or rebuild the world map (`r = 0..650`):** copy `tools/BuildZones.luau` to `src/server/_tmp/BuildZones.luau`, then in Studio Edit mode's command bar run:
+- **Build or rebuild the world map (`r = 0..700`):** copy `tools/BuildZones.luau` to `src/server/_tmp/BuildZones.luau`, then in Studio Edit mode's command bar run:
   ```luau
   task.spawn(loadstring(game.ServerScriptService.Server._tmp.BuildZones.Source))
   ```

@@ -162,7 +162,7 @@ local function rampAt(x, z)
 end
 
 -- Ground height and material at (x, z) across the whole world (r = 0..EXTENT).
-local function ground(x, z)
+local function lowlandGround(x, z)
 	local r = math.sqrt(x * x + z * z)
 	if r < Zones.CAMP_R + 4 then
 		-- Inside the Wizard Camp Courtyard: flat floor with stone/ground paths to stations & gates.
@@ -220,6 +220,23 @@ local function ground(x, z)
 		end
 	end
 	return h, material
+end
+
+local ARENA_CLEAR = Zones.ARENA_R + 4 -- flat dirt floor out to here, then blend into the hills
+
+local function arenaDistance(x, z): number
+	return Vector2.new(x - Zones.ARENA_X, z - Zones.ARENA_Z).Magnitude
+end
+
+-- The Duel Arena Ring south of camp sits on a flat dirt floor at FLOOR, blended into the lowland.
+local function ground(x, z)
+	local h, material = lowlandGround(x, z)
+	local d = arenaDistance(x, z)
+	if d < ARENA_CLEAR then
+		return FLOOR, M.Ground
+	end
+	local w = smooth((d - ARENA_CLEAR) / 12)
+	return FLOOR + (h - FLOOR) * w, material
 end
 
 -- 1. Clear all old world folders ----------------------------------------------------------------
@@ -436,6 +453,9 @@ task.wait()
 local function clear(pos)
 	local r = pos.Magnitude
 	if r < Zones.GATE_D + 10 or r > Zones.WORLD_R - 14 then
+		return false
+	end
+	if arenaDistance(pos.X, pos.Z) < ARENA_CLEAR + 6 then
 		return false
 	end
 	local shift = cliffShift(math.atan2(pos.Z, pos.X))
